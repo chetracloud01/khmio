@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BuyerBottomBar, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { BuyerBottomBar, BuyerColumns, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { formatMoney } from "@/components/order-ui";
 import { cartLines, cartTotal, sellableVariantIds, useShopCart } from "@/lib/cart";
 import { isTakingOrders } from "@/lib/shop-ordering";
@@ -51,9 +51,59 @@ export default function CartPage() {
     return line.product.hasOptions ? `${title} – ${text(line.variant.labelKm, line.variant.labelEn)}` : title;
   };
   const ordering = isTakingOrders(shop);
+  const checkoutHref = `/${locale}/s/${slug}/checkout`;
+
+  const summary = total && (
+            <dl className="flex flex-col gap-1 rounded-2xl border border-border bg-bg p-4 text-sm">
+              <div className="flex items-center justify-between text-muted">
+                <dt>{tStore("subtotal")}</dt>
+                <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
+              </div>
+              {total.discount > 0 && (
+                <div className="flex items-center justify-between text-success">
+                  <dt>{tStore("itemDiscount")}</dt>
+                  <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
+                </div>
+              )}
+              {total.vat > 0 && (
+                <div className="flex items-center justify-between text-muted">
+                  <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
+                  <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-muted">
+                <dt>{tCheckout("deliveryFee")}</dt>
+                <dd>{tCheckout("feeAfterChoice")}</dd>
+              </div>
+              <div className="flex items-center justify-between border-t border-border pt-2">
+                <dt className="font-semibold">{tStore("totalToPay")}</dt>
+                <dd className="text-right">
+                  <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
+                  <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, shop.store.usdToKhrRate), currency === "USD" ? "KHR" : "USD")}</span>
+                </dd>
+              </div>
+            </dl>
+  );
+  const checkoutButton = (
+    <Link href={checkoutHref} className="block">
+      <Button variant="primary" className="w-full">
+        {t("reviewPayment")}
+      </Button>
+    </Link>
+  );
 
   return (
-    <BuyerShell className="pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        aside={
+          total ? (
+            <>
+              {summary}
+              {ordering && checkoutButton}
+            </>
+          ) : undefined
+        }
+      >
       <BuyerTopBar backHref={shopHref} backLabel={t("stepMenu")} title={t("title")} subtitle={shop.store.name}>
         <BuyerSteps steps={[t("stepCart"), t("stepCheckout"), t("stepPay")]} current={0} />
       </BuyerTopBar>
@@ -148,48 +198,13 @@ export default function CartPage() {
               </div>
             </div>
 
-            <dl className="flex flex-col gap-1 rounded-2xl border border-border p-4 text-sm">
-              <div className="flex items-center justify-between text-muted">
-                <dt>{tStore("subtotal")}</dt>
-                <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
-              </div>
-              {total.discount > 0 && (
-                <div className="flex items-center justify-between text-success">
-                  <dt>{tStore("itemDiscount")}</dt>
-                  <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
-                </div>
-              )}
-              {total.vat > 0 && (
-                <div className="flex items-center justify-between text-muted">
-                  <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
-                  <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-muted">
-                <dt>{tCheckout("deliveryFee")}</dt>
-                <dd>{tCheckout("feeAfterChoice")}</dd>
-              </div>
-              <div className="flex items-center justify-between border-t border-border pt-2">
-                <dt className="font-semibold">{tStore("totalToPay")}</dt>
-                <dd className="text-right">
-                  <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
-                  <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, shop.store.usdToKhrRate), currency === "USD" ? "KHR" : "USD")}</span>
-                </dd>
-              </div>
-            </dl>
+            <div className="lg:hidden">{summary}</div>
           </>
         )}
       </main>
+      </BuyerColumns>
 
-      {total && ordering && (
-        <BuyerBottomBar>
-          <Link href={`/${locale}/s/${slug}/checkout`} className="block">
-            <Button variant="primary" className="w-full">
-              {t("reviewPayment")}
-            </Button>
-          </Link>
-        </BuyerBottomBar>
-      )}
+      {total && ordering && <BuyerBottomBar wide>{checkoutButton}</BuyerBottomBar>}
     </BuyerShell>
   );
 }

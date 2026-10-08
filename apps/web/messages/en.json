@@ -135,7 +135,10 @@
     "infoPaymentTitle": "How to pay",
     "infoPayKhqr": "KHQR — any bank app",
     "infoPayCod": "Cash on delivery or at pickup (Phnom Penh)",
-    "callShop": "Call the shop · {phone}"
+    "callShop": "Call the shop · {phone}",
+    "openNow": "Open now",
+    "goodsTotal": "Items total",
+    "panelEmpty": "Nothing here yet. Tap + on a product to add it."
   },
   "Cart": {
     "title": "Cart",
@@ -149,7 +152,9 @@
     "hideSummary": "Hide summary",
     "reviewPayment": "Review payment and address",
     "stockAdjusted": "Your cart was updated: some items sold out, have fewer left, or are no longer sold.",
-    "stepPay": "Pay"
+    "stepPay": "Pay",
+    "yourCart": "Your cart",
+    "checkout": "Checkout"
   },
   "Checkout": {
     "title": "Checkout",
@@ -191,7 +196,9 @@
     "payAtPickup": "Pay when you pick up",
     "feeAfterChoice": "Choose where first",
     "botCheckWait": "One moment — checking the connection. Tap the button again in a few seconds.",
-    "botCheckFailed": "We couldn't confirm this order came from a person. Please tap the button again."
+    "botCheckFailed": "We couldn't confirm this order came from a person. Please tap the button again.",
+    "trustCod": "Cash on delivery: you pay when it arrives.",
+    "trustDetails": "Your details go only to this shop, to deliver your order."
   },
   "Khqr": {
     "title": "Pay with KHQR",
@@ -1485,7 +1492,9 @@
     "buyerTitle_not_collected": "Your order wasn't collected",
     "buyerBody_not_collected": "Call the shop to arrange a new time.",
     "hint_settle_cash_pickup": "Tap when the buyer has paid you.",
-    "buyerBody_out_for_delivery_bus": "It was sent by bus. Collect it with the ticket number below."
+    "buyerBody_out_for_delivery_bus": "It was sent by bus. Collect it with the ticket number below.",
+    "buyerShopTitle": "The shop",
+    "buyerOrderedFrom": "Ordered from"
   },
   "Readiness": {
     "title": "Before you share your shop",

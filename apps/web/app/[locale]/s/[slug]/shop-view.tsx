@@ -1,13 +1,17 @@
 "use client";
 
 import type { Currency } from "@khmio/shared";
-import { Button, Card, cn, DiscountBadge, PriceTag, SearchInput, SegmentedControl } from "@khmio/ui";
+import { Button, Card, cn, DiscountBadge, PriceTag, SearchInput, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
+import { CartPanel } from "@/components/buyer/cart-panel";
+import { ShopHero } from "@/components/buyer/shop-hero";
 import { formatMoney } from "@/components/order-ui";
+import { useThemeLabels } from "@/components/use-theme-labels";
 import { shareOrCopyLink } from "@/components/share-link";
 import type { Product, ProductVariant, PublicShop } from "@/lib/api";
 import { cartLines, cartTotal, useShopCart } from "@/lib/cart";
@@ -48,6 +52,8 @@ function ShopClosed({ shop }: { shop: PublicShop }) {
 function OpenShop({ shop }: { shop: PublicShop }) {
   const t = useTranslations("Storefront");
   const tCheckout = useTranslations("Checkout");
+  const tCart = useTranslations("Cart");
+  const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
@@ -84,30 +90,58 @@ function OpenShop({ shop }: { shop: PublicShop }) {
     store.name.charAt(0).toUpperCase()
   );
 
+  const cartHref = `/${locale}/s/${store.slug}/cart`;
+  // Each line's amount from the same shared calculation as the cart and checkout.
+  const lineAmounts = new Map(goods?.lines.map((line) => [line.key, line.lineTotal]) ?? []);
+  const panelLines = lines.map((line) => ({
+    key: line.variant.id,
+    name: line.product.variants.length > 1 ? `${text(line.product.titleKm, line.product.titleEn)} · ${text(line.variant.labelKm, line.variant.labelEn)}` : text(line.product.titleKm, line.product.titleEn),
+    qty: line.quantity,
+    amount: formatMoney(lineAmounts.get(line.variant.id) ?? 0, currency),
+  }));
+
   return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1100px] flex-col bg-bg pb-32 md:border-x md:border-border">
-        <header className="flex flex-col gap-3 border-b border-border p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand text-xl font-bold text-on-brand">{logo}</span>
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold leading-normal">{store.name}</h1>
-                {store.description && <p className="text-sm text-muted">{store.description}</p>}
-              </div>
-            </div>
-            <SegmentedControl
-              value={locale}
-              onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
-              options={[
-                { value: "km", label: "ខ្មែរ" },
-                { value: "en", label: "EN" },
-              ]}
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        aside={
+          ordering ? (
+            <CartPanel
+              title={tCart("yourCart")}
+              lines={panelLines}
+              totalLabel={t("goodsTotal")}
+              total={formatMoney(goods?.goods ?? 0, currency)}
+              checkoutHref={cartHref}
+              checkoutLabel={tCart("checkout")}
+              emptyText={t("panelEmpty")}
             />
-          </div>
-          <ShopInfo shop={shop} currency={currency} />
-          {!ordering && <p className="rounded-DEFAULT bg-info/5 p-3 text-sm text-muted">{tCheckout("noPaymentMethods")}</p>}
-        </header>
+          ) : undefined
+        }
+      >
+        <ShopHero
+          name={store.name}
+          logo={logo}
+          openLabel={t("openNow")}
+          controls={
+            <>
+              <SegmentedControl
+                value={locale}
+                onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
+                options={[
+                  { value: "km", label: "ខ្មែរ" },
+                  { value: "en", label: "EN" },
+                ]}
+              />
+              <ThemeSwitcher labels={themeLabels} />
+            </>
+          }
+          facts={store.description ? <span>{store.description}</span> : undefined}
+          info={
+            <div className="flex flex-col gap-2">
+              <ShopInfo shop={shop} currency={currency} />
+              {!ordering && <p className="rounded-DEFAULT bg-info/5 p-3 text-sm text-muted">{tCheckout("noPaymentMethods")}</p>}
+            </div>
+          }
+        />
 
         <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-border bg-bg py-2">
           <div className="px-4">
@@ -141,7 +175,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
         </div>
 
         {shown.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
             {shown.map((product) => (
               <ProductCard
                 key={product.id}
@@ -178,7 +212,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
             )}
           </div>
         )}
-      </div>
+      </BuyerColumns>
 
       {open && (
         <ProductSheet
@@ -194,10 +228,10 @@ function OpenShop({ shop }: { shop: PublicShop }) {
       )}
 
       {ordering && goods && goods.itemCount > 0 && !open && (
-        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3">
+        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3 lg:hidden">
           <Link
             key={goods.itemCount}
-            href={`/${locale}/s/${store.slug}/cart`}
+            href={cartHref}
             className="pointer-events-auto mx-auto flex min-h-[56px] w-full max-w-[520px] animate-bump items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-2 text-on-brand shadow-raised motion-reduce:animate-none"
           >
             <span className="flex items-center gap-3">
@@ -217,7 +251,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
           </Link>
         </div>
       )}
-    </div>
+    </BuyerShell>
   );
 }
 

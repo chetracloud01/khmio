@@ -6,6 +6,9 @@ import { ChevronRight, Clock, Info, SearchX, ShoppingBag, Store, X } from "lucid
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
+import { CartPanel } from "@/components/buyer/cart-panel";
+import { ShopHero } from "@/components/buyer/shop-hero";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { getStoreMaxDiscountPercent, mockStore, parseLineKey, type MockProduct } from "@/mock/mock-data";
 import { useAdmin } from "../admin-context";
@@ -163,6 +166,7 @@ function Storefront() {
 
   // The cart bar shows the goods total in the buyer's currency — the same
   // round-each-line-then-sum numbers checkout uses.
+  const tCart = useTranslations("Cart");
   const { itemCount, lines } = useCheckoutTotal(quantities, locale, null, currency);
   const goodsTotal = lines.reduce((sum, line) => sum + line.discounted * line.qty, 0);
   const format = (amount: number, cur: Currency) => (cur === "USD" ? formatUsd(amount) : formatKhr(amount));
@@ -199,49 +203,55 @@ function Storefront() {
     increaseLabelFor: (title: string) => t("increase", { title }),
   };
 
-  return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      {/* Phones: full width. Tablet and up: a centred shop column on the page background. */}
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1100px] flex-col bg-bg pb-32 md:border-x md:border-border">
-        <section className="relative">
-          <div className={cn("h-32 w-full sm:h-44", mockStore.bannerColor)} />
-          {/* A dark shade at the bottom keeps the offer text readable on any banner colour. */}
-          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-nav-bg/50 via-transparent to-transparent" />
-          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-bg/85 p-0.5 shadow-card backdrop-blur">
-            <SegmentedControl
-              value={locale}
-              onChange={(next) => router.push(`/${next}/mockup/storefront`)}
-              options={[
-                { value: "km", label: "ខ្មែរ" },
-                { value: "en", label: "EN" },
-              ]}
-            />
-            <ThemeSwitcher labels={themeLabels} />
-          </div>
-          {maxDiscount > 0 && (
-            <span className="absolute bottom-3 right-4 text-xl font-extrabold text-nav-fg drop-shadow sm:text-2xl">
-              {t("upTo", { percent: maxDiscount })}
-            </span>
-          )}
-          <div className="absolute -bottom-7 left-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-bg bg-brand text-2xl font-bold text-on-brand shadow-raised">
-            {logo}
-          </div>
-        </section>
+  const cartHref = `/${locale}/mockup/cart`;
 
-        <div ref={identityRef} className="flex flex-col gap-1 px-4 pb-3 pt-9">
-          <h1 className="text-lg font-bold leading-normal">{storeName}</h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-            {/* Only after the super admin approved the owner's ID — the badge is a promise to buyers. */}
-            {demoKycStatus === "approved" && <Badge>{t("verified")}</Badge>}
-            <span>{t("rating", { value: mockStore.ratingValue, count: ratingCountLabel })}</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("deliveryTime", { min: mockStore.deliveryEtaMinMinutes, max: mockStore.deliveryEtaMaxMinutes })}
-            </span>
-          </div>
-          <div className="mt-2">
-            <ShopInfo />
-          </div>
+  return (
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        aside={
+          <CartPanel
+            title={tCart("yourCart")}
+            lines={lines.map((line) => ({ key: line.key, name: line.title, qty: line.qty, amount: format(line.discounted * line.qty, currency) }))}
+            totalLabel={t("goodsTotal")}
+            total={format(goodsTotal, currency)}
+            checkoutHref={cartHref}
+            checkoutLabel={tCart("checkout")}
+            emptyText={t("panelEmpty")}
+          />
+        }
+      >
+        <div ref={identityRef}>
+          <ShopHero
+            name={storeName}
+            logo={logo}
+            openLabel={t("openNow")}
+            highlight={maxDiscount > 0 ? t("upTo", { percent: maxDiscount }) : undefined}
+            controls={
+              <>
+                <SegmentedControl
+                  value={locale}
+                  onChange={(next) => router.push(`/${next}/mockup/storefront`)}
+                  options={[
+                    { value: "km", label: "ខ្មែរ" },
+                    { value: "en", label: "EN" },
+                  ]}
+                />
+                <ThemeSwitcher labels={themeLabels} />
+              </>
+            }
+            facts={
+              <>
+                {/* Only after the super admin approved the owner's ID — the badge is a promise to buyers. */}
+                {demoKycStatus === "approved" && <Badge>{t("verified")}</Badge>}
+                <span>{t("rating", { value: mockStore.ratingValue, count: ratingCountLabel })}</span>
+                <span className="inline-flex items-center gap-1">
+                  <Clock className="h-4 w-4" aria-hidden="true" />
+                  {t("deliveryTime", { min: mockStore.deliveryEtaMinMinutes, max: mockStore.deliveryEtaMaxMinutes })}
+                </span>
+              </>
+            }
+            info={<ShopInfo />}
+          />
         </div>
 
         {/* Only search and categories stay pinned — the rest of the screen is for products. */}
@@ -312,7 +322,7 @@ function Storefront() {
         <section className="flex flex-1 flex-col gap-3 pt-4">
           {showSpecialOffers && <h2 className="px-4 text-base font-semibold">{t("allProducts")}</h2>}
           {visibleProducts.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-3">
               {visibleProducts.map((product) => (
                 <ProductCard key={product.id} product={product} {...cardProps} />
               ))}
@@ -331,16 +341,16 @@ function Storefront() {
             </div>
           )}
         </section>
-      </div>
+      </BuyerColumns>
 
       {detailProduct && <ProductDetail key={detailProduct.id} product={detailProduct} onClose={closeProduct} />}
 
       {itemCount > 0 && (
-        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3">
+        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3 lg:hidden">
           <Link
             // Re-mounting on each change replays the small "bump", so adding an item is felt.
             key={itemCount}
-            href={`/${locale}/mockup/cart`}
+            href={cartHref}
             className="pointer-events-auto mx-auto flex min-h-[56px] w-full max-w-[520px] animate-bump items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-2 text-on-brand shadow-raised motion-reduce:animate-none"
           >
             <span className="flex items-center gap-3">
@@ -362,6 +372,6 @@ function Storefront() {
           </Link>
         </div>
       )}
-    </div>
+    </BuyerShell>
   );
 }

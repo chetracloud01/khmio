@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BuyerShell } from "@/components/buyer-shell";
+import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
 import { api, ApiError, type PublicOrder, type TelegramLink } from "@/lib/api";
 
@@ -75,55 +75,8 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   const shopHref = `/${locale}/s/${order.store.slug}`;
 
-  return (
-    <BuyerShell className="pb-10">
-      <header className="flex items-center gap-3 border-b border-border p-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand text-lg font-bold text-on-brand">
-          {order.store.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the shop's own uploaded logo
-            <img src={order.store.logoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            order.store.name.charAt(0).toUpperCase()
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{order.store.name}</p>
-          <p className="text-sm text-muted">
-            {t("orderNumber")} #{order.orderNumber}
-          </p>
-        </div>
-        <OrderStatusPill order={order} />
-      </header>
-
-      <main className="flex flex-col gap-5 p-4">
-        <section className="flex flex-col gap-1" role="status">
-          <h1 className="text-xl font-bold leading-normal">{t(`buyerTitle_${shownStatus}`)}</h1>
-          <p className="text-sm text-muted">{t(`buyerBody_${shownStatus}`)}</p>
-          {order.status === "cancelled" && order.cancelReason && (
-            <p className="text-sm">
-              {t("cancelReasonLabel")}: {t(`cancelReason_${order.cancelReason}`)}
-            </p>
-          )}
-        </section>
-
-        {progress !== null && (
-          <ol aria-label={t("progressLabel")} className="flex flex-col gap-2">
-            {BUYER_ORDER_STEPS.map((step, index) => {
-              const done = index <= progress;
-              const label = pickup && step === "sending" ? t("step_ready") : t(`step_${step}`);
-              return (
-                <li key={step} className="flex items-center gap-3" aria-current={index === progress ? "step" : undefined}>
-                  <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold", done ? "bg-brand text-on-brand" : "bg-border/40 text-muted")}>
-                    {done ? <Check className="h-4 w-4" aria-hidden="true" /> : index + 1}
-                  </span>
-                  <span className={cn("text-sm", index === progress ? "font-semibold" : done ? "" : "text-muted")}>{label}</span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-
-        <section className="flex flex-col gap-2 rounded-2xl border border-border p-4 text-sm">
+  const deliveryCard = (
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4 text-sm">
           <p className="flex items-start gap-2">
             {pickup ? <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" /> : <Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />}
             <span>
@@ -164,8 +117,99 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
             </p>
           )}
         </section>
+  );
+  const shopCard = (
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-bg p-4">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("buyerOrderedFrom")}</h2>
+          <p className="font-semibold">{order.store.name}</p>
+        </div>
+          {order.store.phone && (
+            <a href={`tel:+${order.store.phone}`} className="flex min-h-touch items-center justify-center gap-2 rounded-DEFAULT border border-border text-sm font-medium">
+              <Phone className="h-4 w-4" aria-hidden="true" />
+              {t("callShop", { phone: formatKhmerPhoneLocal(order.store.phone) })}
+            </a>
+          )}
+          <Link href={shopHref} className="block">
+            <Button variant="secondary" className="w-full">
+              {t("backToShop")}
+            </Button>
+          </Link>
+          {!finished && <TelegramUpdates token={token} following={order.followingOnTelegram} />}
+          {cancelProblem && (
+            <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+              {cancelProblem}
+            </p>
+          )}
+          {order.canCancel && (
+            <Button variant="secondary" className="w-full text-danger" loading={cancelling} onClick={() => setConfirmCancel(true)}>
+              {t("cancelOrder")}
+            </Button>
+          )}
+      </section>
+  );
 
-        <section className="flex flex-col gap-2">
+  return (
+    <BuyerShell wide className="pb-10 lg:pb-0">
+      <BuyerColumns
+        plain
+        aside={
+          <>
+            {shopCard}
+            {deliveryCard}
+          </>
+        }
+      >
+      <main className="flex flex-col gap-4 p-4 lg:p-0">
+      {/* The order at a glance: whose, which number, where it stands. */}
+      <section className="flex flex-col gap-4 rounded-2xl border border-border bg-bg p-4">
+      <header className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand text-lg font-bold text-on-brand">
+          {order.store.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- the shop's own uploaded logo
+            <img src={order.store.logoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            order.store.name.charAt(0).toUpperCase()
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">{order.store.name}</p>
+          <p className="text-sm text-muted">
+            {t("orderNumber")} #{order.orderNumber}
+          </p>
+        </div>
+        <OrderStatusPill order={order} />
+      </header>
+        <div className="flex flex-col gap-1 border-t border-border pt-4" role="status">
+          <h1 className="text-xl font-bold leading-normal">{t(`buyerTitle_${shownStatus}`)}</h1>
+          <p className="text-sm text-muted">{t(`buyerBody_${shownStatus}`)}</p>
+          {order.status === "cancelled" && order.cancelReason && (
+            <p className="text-sm">
+              {t("cancelReasonLabel")}: {t(`cancelReason_${order.cancelReason}`)}
+            </p>
+          )}
+        </div>
+      </section>
+
+        {progress !== null && (
+          <ol aria-label={t("progressLabel")} className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
+            {BUYER_ORDER_STEPS.map((step, index) => {
+              const done = index <= progress;
+              const label = pickup && step === "sending" ? t("step_ready") : t(`step_${step}`);
+              return (
+                <li key={step} className="flex items-center gap-3" aria-current={index === progress ? "step" : undefined}>
+                  <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold", done ? "bg-brand text-on-brand" : "bg-border/40 text-muted")}>
+                    {done ? <Check className="h-4 w-4" aria-hidden="true" /> : index + 1}
+                  </span>
+                  <span className={cn("text-sm", index === progress ? "font-semibold" : done ? "" : "text-muted")}>{label}</span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+
+
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
           <h2 className="font-semibold">{t("items")}</h2>
           <ul className="flex flex-col">
             {order.items.map((item, index) => {
@@ -220,31 +264,13 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
 
         {order.events.length > 0 && <p className="text-xs text-muted">{clockTime(order.events[order.events.length - 1]!.at)}</p>}
 
-        <div className="flex flex-col gap-2">
-          {order.store.phone && (
-            <a href={`tel:+${order.store.phone}`} className="flex min-h-touch items-center justify-center gap-2 rounded-DEFAULT border border-border text-sm font-medium">
-              <Phone className="h-4 w-4" aria-hidden="true" />
-              {t("callShop", { phone: formatKhmerPhoneLocal(order.store.phone) })}
-            </a>
-          )}
-          <Link href={shopHref} className="block">
-            <Button variant="secondary" className="w-full">
-              {t("backToShop")}
-            </Button>
-          </Link>
-          {!finished && <TelegramUpdates token={token} following={order.followingOnTelegram} />}
-          {cancelProblem && (
-            <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-              {cancelProblem}
-            </p>
-          )}
-          {order.canCancel && (
-            <Button variant="secondary" className="w-full text-danger" loading={cancelling} onClick={() => setConfirmCancel(true)}>
-              {t("cancelOrder")}
-            </Button>
-          )}
+        {/* Phone and tablet: the shop and delivery cards follow; from 1024 px they're in the side column. */}
+        <div className="flex flex-col gap-4 lg:hidden">
+          {shopCard}
+          {deliveryCard}
         </div>
       </main>
+      </BuyerColumns>
 
       <ConfirmDialog
         open={confirmCancel}

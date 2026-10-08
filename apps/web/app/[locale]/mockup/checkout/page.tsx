@@ -24,7 +24,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { mockPaymentMethods, type MockPaymentMethodCode } from "@/mock/mock-data";
-import { BuyerBottomBar, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { BuyerBottomBar, BuyerColumns, BuyerSection, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { useCart } from "../cart-context";
 import { useDeliverySettings } from "../delivery-settings-context";
 import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
@@ -261,13 +261,96 @@ export default function CheckoutMockupPage() {
       active ? "bg-brand text-on-brand" : "text-muted hover:text-fg",
     );
 
+  const summary = (
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
+          <h2 className="font-semibold">{t("sectionSummary")}</h2>
+          {appliedPromo && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-success">{tStore("promoApplied", { code: appliedPromo.code })}</span>
+              <button
+                type="button"
+                onClick={() => setAppliedPromo(null)}
+                className="flex min-h-touch items-center px-2 text-sm text-muted underline"
+              >
+                {tStore("remove")}
+              </button>
+            </div>
+          )}
+          <dl className="flex flex-col gap-1 text-sm">
+            <div className="flex items-center justify-between text-muted">
+              <dt>{tStore("subtotal")}</dt>
+              <dd className="tabular-nums">{format(subtotal, currency)}</dd>
+            </div>
+            {itemDiscount > 0 && (
+              <div className="flex items-center justify-between text-success">
+                <dt>{tStore("itemDiscount")}</dt>
+                <dd className="tabular-nums">-{format(itemDiscount, currency)}</dd>
+              </div>
+            )}
+            {promoDiscount > 0 && (
+              <div className="flex items-center justify-between text-success">
+                <dt>{tStore("promoDiscount")}</dt>
+                <dd className="tabular-nums">-{format(promoDiscount, currency)}</dd>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-muted">
+              <dt>{fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
+              <dd className="tabular-nums">
+                {deliveryStatus === "ok"
+                  ? deliveryFee === 0
+                    ? t("free")
+                    : format(deliveryFee, currency)
+                  : deliveryStatus === "incomplete"
+                    ? t("feeAfterChoice")
+                    : "—"}
+              </dd>
+            </div>
+            {storeSettings.vatPercent > 0 && (
+              <div className="flex items-center justify-between text-muted">
+                <dt>{tStore("vat", { percent: storeSettings.vatPercent })}</dt>
+                <dd className="tabular-nums">{format(vat, currency)}</dd>
+              </div>
+            )}
+          </dl>
+          <div className="flex items-center justify-between border-t border-border pt-2">
+            <span className="font-semibold">{tStore("totalToPay")}</span>
+            <span className="text-right">
+              <span className="block text-lg font-bold tabular-nums">{format(total, currency)}</span>
+              <span className="block text-xs text-muted">≈ {format(secondaryTotal, currency === "USD" ? "KHR" : "USD")}</span>
+            </span>
+          </div>
+        </section>
+  );
+  const placeOrderButton = (
+    <Button variant="primary" className="w-full" onClick={handleSubmit} disabled={!canTakeOrder}>
+      {t("placeOrder")} · {format(total, currency)}
+    </Button>
+  );
+  // What a buyer may wonder before pressing the button.
+  const trust = (
+    <ul className="flex flex-col gap-1 text-sm text-muted">
+      {paymentMethod === "cod" && <li>{t("trustCod")}</li>}
+      <li>{t("trustDetails")}</li>
+    </ul>
+  );
+
   return (
-    <BuyerShell className="pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
       <BuyerTopBar backHref={`/${locale}/mockup/cart`} backLabel={t("backToCart")} title={t("title")}>
         <BuyerSteps steps={[tCart("stepCart"), tCart("stepCheckout"), tCart("stepPay")]} current={1} />
       </BuyerTopBar>
 
-      <div ref={formRef} className="flex flex-col gap-6 p-4">
+      <BuyerColumns
+        plain
+        aside={
+          <>
+            {summary}
+            {placeOrderButton}
+            {trust}
+          </>
+        }
+      >
+      <div ref={formRef} className="flex flex-col gap-4 p-4 lg:p-0">
         {stockCheck.adjusted && (
           <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -275,8 +358,7 @@ export default function CheckoutMockupPage() {
           </p>
         )}
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionYou")}</h2>
+        <BuyerSection number={1} title={t("sectionYou")}>
           <Input
             label={t("name")}
             placeholder={t("namePlaceholder")}
@@ -303,10 +385,9 @@ export default function CheckoutMockupPage() {
             onBlur={() => checkField("phone")}
             error={errorText(errors.phone)}
           />
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionHow")}</h2>
+        <BuyerSection number={2} title={t("sectionHow")}>
           {!canDeliver && !canPickup ? (
             <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -433,10 +514,9 @@ export default function CheckoutMockupPage() {
             />
             <span className="text-sm">{t("rememberDetails")}</span>
           </label>
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionPay")}</h2>
+        <BuyerSection number={3} title={t("sectionPay")}>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t("payIn")}</span>
             <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
@@ -486,73 +566,17 @@ export default function CheckoutMockupPage() {
                 </button>
               ))}
           </div>
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
-          <h2 className="font-semibold">{t("sectionSummary")}</h2>
-          {appliedPromo && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-success">{tStore("promoApplied", { code: appliedPromo.code })}</span>
-              <button
-                type="button"
-                onClick={() => setAppliedPromo(null)}
-                className="flex min-h-touch items-center px-2 text-sm text-muted underline"
-              >
-                {tStore("remove")}
-              </button>
-            </div>
-          )}
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between text-muted">
-              <dt>{tStore("subtotal")}</dt>
-              <dd className="tabular-nums">{format(subtotal, currency)}</dd>
-            </div>
-            {itemDiscount > 0 && (
-              <div className="flex items-center justify-between text-success">
-                <dt>{tStore("itemDiscount")}</dt>
-                <dd className="tabular-nums">-{format(itemDiscount, currency)}</dd>
-              </div>
-            )}
-            {promoDiscount > 0 && (
-              <div className="flex items-center justify-between text-success">
-                <dt>{tStore("promoDiscount")}</dt>
-                <dd className="tabular-nums">-{format(promoDiscount, currency)}</dd>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-muted">
-              <dt>{fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
-              <dd className="tabular-nums">
-                {deliveryStatus === "ok"
-                  ? deliveryFee === 0
-                    ? t("free")
-                    : format(deliveryFee, currency)
-                  : deliveryStatus === "incomplete"
-                    ? t("feeAfterChoice")
-                    : "—"}
-              </dd>
-            </div>
-            {storeSettings.vatPercent > 0 && (
-              <div className="flex items-center justify-between text-muted">
-                <dt>{tStore("vat", { percent: storeSettings.vatPercent })}</dt>
-                <dd className="tabular-nums">{format(vat, currency)}</dd>
-              </div>
-            )}
-          </dl>
-          <div className="flex items-center justify-between border-t border-border pt-2">
-            <span className="font-semibold">{tStore("totalToPay")}</span>
-            <span className="text-right">
-              <span className="block text-lg font-bold tabular-nums">{format(total, currency)}</span>
-              <span className="block text-xs text-muted">≈ {format(secondaryTotal, currency === "USD" ? "KHR" : "USD")}</span>
-            </span>
-          </div>
-        </section>
+        {/* Phone and tablet: the summary ends the form; from 1024 px it's in the side column. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {summary}
+          {trust}
+        </div>
       </div>
+      </BuyerColumns>
 
-      <BuyerBottomBar>
-        <Button variant="primary" className="w-full" onClick={handleSubmit} disabled={!canTakeOrder}>
-          {t("placeOrder")} · {format(total, currency)}
-        </Button>
-      </BuyerBottomBar>
+      <BuyerBottomBar wide>{placeOrderButton}</BuyerBottomBar>
     </BuyerShell>
   );
 }

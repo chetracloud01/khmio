@@ -24,7 +24,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotCheck, TURNSTILE_SITE_KEY } from "@/components/bot-check";
-import { BuyerBottomBar, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { BuyerBottomBar, BuyerColumns, BuyerSection, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { formatMoney } from "@/components/order-ui";
 import { api, ApiError, type PlacedOrder, type PublicShop } from "@/lib/api";
@@ -235,13 +235,72 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   const segment = (active: boolean) => cn("min-h-touch rounded-full px-4 text-sm font-medium transition-colors", active ? "bg-brand text-on-brand" : "text-muted hover:text-fg");
   const methodLabel = (method: PaymentMethod) => (method === "cod" ? (details.fulfilment === "pickup" ? t("payAtPickup") : tApp("payCashOnDelivery")) : method === "khqr" ? "KHQR" : "ABA PayWay");
 
+  const summary = (
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
+          <h2 className="font-semibold">{t("sectionSummary")}</h2>
+          <dl className="flex flex-col gap-1 text-sm">
+            <div className="flex items-center justify-between text-muted">
+              <dt>{tStore("subtotal")}</dt>
+              <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
+            </div>
+            {total.discount > 0 && (
+              <div className="flex items-center justify-between text-success">
+                <dt>{tStore("itemDiscount")}</dt>
+                <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-muted">
+              <dt>{details.fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
+              <dd className="tabular-nums">
+                {quote.status === "ok" ? (total.deliveryFee === 0 ? t("free") : formatMoney(total.deliveryFee, currency)) : quote.status === "incomplete" ? t("feeAfterChoice") : "—"}
+              </dd>
+            </div>
+            {shop.store.vatPercent > 0 && (
+              <div className="flex items-center justify-between text-muted">
+                <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
+                <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
+              </div>
+            )}
+          </dl>
+          <div className="flex items-center justify-between border-t border-border pt-2">
+            <span className="font-semibold">{tStore("totalToPay")}</span>
+            <span className="text-right">
+              <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
+              <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, rate), currency === "USD" ? "KHR" : "USD")}</span>
+            </span>
+          </div>
+        </section>
+  );
+  const placeOrderButton = (
+    <Button variant="primary" className="w-full" onClick={() => void handleSubmit()} disabled={!canTakeOrder} loading={placing}>
+      {t("placeOrder")} · {formatMoney(total.total, currency)}
+    </Button>
+  );
+  // What a buyer may wonder before pressing the button.
+  const trust = (
+    <ul className="flex flex-col gap-1 text-sm text-muted">
+      {paymentMethod === "cod" && <li>{t("trustCod")}</li>}
+      <li>{t("trustDetails")}</li>
+    </ul>
+  );
+
   return (
-    <BuyerShell className="pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
       <BuyerTopBar backHref={`/${locale}/s/${slug}/cart`} backLabel={t("backToCart")} title={t("title")} subtitle={shop.store.name}>
         <BuyerSteps steps={[tCart("stepCart"), tCart("stepCheckout"), tCart("stepPay")]} current={1} />
       </BuyerTopBar>
 
-      <div ref={formRef} className="flex flex-col gap-6 p-4">
+      <BuyerColumns
+        plain
+        aside={
+          <>
+            {summary}
+            {placeOrderButton}
+            {trust}
+          </>
+        }
+      >
+      <div ref={formRef} className="flex flex-col gap-4 p-4 lg:p-0">
         {problem && (
           <p role="alert" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
@@ -249,8 +308,7 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
           </p>
         )}
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionYou")}</h2>
+        <BuyerSection number={1} title={t("sectionYou")}>
           <Input
             label={t("name")}
             placeholder={t("namePlaceholder")}
@@ -277,10 +335,9 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             onBlur={() => checkField("phone")}
             error={errorText(errors.phone)}
           />
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionHow")}</h2>
+        <BuyerSection number={2} title={t("sectionHow")}>
           <div role="radiogroup" aria-label={t("sectionHow")} className="grid grid-cols-2 gap-3" data-invalid={errors.fulfilment ? "true" : undefined}>
             {fulfilmentCards
               .filter((card) => card.show)
@@ -397,10 +454,9 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 shrink-0 accent-brand" />
             <span className="text-sm">{t("rememberDetails")}</span>
           </label>
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionPay")}</h2>
+        <BuyerSection number={3} title={t("sectionPay")}>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t("payIn")}</span>
             <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
@@ -437,50 +493,19 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             ))}
             {errors.paymentMethod && <p className="text-sm text-danger">{errorText(errors.paymentMethod)}</p>}
           </div>
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
-          <h2 className="font-semibold">{t("sectionSummary")}</h2>
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between text-muted">
-              <dt>{tStore("subtotal")}</dt>
-              <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
-            </div>
-            {total.discount > 0 && (
-              <div className="flex items-center justify-between text-success">
-                <dt>{tStore("itemDiscount")}</dt>
-                <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-muted">
-              <dt>{details.fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
-              <dd className="tabular-nums">
-                {quote.status === "ok" ? (total.deliveryFee === 0 ? t("free") : formatMoney(total.deliveryFee, currency)) : quote.status === "incomplete" ? t("feeAfterChoice") : "—"}
-              </dd>
-            </div>
-            {shop.store.vatPercent > 0 && (
-              <div className="flex items-center justify-between text-muted">
-                <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
-                <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
-              </div>
-            )}
-          </dl>
-          <div className="flex items-center justify-between border-t border-border pt-2">
-            <span className="font-semibold">{tStore("totalToPay")}</span>
-            <span className="text-right">
-              <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
-              <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, rate), currency === "USD" ? "KHR" : "USD")}</span>
-            </span>
-          </div>
-        </section>
+        {/* Phone and tablet: the summary ends the form; from 1024 px it's in the side column. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {summary}
+          {trust}
+        </div>
+        {/* Once only, whatever the width: the bot check gives one token per attempt. */}
         <BotCheck onToken={setBotToken} resetKey={botReset} />
       </div>
+      </BuyerColumns>
 
-      <BuyerBottomBar>
-        <Button variant="primary" className="w-full" onClick={() => void handleSubmit()} disabled={!canTakeOrder} loading={placing}>
-          {t("placeOrder")} · {formatMoney(total.total, currency)}
-        </Button>
-      </BuyerBottomBar>
+      <BuyerBottomBar wide>{placeOrderButton}</BuyerBottomBar>
     </BuyerShell>
   );
 }

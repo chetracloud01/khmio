@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState } from "react";
 import { mockPromoCodes, parseLineKey } from "@/mock/mock-data";
-import { BuyerBottomBar, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { BuyerBottomBar, BuyerColumns, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { useCart } from "../cart-context";
 import { useClampCartToStock, useOnlineStock } from "../online-stock";
 import { useShopIdentity } from "../shop-identity";
@@ -81,9 +81,66 @@ export default function CartMockupPage() {
   }
 
   const storefrontHref = `/${locale}/mockup/storefront`;
+  const checkoutHref = `/${locale}/mockup/checkout`;
+
+  const summaryRows = (
+    <dl className="flex flex-col gap-1 text-sm">
+      <div className="flex items-center justify-between text-muted">
+        <dt>{tStore("subtotal")}</dt>
+        <dd>{format(subtotal, currency)}</dd>
+      </div>
+      {itemDiscount > 0 && (
+        <div className="flex items-center justify-between text-success">
+          <dt>{tStore("itemDiscount")}</dt>
+          <dd>-{format(itemDiscount, currency)}</dd>
+        </div>
+      )}
+      {promoDiscount > 0 && (
+        <div className="flex items-center justify-between text-success">
+          <dt>{tStore("promoDiscount")}</dt>
+          <dd>-{format(promoDiscount, currency)}</dd>
+        </div>
+      )}
+      <div className="flex items-center justify-between text-muted">
+        <dt>{tCheckout("deliveryFee")}</dt>
+        {/* Known only once the buyer picks delivery or pickup and where, at checkout. */}
+        <dd>{deliveryStatus === "ok" ? (deliveryFee === 0 ? tCheckout("free") : format(deliveryFee, currency)) : tCheckout("feeAfterChoice")}</dd>
+      </div>
+      {storeSettings.vatPercent > 0 && (
+        <div className="flex items-center justify-between text-muted">
+          <dt>{tStore("vat", { percent: storeSettings.vatPercent })}</dt>
+          <dd>{format(vat, currency)}</dd>
+        </div>
+      )}
+    </dl>
+  );
+  const totalRow = (
+    <div className="flex items-center justify-between border-t border-border pt-3">
+      <span className="font-semibold">{tStore("totalToPay")}</span>
+      <span className="text-right">
+        <span className="block text-lg font-bold">{format(total, currency)}</span>
+        <span className="block text-xs text-muted">≈ {format(secondaryTotal, otherCurrency)}</span>
+      </span>
+    </div>
+  );
+  // Laptop: the summary always open, with the next button, beside the items.
+  const aside =
+    itemCount > 0 ? (
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-bg p-4">
+        <h2 className="font-semibold">{tCheckout("sectionSummary")}</h2>
+        {summaryRows}
+        {totalRow}
+        <Link href={checkoutHref} className="block">
+          <Button variant="primary" className="w-full">
+            {t("reviewPayment")}
+          </Button>
+        </Link>
+      </div>
+    ) : undefined;
 
   return (
-    <BuyerShell className="pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns aside={aside}>
       <BuyerTopBar
         backHref={storefrontHref}
         backLabel={t("stepMenu")}
@@ -203,66 +260,31 @@ export default function CartMockupPage() {
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => setSummaryExpanded((v) => !v)}
-                aria-expanded={summaryExpanded}
-                className="flex min-h-touch items-center justify-between border-t border-border pt-2 text-sm font-medium text-brand"
-              >
-                {summaryExpanded ? t("hideSummary") : t("seeSummary")}
-                <ChevronDown
-                  className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", summaryExpanded && "rotate-180")}
-                  aria-hidden="true"
-                />
-              </button>
-
-              {summaryExpanded && (
-                <dl className="flex flex-col gap-1 text-sm">
-                  <div className="flex items-center justify-between text-muted">
-                    <dt>{tStore("subtotal")}</dt>
-                    <dd>{format(subtotal, currency)}</dd>
-                  </div>
-                  {itemDiscount > 0 && (
-                    <div className="flex items-center justify-between text-success">
-                      <dt>{tStore("itemDiscount")}</dt>
-                      <dd>-{format(itemDiscount, currency)}</dd>
-                    </div>
-                  )}
-                  {promoDiscount > 0 && (
-                    <div className="flex items-center justify-between text-success">
-                      <dt>{tStore("promoDiscount")}</dt>
-                      <dd>-{format(promoDiscount, currency)}</dd>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between text-muted">
-                    <dt>{tCheckout("deliveryFee")}</dt>
-                    {/* Known only once the buyer picks delivery or pickup and where, at checkout. */}
-                    <dd>{deliveryStatus === "ok" ? (deliveryFee === 0 ? tCheckout("free") : format(deliveryFee, currency)) : tCheckout("feeAfterChoice")}</dd>
-                  </div>
-                  {storeSettings.vatPercent > 0 && (
-                    <div className="flex items-center justify-between text-muted">
-                      <dt>{tStore("vat", { percent: storeSettings.vatPercent })}</dt>
-                      <dd>{format(vat, currency)}</dd>
-                    </div>
-                  )}
-                </dl>
-              )}
-
-              <div className="flex items-center justify-between border-t border-border pt-3">
-                <span className="font-semibold">{tStore("totalToPay")}</span>
-                <span className="text-right">
-                  <span className="block text-lg font-bold">{format(total, currency)}</span>
-                  <span className="block text-xs text-muted">≈ {format(secondaryTotal, otherCurrency)}</span>
-                </span>
+              <div className="flex flex-col gap-2 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSummaryExpanded((v) => !v)}
+                  aria-expanded={summaryExpanded}
+                  className="flex min-h-touch items-center justify-between border-t border-border pt-2 text-sm font-medium text-brand"
+                >
+                  {summaryExpanded ? t("hideSummary") : t("seeSummary")}
+                  <ChevronDown
+                    className={cn("h-4 w-4 transition-transform motion-reduce:transition-none", summaryExpanded && "rotate-180")}
+                    aria-hidden="true"
+                  />
+                </button>
+                {summaryExpanded && summaryRows}
+                {totalRow}
               </div>
             </div>
           </>
         )}
       </main>
+      </BuyerColumns>
 
       {itemCount > 0 && (
-        <BuyerBottomBar>
-          <Link href={`/${locale}/mockup/checkout`} className="block">
+        <BuyerBottomBar wide>
+          <Link href={checkoutHref} className="block">
             <Button variant="primary" className="w-full">
               {t("reviewPayment")}
             </Button>
