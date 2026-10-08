@@ -305,7 +305,6 @@
     "mockCodeNote": "Mock: any 6-digit code works; 000000 shows the wrong-code message."
   },
   "Onboarding": {
-    "stepLabel": "Step {current} of {total}",
     "back": "Back",
     "next": "Next",
     "finish": "Finish",
@@ -321,15 +320,9 @@
     "slugTaken": "Already taken — try another",
     "removeLogo": "Remove",
     "doneTitle": "Your shop is ready!",
-    "showQrTitle": "Share with a QR code",
-    "qrScanHint": "Buyers can scan this to open your shop",
-    "downloadQr": "Download QR",
-    "copyLink": "Copy link",
     "linkCopied": "Copied!",
-    "shareLink": "Share",
     "goToDashboard": "Go to dashboard",
     "nameStepHint": "Buyers see this name and link. You can change the name later.",
-    "uploadLogoOptional": "Add logo (optional)",
     "slugFromKhmerHint": "A shop link uses English letters, so we made one for you. You can change it.",
     "slugRequired": "Type a link using English letters, e.g. sreyneang"
   },
@@ -2014,5 +2007,25 @@
     "help1": "Check the phone is on the same Wi-Fi as the PC, with mobile data off.",
     "help2": "The first time on a new Wi-Fi, Windows may ask to allow Node.js: tick Private and Public.",
     "help3": "Café or hotel Wi-Fi may block devices from each other: connect the PC to your phone's hotspot, then reload this page."
+  },
+  "SignUp": {
+    "brandTitle": "Your shop online, today",
+    "benefitLink": "Your own shop link in 2 minutes",
+    "benefitAlerts": "New orders straight to your Telegram",
+    "benefitCash": "Cash on delivery today, KHQR coming",
+    "betaFree": "Free during the beta",
+    "stepsLabel": "Setting up your shop",
+    "stepBusiness": "Business",
+    "stepShop": "Your shop",
+    "stepReady": "Ready",
+    "previewTitle": "Your shop page",
+    "previewNamePlaceholder": "Your shop's name",
+    "previewHint": "This is the top of the page buyers open.",
+    "nextTitle": "What's next",
+    "nextIntro": "A few steps and buyers can order from your link:",
+    "addLogo": "Add a logo",
+    "changeLogo": "Change logo",
+    "logoHint": "Square, at least 512 px. You can change it any time.",
+    "logoFailed": "That photo didn't upload. Please try another one."
   }
 }

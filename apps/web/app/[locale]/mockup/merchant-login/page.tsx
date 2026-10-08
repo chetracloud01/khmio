@@ -10,7 +10,7 @@ import {
   toFieldErrors,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Input, Mio, SegmentedControl } from "@khmio/ui";
+import { Button, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
 import { ArrowLeft, Phone, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { mockMerchant } from "@/mock/mock-data";
 import { useFormErrorText } from "@/components/form-ui";
+import { SignUpFrame } from "@/components/sign-up-frame";
+import { useThemeLabels } from "@/components/use-theme-labels";
 import { useMerchantAccount } from "../merchant-account-context";
 import { useMerchantProfile } from "../merchant-profile-context";
 
@@ -30,6 +32,7 @@ export default function MerchantLoginMockupPage() {
   const t = useTranslations("MerchantLogin");
   const tMascot = useTranslations("Mascot");
   const errorText = useFormErrorText();
+  const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
   const { signIn } = useMerchantAccount();
@@ -131,10 +134,15 @@ export default function MerchantLoginMockupPage() {
   );
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-gradient-to-b from-brand/10 via-canvas to-canvas p-4 text-fg">
-      <div className="absolute right-4 top-4">{languageSwitch}</div>
-
-      <div className="flex w-full max-w-[400px] flex-col gap-5 rounded-2xl border border-border bg-bg p-5 shadow-raised sm:p-8">
+    <SignUpFrame
+      controls={
+        <>
+          {languageSwitch}
+          <ThemeSwitcher labels={themeLabels} />
+        </>
+      }
+    >
+      <div className="flex w-full flex-col gap-5 rounded-2xl border border-border bg-bg p-5 shadow-raised sm:p-8">
         {step !== "choose" && (
           <button
             type="button"
@@ -152,7 +160,10 @@ export default function MerchantLoginMockupPage() {
         {step === "choose" && (
           <>
             <div className="flex flex-col items-center gap-3 text-center">
-              <Mio size={88} label={tMascot("label")} />
+              {/* On a laptop Mio is on the teal side already. */}
+              <span className="lg:hidden">
+                <Mio size={88} label={tMascot("label")} />
+              </span>
               <h1 className="text-xl font-bold">{t("title")}</h1>
               <p className="text-sm text-muted">{t("subtitle")}</p>
             </div>
@@ -272,6 +283,6 @@ export default function MerchantLoginMockupPage() {
           </form>
         )}
       </div>
-    </div>
+    </SignUpFrame>
   );
 }
