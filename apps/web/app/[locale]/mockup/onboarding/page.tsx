@@ -2,7 +2,7 @@
 
 import { BUSINESS_TYPES, SHARE_REQUIREMENTS, shopNameSchema, shopSlugSchema, suggestShopSlug, toFieldErrors, type BusinessType, type ShareRequirement } from "@khmio/shared";
 import { Button, cn, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
-import { Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
+import { Car, Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,7 @@ const BUSINESS_TYPE_ICONS: Record<BusinessType, LucideIcon> = {
   shop: Store,
   restaurant: UtensilsCrossed,
   service: Wrench,
+  garage: Car,
   other: LayoutGrid,
 };
 

@@ -415,6 +415,8 @@
     "restaurantHint": "Food and drinks",
     "service": "Service",
     "serviceHint": "Salon, repair, tutoring…",
+    "garage": "Garage / cars",
+    "garageHint": "Cars, parts, oil, tyres, repairs…",
     "other": "Other",
     "otherHint": "Anything else"
   },
@@ -563,6 +565,9 @@
     "titleKmPlaceholder_service": "e.g. កាត់សក់បុរស",
     "titleEnPlaceholder_service": "e.g. Men's haircut",
     "descriptionPlaceholder_service": "e.g. Wash, cut and style, about 45 minutes",
+    "titleKmPlaceholder_garage": "e.g. ប្រេងម៉ាស៊ីន Castrol 5W-30",
+    "titleEnPlaceholder_garage": "e.g. Castrol 5W-30 engine oil",
+    "descriptionPlaceholder_garage": "e.g. Fully synthetic, 4 litres, for petrol and hybrid cars",
     "titleKmPlaceholder_other": "e.g. កាបូបដៃធ្វើពីដៃ",
     "titleEnPlaceholder_other": "e.g. Handmade bag",
     "descriptionPlaceholder_other": "e.g. Woven by hand in Takeo"
@@ -1515,6 +1520,7 @@
     "devLoginTitle": "Development login",
     "devLoginHint": "Only on a developer's computer. Signs in as a test merchant without Telegram.",
     "devLoginAs": "Test merchant {name}",
+    "devLoginGarage": "Demo garage (run pnpm demo:garage first)",
     "saveFailed": "Couldn't save. Please try again.",
     "signOut": "Sign out",
     "shopLinkLabel": "Your shop link",

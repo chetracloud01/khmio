@@ -415,6 +415,8 @@
     "restaurantHint": "ម្ហូប និងភេសជ្ជៈ",
     "service": "សេវាកម្ម",
     "serviceHint": "ហាងកាត់សក់ ជួសជុល បង្រៀន…",
+    "garage": "យានដ្ឋាន / រថយន្ត",
+    "garageHint": "រថយន្ត គ្រឿងបន្លាស់ ប្រេង កង់ ជួសជុល…",
     "other": "ផ្សេងៗ",
     "otherHint": "ប្រភេទផ្សេងទៀត"
   },
@@ -563,6 +565,9 @@
     "titleKmPlaceholder_service": "ឧទាហរណ៍៖ កាត់សក់បុរស",
     "titleEnPlaceholder_service": "ឧទាហរណ៍៖ Men's haircut",
     "descriptionPlaceholder_service": "ឧ. កក់ កាត់ និងតុបតែង ប្រហែល ៤៥ នាទី",
+    "titleKmPlaceholder_garage": "ឧទាហរណ៍៖ ប្រេងម៉ាស៊ីន Castrol 5W-30",
+    "titleEnPlaceholder_garage": "ឧទាហរណ៍៖ Castrol 5W-30 engine oil",
+    "descriptionPlaceholder_garage": "ឧ. ប្រេងសំយោគពេញលេញ ៤ លីត្រ សម្រាប់ឡានសាំង និងហាយប្រ៊ីដ",
     "titleKmPlaceholder_other": "ឧទាហរណ៍៖ កាបូបដៃធ្វើពីដៃ",
     "titleEnPlaceholder_other": "ឧទាហរណ៍៖ Handmade bag",
     "descriptionPlaceholder_other": "ឧ. ត្បាញដោយដៃនៅតាកែវ"
@@ -1515,6 +1520,7 @@
     "devLoginTitle": "ការចូលសម្រាប់អ្នកអភិវឌ្ឍ",
     "devLoginHint": "មានតែលើកុំព្យូទ័ររបស់អ្នកអភិវឌ្ឍ។ ចូលជាអ្នកលក់សាកល្បង ដោយមិនប្រើ Telegram។",
     "devLoginAs": "អ្នកលក់សាកល្បង {name}",
+    "devLoginGarage": "យានដ្ឋានសាកល្បង (ដំណើរការ pnpm demo:garage ជាមុនសិន)",
     "saveFailed": "មិនអាចរក្សាទុកបានទេ។ សូមសាកម្តងទៀត។",
     "signOut": "ចាកចេញ",
     "shopLinkLabel": "តំណហាងរបស់អ្នក",

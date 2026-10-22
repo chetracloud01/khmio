@@ -3,7 +3,7 @@ import { z } from "zod";
 // Picked once during onboarding. It only pre-fills starting defaults (unit of
 // measure, suggested categories) — every feature works the same for every
 // type. See docs/blueprint.md "Business types".
-export const businessTypeSchema = z.enum(["shop", "restaurant", "service", "other"]);
+export const businessTypeSchema = z.enum(["shop", "restaurant", "service", "garage", "other"]);
 export type BusinessType = z.infer<typeof businessTypeSchema>;
 
 export const BUSINESS_TYPES: readonly BusinessType[] = businessTypeSchema.options;
@@ -24,6 +24,9 @@ export const DEFAULT_UNITS: readonly NamedDefault[] = [
   { key: "carton", nameKm: "កេស", nameEn: "Carton" },
   { key: "plate", nameKm: "ចាន", nameEn: "Plate" },
   { key: "service", nameKm: "សេវា", nameEn: "Service" },
+  { key: "litre", nameKm: "លីត្រ", nameEn: "Litre" },
+  { key: "set", nameKm: "ឈុត", nameEn: "Set" },
+  { key: "vehicle", nameKm: "គ្រឿង", nameEn: "Vehicle" },
 ];
 
 /** What a new store starts with, by business type: its categories and the unit new products default to. */
@@ -48,6 +51,19 @@ export const BUSINESS_TYPE_DEFAULTS: Record<BusinessType, { unitKey: string; cat
     categories: [
       { key: "services", nameKm: "សេវាកម្ម", nameEn: "Services" },
       { key: "packages", nameKm: "កញ្ចប់", nameEn: "Packages" },
+    ],
+  },
+  // A garage sells cars, the parts for them and its workshop's services.
+  garage: {
+    unitKey: "piece",
+    categories: [
+      { key: "cars", nameKm: "រថយន្ត", nameEn: "Cars" },
+      { key: "engine-oil", nameKm: "ប្រេងម៉ាស៊ីន", nameEn: "Engine oil" },
+      { key: "tyres", nameKm: "កង់ឡាន", nameEn: "Tyres" },
+      { key: "batteries", nameKm: "អាគុយ", nameEn: "Batteries" },
+      { key: "parts", nameKm: "គ្រឿងបន្លាស់", nameEn: "Parts" },
+      { key: "accessories", nameKm: "គ្រឿងតុបតែង", nameEn: "Accessories" },
+      { key: "services", nameKm: "សេវាជួសជុល", nameEn: "Workshop services" },
     ],
   },
   other: {

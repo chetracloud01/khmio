@@ -13,7 +13,7 @@ import {
   type ShareRequirement,
 } from "@khmio/shared";
 import { Button, cn, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
-import { Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
+import { Car, Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -25,7 +25,7 @@ import { useThemeLabels } from "@/components/use-theme-labels";
 import { api, ApiError, getMe, uploadPhoto, type Me, type StoreDetails } from "@/lib/api";
 import { AppLoading, AppOffline } from "../app-frame";
 
-const ICONS: Record<BusinessType, LucideIcon> = { shop: Store, restaurant: UtensilsCrossed, service: Wrench, other: LayoutGrid };
+const ICONS: Record<BusinessType, LucideIcon> = { shop: Store, restaurant: UtensilsCrossed, service: Wrench, garage: Car, other: LayoutGrid };
 type SlugState = "idle" | "checking" | "available" | "taken" | "invalid";
 
 // Real onboarding (roadmap step 2, redesigned with the approved mockup):

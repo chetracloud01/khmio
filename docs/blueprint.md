@@ -171,7 +171,9 @@ New store → Free trial (14 days) → Active (paid plan) → Payment due → Gr
 
 ### Business types
 
-The platform serves any business with **one** product model (categories, variants, unit of measure, brand) — there is no separate code path for a café, a shop or a restaurant. During onboarding the merchant picks a business type (`shop`, `restaurant`, `service`, `other`), stored on `stores.business_type`. It only pre-fills starting defaults — for example, the default unit of measure (Piece for a shop, Cup/Plate for a restaurant) and suggested first categories. The merchant can change any of these afterwards, and every feature works the same way for every business type.
+The platform serves any business with **one** product model (categories, variants, unit of measure, brand) — there is no separate code path for a café, a shop or a restaurant. During onboarding the merchant picks a business type (`shop`, `restaurant`, `service`, `garage`, `other`), stored on `stores.business_type`. It only pre-fills starting defaults — for example, the default unit of measure (Piece for a shop, Cup/Plate for a restaurant) and suggested first categories (a garage starts with Cars, Engine oil, Tyres, Batteries, Parts, Accessories and Workshop services; every store also gets the Litre, Set and Vehicle units). The merchant can change any of these afterwards, and every feature works the same way for every business type.
+
+**Demo garage:** `pnpm demo:garage` (development only) makes a complete made-up garage, Mekong Auto Garage at `/s/mekong-auto-garage`: 29 products across cars, parts and services, delivery set up, and 12 orders at every stage. Log in with "Demo garage" under Development login. `-- --reset` makes it again, `-- --remove` deletes it, `-- --photos <folder>` loads `<product key>.jpg` photos (default `sample/garage`), `-- --telegram-id <id>` gives it to a real Telegram account.
 
 ## Workflows from start to end
 

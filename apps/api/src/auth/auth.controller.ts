@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getEnv } from "../config";
 import { APP_DB, SYSTEM_DB } from "../db";
 import { findOrCreateTelegramMerchant } from "./accounts";
+import { DEV_MERCHANTS } from "./dev-merchants";
 import { CurrentMerchant, SessionGuard } from "./session.guard";
 import { clearedSessionCookie, createSession, readCookie, revokeSession, SESSION_COOKIE, sessionCookie } from "./sessions";
 import { checkTelegramLogin } from "./telegram";
@@ -18,12 +19,7 @@ interface CookieRequest {
   ip?: string;
 }
 
-/** The two made-up merchants the development login can sign in as. */
-const DEV_MERCHANTS = {
-  a: { telegramId: "1000000001", username: "dev_merchant_a", firstName: "Dev A" },
-  b: { telegramId: "1000000002", username: "dev_merchant_b", firstName: "Dev B" },
-} as const;
-const devLoginSchema = z.object({ as: z.enum(["a", "b"]) });
+const devLoginSchema = z.object({ as: z.enum(["a", "b", "garage"]) });
 
 @Controller("auth")
 export class AuthController {
@@ -51,7 +47,7 @@ export class AuthController {
     return this.signIn(merchantId, res);
   }
 
-  /** Development only: Telegram's button needs a public web address, so locally you sign in as test merchant A or B. */
+  /** Development only: Telegram's button needs a public web address, so locally you sign in as test merchant A, B or the demo garage. */
   @Post("dev-login")
   @HttpCode(200)
   async devLogin(@Body() body: unknown, @Res({ passthrough: true }) res: CookieResponse) {

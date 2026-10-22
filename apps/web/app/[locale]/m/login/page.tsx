@@ -2,7 +2,7 @@
 
 import type { TelegramLoginPayload } from "@khmio/shared";
 import { Button, Card, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
-import { FlaskConical, Send } from "lucide-react";
+import { Car, FlaskConical, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -112,6 +112,10 @@ export default function LoginPage() {
                 {t("devLoginAs", { name: who.toUpperCase() })}
               </Button>
             ))}
+            <Button variant="secondary" className="col-span-2" disabled={busy} onClick={() => void signIn("/auth/dev-login", { as: "garage" })}>
+              <Car className="h-4 w-4" aria-hidden="true" />
+              {t("devLoginGarage")}
+            </Button>
           </div>
         </Card>
       )}

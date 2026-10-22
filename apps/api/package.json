@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "admin:add-owner": "tsx --env-file-if-exists=../../.env src/cli/add-owner.ts",
-    "files": "tsx --env-file-if-exists=../../.env src/cli/files.ts"
+    "files": "tsx --env-file-if-exists=../../.env src/cli/files.ts",
+    "demo:garage": "tsx --env-file-if-exists=../../.env src/cli/demo-garage.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3",
