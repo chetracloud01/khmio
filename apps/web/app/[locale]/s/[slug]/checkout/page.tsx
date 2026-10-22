@@ -18,7 +18,7 @@ import {
   type PaymentMethod,
 } from "@khmio/shared";
 import { Button, cn, Input, Select } from "@khmio/ui";
-import { AlertTriangle, Check, Clock, MapPin, Store, Truck } from "lucide-react";
+import { AlertTriangle, Check, Clock, History, MapPin, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -64,6 +64,8 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   const [details, setDetails] = useState<BuyerDetails>(initialDetails);
   // Ticked only if the buyer chose it last time: keeping their details needs their own consent.
   const [remember, setRemember] = useState(remembered);
+  // "Filled in from your last order": shown until the buyer clears it (someone else ordering on this phone).
+  const [prefilled, setPrefilled] = useState(remembered && initialDetails.name !== "");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [errors, setErrors] = useState<Partial<Record<Field, FormErrorCode>>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -309,6 +311,23 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
         )}
 
         <BuyerSection number={1} title={t("sectionYou")}>
+          {prefilled && (
+            <div className="flex items-center gap-3 rounded-2xl bg-brand/5 p-3 text-sm">
+              <History className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+              <span className="min-w-0 flex-1">{t("prefilledNote")}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetails({ ...details, name: "", phone: "", landmark: "", districtId: "", provinceId: "" });
+                  setRemember(false);
+                  setPrefilled(false);
+                }}
+                className="-my-2 flex min-h-touch shrink-0 items-center px-2 font-semibold text-brand"
+              >
+                {t("prefilledClear")}
+              </button>
+            </div>
+          )}
           <Input
             label={t("name")}
             placeholder={t("namePlaceholder")}

@@ -14,13 +14,14 @@ import {
   type SellerOrderAction,
 } from "@khmio/shared";
 import { BottomSheet, Button, Card, Input, Select } from "@khmio/ui";
-import { ArrowLeft, Bus, MapPin, Phone, Printer, Store, Truck, User } from "lucide-react";
+import { ArrowLeft, Bus, MapPin, Phone, Store, Truck, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useFormErrorText } from "@/components/form-ui";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
+import { OrderContactBar } from "@/components/seller-app";
 import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, type DeliveryResponse, type SellerOrderDetail } from "@/lib/api";
 import { PageLoading, PageOffline } from "../../page-states";
@@ -176,11 +177,16 @@ function OrderDetail({
           </h1>
           <p className="text-sm text-muted">{timeAgo(order.createdAt)}</p>
         </div>
-        {/* A one-page slip to pack with, or to hand to the driver. */}
-        <Button variant="secondary" onClick={() => window.print()} className="shrink-0 px-3 print:hidden">
-          <Printer className="h-4 w-4" aria-hidden="true" />
-          {t("printSlip")}
-        </Button>
+      </div>
+
+      {/* Call, Telegram, copy address and the invoice (design/screens.md B7) — one tap each, above everything else. */}
+      <div className="print:hidden">
+        <OrderContactBar
+          phone={order.buyerPhone}
+          address={[isPickup ? order.pickupAddress : placeLabel(order), order.landmark].filter(Boolean).join(" · ")}
+          invoiceHref={`/${locale}/m/orders/${order.id}/invoice`}
+          trackingCode={order.trackingCode}
+        />
       </div>
 
       <Card className="flex flex-col gap-3 p-4 print:hidden">

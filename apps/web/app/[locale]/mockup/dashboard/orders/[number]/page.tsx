@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  formatTrackingCode,
   dispatchInputSchema,
   formatKhmerPhoneLocal,
   getDispatchRoute,
@@ -14,12 +15,14 @@ import {
   type OrderCancelReason,
 } from "@khmio/shared";
 import { BottomSheet, Button, Card, Input, Select } from "@khmio/ui";
-import { ArrowLeft, Bus, MapPin, Phone, Printer, Store, Truck, User } from "lucide-react";
+import { ArrowLeft, Bus, MapPin, Phone, Store, Truck, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { orderLineLabel, type OrderRecord } from "@/mock/mock-orders";
+import { mockStore, mockTrackingCode } from "@/mock/mock-data";
+import { OrderContactBar } from "@/components/seller-app";
 import { useDeliverySettings } from "../../../delivery-settings-context";
 import { useFormErrorText } from "@/components/form-ui";
 import { useMerchantProducts } from "../../../merchant-products-context";
@@ -265,12 +268,15 @@ function OrderDetail({ order, listHref }: { order: OrderRecord; listHref: string
           <h1 className="truncate text-xl font-bold leading-normal">{order.orderNumber}</h1>
           <p className="text-sm text-muted">{timeAgo(order.placedAtIso)}</p>
         </div>
-        <Button variant="secondary" onClick={() => window.print()} className="shrink-0 px-3 print:hidden">
-          <Printer className="h-4 w-4" aria-hidden="true" />
-          <span className="hidden sm:inline">{t("printSlip")}</span>
-          <span className="sr-only sm:hidden">{t("printSlip")}</span>
-        </Button>
       </div>
+
+      {/* Call, Telegram, copy address and the invoice — one tap each, above everything else. */}
+      <OrderContactBar
+        phone={order.phone}
+        address={[order.fulfilment === "pickup" ? order.pickupAddress ?? "" : placeLabel(order), order.landmark].filter(Boolean).join(" · ")}
+        invoiceHref={`/${locale}/mockup/order/${encodeURIComponent(order.orderNumber)}/invoice`}
+        trackingCode={formatTrackingCode(mockStore.slug, mockTrackingCode(order.orderNumber))}
+      />
 
       {/* Phone and tablet: the next step first. Desktop: order on the left, actions and history on the right. */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">

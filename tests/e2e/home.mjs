@@ -40,7 +40,8 @@ check("'to handle' matches A's own order list", before.waiting === listA.filter(
 
 // A new cash order today, in dollars.
 const shop = (await call(`/public/stores/${slugA}`)).json;
-const variant = shop.products.find((p) => !p.hasOptions)?.variants[0];
+const product = shop.products.find((p) => !p.hasOptions);
+const variant = product?.variants[0];
 const placed = await call(`/public/stores/${slugA}/orders`, {
   method: "POST",
   body: { idempotencyKey: randomUUID(), lines: [{ variantId: variant.id, quantity: 2 }], checkout: { name: "Dara", phone: "097 555 0101", currency: "USD", fulfilment: "pickup", area: "phnom_penh", landmark: "", paymentMethod: "cod" } },
@@ -53,7 +54,13 @@ check("the new order is one more to handle", after.waiting === before.waiting + 
 check("its total joins today's sales in dollars, riel untouched", after.salesToday.USD === before.salesToday.USD + order.totalMinor && after.salesToday.KHR === before.salesToday.KHR);
 check("and the cash to collect", after.cashToCollect.USD === before.cashToCollect.USD + order.totalMinor && after.cashToCollect.KHR === before.cashToCollect.KHR);
 check("today's bar and the week both count it", after.days.at(-1).orders === before.days.at(-1).orders + 1 && after.ordersLast7Days === before.ordersLast7Days + 1);
-check("the product is among this week's best sellers", after.bestSellers.length > 0 && after.bestSellers.length <= 5 && after.bestSellers.every((item) => item.quantity > 0 && (item.nameKm || item.nameEn)), JSON.stringify(after.bestSellers));
+check("today's bar counts it in dollars", after.days.at(-1).ordersUSD === before.days.at(-1).ordersUSD + 1 && after.days.length === 60);
+const soldToday = after.topProducts.today.find((item) => item.nameKm === product.titleKm && item.nameEn === product.titleEn);
+check(
+  "the product is among today's top products, with what it earned in dollars",
+  ["today", "week", "month"].every((period) => after.topProducts[period].length > 0 && after.topProducts[period].length <= 5) && soldToday && soldToday.quantity >= 2 && soldToday.USD > 0,
+  JSON.stringify(after.topProducts.today),
+);
 
 // B's numbers are made only of B's own orders (today = Phnom Penh, UTC+7).
 const forB = (await call("/orders/summary", { cookie: b })).json;

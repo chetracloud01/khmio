@@ -1,6 +1,6 @@
 "use client";
 
-import { getSellerActions, type SellerOrderAction } from "@khmio/shared";
+import { getDispatchRoute, getSellerActions, type OrderActionRequest, type SellerOrderAction } from "@khmio/shared";
 import { Button } from "@khmio/ui";
 import { ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -10,8 +10,17 @@ import { useOrderText } from "@/components/order-ui";
 import { api, ApiError, type SellerOrder } from "@/lib/api";
 import { useMerchant } from "./merchant-context";
 
-/** Steps that need nothing more than one tap. Sending and cancelling ask for details, so they open the order. */
+/**
+ * Steps that need nothing more than one tap. Sending by driver or bus and
+ * cancelling ask for details, so they open the order; a pickup order is "sent"
+ * by marking it ready, which needs nothing more (isOneTap).
+ */
 const ONE_TAP: readonly SellerOrderAction[] = ["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "rebook"];
+
+/** Whether this step happens with one tap from the list. */
+function isOneTap(order: SellerOrder, action: SellerOrderAction): boolean {
+  return ONE_TAP.includes(action) || (action === "dispatch" && getDispatchRoute(order) === "pickup");
+}
 
 /** The order's next step, or null when there's nothing to do but look. */
 export function nextAction(order: SellerOrder): SellerOrderAction | null {
@@ -47,7 +56,9 @@ export function OrderNextStep({
     setBusy(true);
     onProblem(null);
     try {
-      await api(`/orders/${order.id}/actions`, { method: "POST", body: { action: step } });
+      // "Ready for pickup" is the dispatch step with the pickup route, which carries no details.
+      const body: OrderActionRequest = step === "dispatch" ? { action: "dispatch", dispatch: { route: "pickup" } } : ({ action: step } as OrderActionRequest);
+      await api(`/orders/${order.id}/actions`, { method: "POST", body });
     } catch (failure) {
       onProblem(failure instanceof ApiError && failure.code === "store_paused" ? tApp("storePaused") : failure instanceof ApiError && failure.code === "action_not_allowed" ? tApp("orderMovedOn") : tApp("saveFailed"));
     } finally {
@@ -58,7 +69,7 @@ export function OrderNextStep({
     }
   }
 
-  if (action && ONE_TAP.includes(action)) {
+  if (action && isOneTap(order, action)) {
     return (
       <Button
         variant="primary"

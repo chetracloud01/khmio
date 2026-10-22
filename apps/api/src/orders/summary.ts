@@ -7,8 +7,12 @@ import { isCashOrder, needsSellerAction, type Currency, type OrderStatus, type P
 // kept apart — a riel order is never converted (docs/blueprint.md
 // "Multi-currency pricing and totals").
 
-export const SUMMARY_DAYS = 30;
-export const BEST_SELLERS = 5;
+/** 60 days: the longest period on the sales card (30 days) and the 30 before it, to compare. */
+export const SUMMARY_DAYS = 60;
+export const TOP_PRODUCTS = 5;
+/** The sales card's periods, in days back from today (Phnom Penh). */
+export const SALES_PERIODS = { today: 1, week: 7, month: 30 } as const;
+export type SalesPeriod = keyof typeof SALES_PERIODS;
 const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
 /** Orders that count as sales: not cancelled, and not still waiting for an online payment. */
 const NOT_SALES = ["cancelled", "awaiting_payment"];
@@ -23,10 +27,18 @@ export interface SellerSummary {
   cashToCollect: Money;
   ordersLast7Days: number;
   ordersPrevious7Days: number;
-  /** Oldest first, SUMMARY_DAYS days ending today, days without sales included. */
-  days: { date: string; orders: number; USD: number; KHR: number }[];
-  /** This week's best sellers by quantity. */
-  bestSellers: { nameKm: string; nameEn: string; quantity: number }[];
+  /** Oldest first, SUMMARY_DAYS days ending today, days without sales included; orders also counted per currency (an order has one). */
+  days: { date: string; orders: number; ordersUSD: number; ordersKHR: number; USD: number; KHR: number }[];
+  /** Per period, the products that earned the most in the shop's main currency (then the other): line totals, both currencies kept apart. */
+  topProducts: Record<SalesPeriod, TopProduct[]>;
+}
+
+export interface TopProduct {
+  nameKm: string;
+  nameEn: string;
+  quantity: number;
+  USD: number;
+  KHR: number;
 }
 
 export interface OpenRow {
@@ -42,10 +54,14 @@ export interface DayRow {
   orders: number;
   total: number;
 }
-export interface BestRow {
+/** One product's sales on one day in one currency. */
+export interface ItemRow {
+  day: string;
   nameKm: string;
   nameEn: string;
+  currency: Currency;
   quantity: number;
+  total: number;
 }
 
 /** "2026-10-08": the Phnom Penh date `daysAgo` days before `now`. */
@@ -56,17 +72,18 @@ export function phnomPenhDate(now: Date, daysAgo = 0): string {
 const emptyMoney = (): Money => ({ USD: 0, KHR: 0 });
 
 /** The answer from the three grouped queries; pure, so it's tested without a database. */
-export function buildSummary(open: OpenRow[], daily: DayRow[], best: BestRow[], now: Date): SellerSummary {
+export function buildSummary(open: OpenRow[], daily: DayRow[], items: ItemRow[], now: Date, mainCurrency: Currency = "USD"): SellerSummary {
   const waiting = open.filter((row) => needsSellerAction(row.status)).reduce((sum, row) => sum + row.orders, 0);
   const cashToCollect = emptyMoney();
   for (const row of open) if (isCashOrder(row)) cashToCollect[row.currency] += row.total;
 
-  const days = Array.from({ length: SUMMARY_DAYS }, (_, index) => ({ date: phnomPenhDate(now, SUMMARY_DAYS - 1 - index), orders: 0, USD: 0, KHR: 0 }));
+  const days = Array.from({ length: SUMMARY_DAYS }, (_, index) => ({ date: phnomPenhDate(now, SUMMARY_DAYS - 1 - index), orders: 0, ordersUSD: 0, ordersKHR: 0, USD: 0, KHR: 0 }));
   const byDate = new Map(days.map((day) => [day.date, day]));
   for (const row of daily) {
     const day = byDate.get(row.day);
     if (!day) continue;
     day.orders += row.orders;
+    day[row.currency === "USD" ? "ordersUSD" : "ordersKHR"] += row.orders;
     day[row.currency] += row.total;
   }
   const today = days[days.length - 1]!;
@@ -79,14 +96,34 @@ export function buildSummary(open: OpenRow[], daily: DayRow[], best: BestRow[], 
     ordersLast7Days: countDays(0, 7),
     ordersPrevious7Days: countDays(7, 14),
     days,
-    bestSellers: best.slice(0, BEST_SELLERS),
+    topProducts: {
+      today: topProductsSince(items, phnomPenhDate(now, SALES_PERIODS.today - 1), mainCurrency),
+      week: topProductsSince(items, phnomPenhDate(now, SALES_PERIODS.week - 1), mainCurrency),
+      month: topProductsSince(items, phnomPenhDate(now, SALES_PERIODS.month - 1), mainCurrency),
+    },
   };
+}
+
+/** The products sold from `since` (a Phnom Penh date) on, most earned first in the main currency, then the other. */
+function topProductsSince(items: ItemRow[], since: string, mainCurrency: Currency): TopProduct[] {
+  const other: Currency = mainCurrency === "USD" ? "KHR" : "USD";
+  const byName = new Map<string, TopProduct>();
+  for (const row of items) {
+    if (row.day < since) continue;
+    const key = JSON.stringify([row.nameKm, row.nameEn]);
+    const entry = byName.get(key) ?? { nameKm: row.nameKm, nameEn: row.nameEn, quantity: 0, USD: 0, KHR: 0 };
+    entry.quantity += row.quantity;
+    entry[row.currency] += row.total;
+    byName.set(key, entry);
+  }
+  return [...byName.values()]
+    .sort((a, b) => b[mainCurrency] - a[mainCurrency] || b[other] - a[other] || b.quantity - a.quantity)
+    .slice(0, TOP_PRODUCTS);
 }
 
 /** Runs the three queries for this shop (inside withContext: row-level security applies, and every query also filters by store). */
 export async function sellerSummary(tx: Tx, storeId: string, now = new Date()): Promise<SellerSummary> {
   const since = phnomPenhDate(now, SUMMARY_DAYS - 1);
-  const weekStart = phnomPenhDate(now, 6);
   // One after another: queries inside a transaction share its one connection.
   const open = await tx.$queryRaw<{ status: OrderStatus; paymentMethod: PaymentMethod; currency: Currency; orders: bigint; total: bigint }[]>`
       SELECT status, payment_method AS "paymentMethod", currency, count(*) AS orders, coalesce(sum(total_minor), 0) AS total
@@ -100,20 +137,23 @@ export async function sellerSummary(tx: Tx, storeId: string, now = new Date()): 
         AND status::text NOT IN (${NOT_SALES[0]}, ${NOT_SALES[1]})
         AND created_at >= (${since}::date::timestamp AT TIME ZONE 'Asia/Phnom_Penh')
       GROUP BY 1, 2`;
-  const best = await tx.$queryRaw<{ nameKm: string; nameEn: string; quantity: bigint }[]>`
-      SELECT item.title_km AS "nameKm", item.title_en AS "nameEn", sum(item.quantity) AS quantity
+  const monthStart = phnomPenhDate(now, SALES_PERIODS.month - 1);
+  const items = await tx.$queryRaw<{ day: string; nameKm: string; nameEn: string; currency: Currency; quantity: bigint; total: bigint }[]>`
+      SELECT to_char((orders.created_at AT TIME ZONE 'Asia/Phnom_Penh')::date, 'YYYY-MM-DD') AS day,
+             item.title_km AS "nameKm", item.title_en AS "nameEn", orders.currency,
+             sum(item.quantity) AS quantity, coalesce(sum(item.line_total_minor), 0) AS total
       FROM order_items item
       JOIN orders ON orders.id = item.order_id AND orders.store_id = ${storeId}::uuid
       WHERE item.store_id = ${storeId}::uuid
         AND orders.status::text NOT IN (${NOT_SALES[0]}, ${NOT_SALES[1]})
-        AND orders.created_at >= (${weekStart}::date::timestamp AT TIME ZONE 'Asia/Phnom_Penh')
-      GROUP BY 1, 2
-      ORDER BY quantity DESC, 2
-      LIMIT ${BEST_SELLERS}`;
+        AND orders.created_at >= (${monthStart}::date::timestamp AT TIME ZONE 'Asia/Phnom_Penh')
+      GROUP BY 1, 2, 3, 4`;
+  const store = await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { defaultCurrency: true } });
   return buildSummary(
     open.map((row) => ({ ...row, orders: Number(row.orders), total: Number(row.total) })),
     daily.map((row) => ({ ...row, orders: Number(row.orders), total: Number(row.total) })),
-    best.map((row) => ({ ...row, quantity: Number(row.quantity) })),
+    items.map((row) => ({ ...row, quantity: Number(row.quantity), total: Number(row.total) })),
     now,
+    store.defaultCurrency,
   );
 }

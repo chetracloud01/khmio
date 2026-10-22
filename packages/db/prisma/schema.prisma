@@ -255,6 +255,11 @@ model Store {
   provinceNote            String       @default("") @map("province_note")
   deliveryConfiguredAt    DateTime?    @map("delivery_configured_at") @db.Timestamptz(6)
   linkSharedAt            DateTime?    @map("link_shared_at") @db.Timestamptz(6)
+  /// On invoices (design/screens.md B7); empty = not shown.
+  taxNumber               String       @default("") @map("tax_number")
+  invoiceNote             String       @default("") @map("invoice_note")
+  telegramLink            String       @default("") @map("telegram_link")
+  facebookLink            String       @default("") @map("facebook_link")
   /// The last order number given out; the next order takes this + 1 (app_next_order_number()).
   lastOrderNumber         Int          @default(0) @map("last_order_number")
   createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -526,6 +531,8 @@ model Order {
   orderNumber      Int                @map("order_number")
   /// Random and long: the buyer's order page link. Never the order number.
   publicToken      String             @unique @map("public_token")
+  /// 8 characters the buyer can type, with their phone, on "Track my order" (packages/shared invoice.ts).
+  trackingCode     String             @unique @default(dbgenerated("app_new_tracking_code()")) @map("tracking_code")
   status           OrderStatus
   paymentMethod    PaymentMethod      @map("payment_method")
   currency         Currency

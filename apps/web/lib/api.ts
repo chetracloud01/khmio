@@ -5,6 +5,7 @@ import type {
   DeliverySettings,
   FormErrorCode,
   Fulfilment,
+  InvoiceState,
   OrderCancelReason,
   OrderStatus,
   PaymentMethod,
@@ -139,11 +140,18 @@ export interface StoreDetails {
   logoUrl: string | null;
   bakongId: string;
   usdToKhrRate: number;
+  /** The currency buyers see first; it leads the dashboard's sales numbers. */
+  defaultCurrency: Currency;
   plan: PlanId;
   paused: boolean;
   readiness: { visibleProducts: number; productsWithPhoto: number; deliveryConfigured: boolean; khqrReady: boolean; codEnabled: boolean };
   /** The last checklist step: the shop link was shared. */
   linkShared: boolean;
+  /** "On your invoices" (PUT /store/invoice); empty = not printed. */
+  taxNumber: string;
+  invoiceNote: string;
+  telegramLink: string;
+  facebookLink: string;
 }
 
 export interface ProductVariant {
@@ -227,6 +235,8 @@ export interface PlacedOrder {
 /** GET /public/orders/:token: the buyer's order page. */
 export interface PublicOrder {
   orderNumber: number;
+  /** As printed: MEK-7K4P-9QXR. With the buyer's phone it opens this order on "Track my order". */
+  trackingCode: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   currency: Currency;
@@ -247,7 +257,7 @@ export interface PublicOrder {
   buyerName: string;
   cancelReason: OrderCancelReason | null;
   createdAt: string;
-  items: { titleKm: string; titleEn: string; variantLabelKm: string; variantLabelEn: string; unitPriceMinor: number; quantity: number; lineTotalMinor: number }[];
+  items: { variantId: string; titleKm: string; titleEn: string; variantLabelKm: string; variantLabelEn: string; unitPriceMinor: number; quantity: number; lineTotalMinor: number }[];
   events: { status: OrderStatus; at: string }[];
   /** How it was sent: the driver's name or the bus ticket (never the driver's phone). */
   dispatch: { route: "driver" | "bus" | "pickup"; driverName: string; busCompany: string; ticketNumber: string; dispatchedAt: string } | null;
@@ -266,14 +276,17 @@ export interface SellerSummary {
   cashToCollect: Record<Currency, number>;
   ordersLast7Days: number;
   ordersPrevious7Days: number;
-  /** 30 days, oldest first. */
-  days: { date: string; orders: number; USD: number; KHR: number }[];
-  bestSellers: { nameKm: string; nameEn: string; quantity: number }[];
+  /** 60 days, oldest first; orders also counted per currency. */
+  days: { date: string; orders: number; ordersUSD: number; ordersKHR: number; USD: number; KHR: number }[];
+  /** Per period, the products that earned the most (main currency first), dollars and riel apart. */
+  topProducts: Record<"today" | "week" | "month", { nameKm: string; nameEn: string; quantity: number; USD: number; KHR: number }[]>;
 }
 
 export interface SellerOrder {
   id: string;
   orderNumber: number;
+  /** As printed: MEK-7K4P-9QXR (the list's search finds it). */
+  trackingCode: string;
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   currency: Currency;
@@ -309,6 +322,43 @@ export interface SellerOrderDetail extends Omit<PublicOrder, "store" | "events" 
   actions: SellerOrderAction[];
   /** How it must be sent (packages/shared getDispatchRoute). */
   route: "driver" | "bus" | "pickup";
+}
+
+/** GET /orders/:id/invoice (seller) and GET /public/orders/:token/invoice (buyer: phone half hidden). Saved amounts only. */
+export interface OrderInvoice {
+  order: {
+    orderNumber: number;
+    trackingCode: string;
+    state: InvoiceState;
+    status: OrderStatus;
+    paymentMethod: PaymentMethod;
+    currency: Currency;
+    subtotalMinor: number;
+    discountMinor: number;
+    deliveryFeeMinor: number;
+    vatPercent: number;
+    vatMinor: number;
+    totalMinor: number;
+    exchangeRateUsed: number;
+    fulfilment: Fulfilment;
+    area: DeliveryArea;
+    districtId: string | null;
+    provinceId: string | null;
+    landmark: string;
+    buyerName: string;
+    /** In full for the seller; "012 ••• 678" for the buyer. */
+    buyerPhone: string;
+    createdAt: string;
+    items: { titleKm: string; titleEn: string; variantLabelKm: string; variantLabelEn: string; unitPriceMinor: number; quantity: number; lineTotalMinor: number }[];
+  };
+  shop: { slug: string; name: string; phone: string; address: string; logoUrl: string | null; taxNumber: string; invoiceNote: string; telegramLink: string; facebookLink: string };
+  /** The buyer's order page, for the QR code. */
+  orderToken: string;
+}
+
+/** POST /public/track: the order link for a tracking code and phone. */
+export interface TrackedOrder {
+  token: string;
 }
 
 /** POST /store/telegram-groups/link and /public/orders/:token/telegram-link: a one-time t.me link (15 minutes). */

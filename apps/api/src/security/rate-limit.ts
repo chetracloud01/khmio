@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   checkoutPhone: { limit: 10, windowSeconds: 3600 },
   /** A buyer's Telegram follow link or cancel, per address. */
   buyerAction: { limit: 30, windowSeconds: 3600 },
+  /** "Track my order" (code + phone), per address: enough for typos, too few to guess codes. */
+  trackOrder: { limit: 10, windowSeconds: 600 },
   /** A staff-group link, per shop. */
   groupLink: { limit: 10, windowSeconds: 3600 },
   /** Website waitlist sign-ups, per address. */

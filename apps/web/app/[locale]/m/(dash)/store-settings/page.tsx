@@ -11,6 +11,7 @@ import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-f
 import { api, ApiError, type StoreSettingsResponse } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
+import { BackToMyShop } from "@/components/seller-frame/back-to-my-shop";
 
 type Field = "defaultCurrency" | "usdToKhrRate" | "allowCod" | "vatPercent";
 
@@ -112,6 +113,7 @@ function SettingsForm({ initial }: { initial: StoreSettingsResponse }) {
 
   return (
     <div ref={formRef} className={`${SELLER_FORM} gap-5`}>
+      <BackToMyShop />
       <PageHeader title={t("title")} description={t("description")} />
 
       <Card className="flex flex-col p-4">

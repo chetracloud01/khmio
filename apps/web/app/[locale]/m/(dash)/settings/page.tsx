@@ -12,7 +12,7 @@ import {
   type FormErrorCode,
 } from "@khmio/shared";
 import { Button, Card, Input, PageHeader, SegmentedControl, Select } from "@khmio/ui";
-import { ChevronRight, Loader2, LogOut, SlidersHorizontal, Truck, Upload, Wallet, X } from "lucide-react";
+import { ChevronRight, Loader2, LogOut, ReceiptText, Send, SlidersHorizontal, Truck, Upload, Wallet, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,7 +23,6 @@ import { FormActions, FormSection, ReadOnlyField, focusFirstInvalidField, useFor
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, uploadPhoto, type StoreDetails } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
-import { TelegramAlerts } from "./telegram-alerts";
 
 interface Draft {
   shopName: string;
@@ -55,9 +54,10 @@ export default function ShopSettingsPage() {
   const t = useTranslations("DashboardProfile");
   const tType = useTranslations("BusinessType");
   const tApp = useTranslations("App");
+  const tInvoiceSettings = useTranslations("InvoiceSettings");
   const locale = useLocale();
   const router = useRouter();
-  const { me, store, refreshStore } = useMerchant();
+  const { store, refreshStore } = useMerchant();
   const errorText = useFormErrorText();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -151,25 +151,32 @@ export default function ShopSettingsPage() {
     <div ref={formRef} className={`${SELLER_FORM} gap-5`}>
       <PageHeader title={tApp("shopDetailsTitle")} />
 
-      {/* Delivery and store settings: their own pages, reached from here on a phone. */}
-      <nav aria-label={t("moreSettings")} className="overflow-hidden md:hidden rounded-DEFAULT border border-border bg-bg shadow-card">
-        {[
-          { href: "delivery", icon: Truck, title: t("delivery"), detail: t("deliveryDetail") },
-          { href: "store-settings", icon: SlidersHorizontal, title: t("storeSettings"), detail: t("storeSettingsDetail") },
-        ].map((item) => (
-          <Link
-            key={item.href}
-            href={`/${locale}/m/${item.href}`}
-            className="flex min-h-touch items-center gap-3 border-b border-border p-4 last:border-b-0 hover:bg-border/10"
-          >
-            <item.icon className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">{item.title}</p>
-              <p className="truncate text-xs text-muted">{item.detail}</p>
-            </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
-          </Link>
-        ))}
+      {/* The shop's settings, each on its own page, reached from here on a laptop and a phone alike. */}
+      <nav aria-label={t("moreSettings")} className="flex flex-col gap-2">
+        <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted">{t("moreSettings")}</h2>
+        <div className="overflow-hidden rounded-2xl border border-border bg-bg shadow-card">
+          {[
+            { href: "delivery", icon: Truck, tone: "bg-info/10 text-info", title: t("delivery"), detail: t("deliveryDetail") },
+            { href: "store-settings", icon: SlidersHorizontal, tone: "bg-brand/10 text-brand", title: t("storeSettings"), detail: t("storeSettingsDetail") },
+            { href: "invoice-settings", icon: ReceiptText, tone: "bg-success/10 text-success", title: tInvoiceSettings("title"), detail: t("invoiceSettingsDetail") },
+            { href: "telegram-alerts", icon: Send, tone: "bg-warning/10 text-warning", title: t("telegramAlerts"), detail: t("telegramAlertsDetail") },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={`/${locale}/m/${item.href}`}
+              className="flex min-h-[64px] items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-border/10"
+            >
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${item.tone}`}>
+                <item.icon className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="truncate text-xs text-muted">{item.detail}</p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
       </nav>
 
       <Card className="flex flex-col p-4">
@@ -307,8 +314,6 @@ export default function ShopSettingsPage() {
         />
       </Card>
 
-      {/* Release 1 accounts all sign in with Telegram, so alerts to the private chat are always on (phone login comes in Release 2). */}
-      <TelegramAlerts signedInWithTelegram={me.merchant.signedInWithTelegram} />
 
       <Button variant="secondary" className="self-start" onClick={() => void signOut()}>
         <LogOut className="h-4 w-4" aria-hidden="true" />

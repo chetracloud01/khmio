@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   title: "Khmio",
   // Link previews and the website's addresses use the public address (NEXT_PUBLIC_SITE_URL).
   metadataBase: new URL(SITE_URL),
+  // Installed on an iPhone's home screen (Android reads app/manifest.ts).
+  appleWebApp: { capable: true, title: "Khmio", statusBarStyle: "default" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 // viewport-fit=cover lets pages use the full screen on notched phones; fixed
@@ -24,6 +27,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // The phone's status bar in Khmio Teal, as the installed app shows it.
+  themeColor: "#0e7490",
 };
 
 export function generateStaticParams() {

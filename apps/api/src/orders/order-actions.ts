@@ -1,5 +1,5 @@
 import type { Prisma, Tx } from "@khmio/db";
-import { decideOrderAction, getDispatchRoute, getSellerActions, type OrderActionRequest } from "@khmio/shared";
+import { decideOrderAction, formatTrackingCode, getDispatchRoute, getSellerActions, type OrderActionRequest } from "@khmio/shared";
 import { NotFoundException } from "@nestjs/common";
 import { AppException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
@@ -12,6 +12,7 @@ import type { MerchantStore } from "../merchant/store.guard";
 export const orderDetailSelect = {
   id: true,
   orderNumber: true,
+  trackingCode: true,
   status: true,
   paymentMethod: true,
   currency: true,
@@ -35,7 +36,7 @@ export const orderDetailSelect = {
   cancelNote: true,
   createdAt: true,
   items: {
-    select: { titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
+    select: { variantId: true, titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
     orderBy: { createdAt: "asc" },
   },
   events: { select: { status: true, actor: true, at: true }, orderBy: { at: "asc" } },
@@ -48,14 +49,15 @@ export const orderDetailSelect = {
 type OrderDetailRow = Prisma.OrderGetPayload<{ select: typeof orderDetailSelect }>;
 
 /** The order as the seller's detail page shows it: with the steps the seller may take now and how it must be sent. */
-export function toOrderDetail(order: OrderDetailRow) {
-  return { ...order, actions: getSellerActions(order), route: getDispatchRoute(order) };
+export function toOrderDetail(order: OrderDetailRow, storeSlug: string) {
+  return { ...order, trackingCode: formatTrackingCode(storeSlug, order.trackingCode), actions: getSellerActions(order), route: getDispatchRoute(order) };
 }
 
 export async function readOrderDetail(tx: Tx, orderId: string) {
-  const order = await tx.order.findFirst({ where: { id: orderId }, select: orderDetailSelect });
+  const order = await tx.order.findFirst({ where: { id: orderId }, select: { ...orderDetailSelect, store: { select: { slug: true } } } });
   if (!order) throw new NotFoundException();
-  return toOrderDetail(order);
+  const { store, ...detail } = order;
+  return toOrderDetail(detail, store.slug);
 }
 
 export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: string, request: OrderActionRequest) {

@@ -48,6 +48,7 @@ export function SellerFrame({
   topBarExtra,
   sidebarFooter,
   look = "light",
+  hideMobileNav = false,
   children,
 }: {
   /** `belowOnTeal`: the line under the name in the dark sidebar ("teal" look), in nav colours; the phone header keeps `below`. */
@@ -65,6 +66,8 @@ export function SellerFrame({
   /** At the bottom of the sidebar, under the menu. */
   sidebarFooter?: ReactNode;
   look?: SellerFrameLook;
+  /** A full-screen form on a phone (e.g. the product form): no bottom tabs, so its save bar sits at the bottom. */
+  hideMobileNav?: boolean;
   children: ReactNode;
 }) {
   const locale = useLocale();
@@ -73,7 +76,8 @@ export function SellerFrame({
   const themeLabels = useThemeLabels();
 
   const isActive = (href: string) => (href === homeHref ? pathname === href : pathname.startsWith(href));
-  const isActiveOnPhone = (item: SellerNavItem) => isActive(item.href) || (item.alsoActiveOn ?? []).some((page) => pathname.startsWith(page));
+  /** The item's own page, or one of the pages reached from it (e.g. Delivery from "My shop"). */
+  const isActiveItem = (item: SellerNavItem) => isActive(item.href) || (item.alsoActiveOn ?? []).some((page) => pathname.startsWith(page));
 
   const settings = (direction: "up" | "down") => (
     <div className="flex shrink-0 items-center gap-1">
@@ -109,7 +113,7 @@ export function SellerFrame({
   );
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas text-fg md:flex-row">
+    <div className={cn("flex min-h-dvh flex-col bg-canvas text-fg md:flex-row", hideMobileNav && "nav-hidden")}>
       {/* Tablet and up: every section in a sidebar. */}
       <aside
         className={cn(
@@ -123,7 +127,7 @@ export function SellerFrame({
         </div>
         <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto", teal && "nav-scroll")}>
           {nav.map((item) => {
-            const active = isActive(item.href);
+            const active = isActiveItem(item);
             return (
               <Link
                 key={item.href}
@@ -166,7 +170,7 @@ export function SellerFrame({
       </header>
 
       {/* A plain block, not a flex column: a wide table inside a page must scroll in its own box, never push the page wider. */}
-      <main className="min-w-0 flex-1 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className={cn("min-w-0 flex-1 md:pb-0", hideMobileNav ? "pb-[env(safe-area-inset-bottom)]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
         {/* Teal look, tablet and up: language, theme and extras in a slim bar, as in the admin. */}
         {teal && (
           <div className="sticky top-0 z-30 hidden items-center justify-end gap-2 border-b border-border bg-bg/85 px-4 py-2 backdrop-blur md:flex print:hidden">
@@ -179,7 +183,7 @@ export function SellerFrame({
       </main>
 
       {/* 64px of tabs plus the phone's home-bar gap; .bottom-above-nav (globals.css) keeps form bars on top of it. */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav className={cn("fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden print:hidden", hideMobileNav && "hidden")}>
         <div className="flex h-16">
           {nav
             .filter((item) => item.mobile)
@@ -187,10 +191,10 @@ export function SellerFrame({
               <Link
                 key={item.href}
                 href={item.href}
-                aria-current={isActiveOnPhone(item) ? "page" : undefined}
+                aria-current={isActiveItem(item) ? "page" : undefined}
                 className={cn(
                   "flex min-h-touch flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium",
-                  isActiveOnPhone(item) ? "text-brand" : "text-muted",
+                  isActiveItem(item) ? "text-brand" : "text-muted",
                 )}
               >
                 <span className="relative">

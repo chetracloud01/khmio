@@ -22,6 +22,7 @@ import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-f
 import { api, ApiError, type DeliveryResponse } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
+import { BackToMyShop } from "@/components/seller-frame/back-to-my-shop";
 
 interface ZoneDraft {
   id: string;
@@ -196,6 +197,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
 
   return (
     <div ref={formRef} className={`${SELLER_FORM} gap-5`}>
+      <BackToMyShop />
       <PageHeader title={t("title")} description={t("description")} />
 
       {!configured && (

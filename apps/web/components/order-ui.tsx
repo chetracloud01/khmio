@@ -12,9 +12,25 @@ import {
   type Fulfilment,
   type OrderAction,
   type OrderStatus,
+  type OrderTab,
   type PaymentMethod,
 } from "@khmio/shared";
 import { cn, StatusPill, type Tone } from "@khmio/ui";
+import {
+  AlertTriangle,
+  BellRing,
+  CircleCheckBig,
+  HandCoins,
+  Hourglass,
+  PackageOpen,
+  PackageX,
+  Store,
+  ThumbsUp,
+  Truck,
+  UserRoundSearch,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
 // One wording and one colour per order status, for the buyer's order page,
@@ -30,19 +46,71 @@ export interface OrderFactsForText {
   provinceId?: string | null;
 }
 
-/** Each status's colour role (design/design-standard.md §7): waiting = warning, moving = info, done = success, stopped = danger. */
+/**
+ * Each status's colour role (design/design-standard.md §7): waiting = warning,
+ * being prepared = info, on its way = brand, done = success, stopped = danger.
+ */
 export const ORDER_STATUS_TONE: Record<OrderStatus, Tone> = {
   awaiting_payment: "warning",
   paid: "success",
   cod_pending: "warning",
   confirmed: "info",
   packing: "info",
-  waiting_for_driver: "info",
-  out_for_delivery: "info",
+  waiting_for_driver: "brand",
+  out_for_delivery: "brand",
   delivered: "success",
   completed: "success",
   cancelled: "danger",
   failed_delivery: "danger",
+};
+
+/** One icon per status, the same everywhere (design/design-standard.md §7). */
+export const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  awaiting_payment: Hourglass,
+  paid: BellRing,
+  cod_pending: BellRing,
+  confirmed: ThumbsUp,
+  packing: PackageOpen,
+  waiting_for_driver: UserRoundSearch,
+  out_for_delivery: Truck,
+  delivered: HandCoins,
+  completed: CircleCheckBig,
+  cancelled: XCircle,
+  failed_delivery: PackageX,
+};
+
+/** The status's icon; a pickup order "out for delivery" is waiting at the shop. */
+export function orderStatusIcon(order: { status: OrderStatus; fulfilment?: Fulfilment }): LucideIcon {
+  if (order.status === "out_for_delivery" && order.fulfilment === "pickup") return Store;
+  if (order.status === "delivered" && order.fulfilment === "pickup") return HandCoins;
+  return ORDER_STATUS_ICON[order.status];
+}
+
+/** The orders list's steps (its tabs and status groups), in the order work happens. */
+export const ORDER_TAB_ICON: Record<OrderTab, LucideIcon> = {
+  to_confirm: BellRing,
+  packing: PackageOpen,
+  sending: Truck,
+  delivered: CircleCheckBig,
+  problems: AlertTriangle,
+  awaiting: Hourglass,
+};
+export const ORDER_TAB_TONE: Record<OrderTab, Tone> = {
+  to_confirm: "warning",
+  packing: "info",
+  sending: "brand",
+  delivered: "success",
+  problems: "danger",
+  awaiting: "muted",
+};
+/** Text colour per tone, for icons and headers on a plain background. */
+export const TONE_TEXT: Record<Tone, string> = {
+  brand: "text-brand",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  info: "text-info",
+  muted: "text-muted",
 };
 
 export function formatMoney(amount: number, currency: Currency): string {
@@ -50,9 +118,12 @@ export function formatMoney(amount: number, currency: Currency): string {
 }
 
 /** Translated texts that depend on an order. */
+const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
+
 export function useOrderText() {
   const t = useTranslations("Orders");
   const tCheckout = useTranslations("Checkout");
+  const tInvoice = useTranslations("Invoice");
   const locale = useLocale();
 
   /** A pickup order is never "out for delivery": at that point it's waiting at the shop. */
@@ -97,14 +168,13 @@ export function useOrderText() {
 
   /** "14:05" today, "29 Sep, 14:05" otherwise — for the status history. */
   function clockTime(iso: string): string {
-    const date = new Date(iso);
-    const sameDay = date.toDateString() === new Date().toDateString();
-    return date.toLocaleString(locale === "km" ? "km-KH" : "en-GB", {
-      ...(sameDay ? {} : { day: "numeric", month: "short" }),
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    // Phnom Penh time (UTC+7) and our own month names, not the browser's date data: the server's page and
+    // the phone's agree (some phones have no Khmer dates), and every buyer reads the same time.
+    const local = new Date(new Date(iso).getTime() + PHNOM_PENH_OFFSET_MS);
+    const today = new Date(Date.now() + PHNOM_PENH_OFFSET_MS);
+    const time = `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
+    if (local.toISOString().slice(0, 10) === today.toISOString().slice(0, 10)) return time;
+    return `${local.getUTCDate()} ${tInvoice(`month_${local.getUTCMonth() + 1}`)}, ${time}`;
   }
 
   return { statusLabel, actionLabel, paymentLabel, placeLabel, timeAgo, clockTime };
@@ -112,8 +182,10 @@ export function useOrderText() {
 
 export function OrderStatusPill({ order, className }: { order: Pick<OrderFactsForText, "status" | "fulfilment">; className?: string }) {
   const { statusLabel } = useOrderText();
+  const Icon = orderStatusIcon(order);
   return (
-    <StatusPill tone={ORDER_STATUS_TONE[order.status]} className={className}>
+    <StatusPill tone={ORDER_STATUS_TONE[order.status]} className={cn("items-center gap-1", className)}>
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {statusLabel(order)}
     </StatusPill>
   );

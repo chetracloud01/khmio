@@ -15,6 +15,8 @@ export interface OrderAlertFacts {
   districtId: string | null;
   provinceId: string | null;
   itemCount: number;
+  /** As printed, MEK-7K4P-9QXR: the seller can search the orders list by it. */
+  trackingCode?: string;
 }
 
 const money = (amount: number, currency: Currency) => (currency === "USD" ? formatUsd(amount) : formatKhr(amount));
@@ -32,6 +34,11 @@ function payment(facts: OrderAlertFacts): { km: string; en: string } {
   return { km: "បានបង់តាម KHQR", en: "Paid by KHQR" };
 }
 
+/** The tracking code in a message: with the buyer's phone it opens the order on "Track my order", no Telegram needed. */
+function trackingLine(code: string): string {
+  return `🔎 លេខកូដតាមដាន · Tracking code: ${code}`;
+}
+
 /** "New order #12" for the seller, with the total, how it's paid, where it goes and how many items. */
 export function newOrderAlert(facts: OrderAlertFacts): string {
   const where = place(facts);
@@ -43,6 +50,7 @@ export function newOrderAlert(facts: OrderAlertFacts): string {
     "",
     `New order #${facts.orderNumber} · ${total}`,
     `${pay.en} · ${where.en} · ${facts.itemCount} item${facts.itemCount === 1 ? "" : "s"}`,
+    ...(facts.trackingCode ? ["", trackingLine(facts.trackingCode)] : []),
   ].join("\n");
 }
 
@@ -115,6 +123,8 @@ export interface BuyerUpdateFacts {
   fulfilment: "delivery" | "pickup";
   /** How it was sent, once sent: the driver's name or the bus ticket — never a phone number. */
   dispatch: { route: "driver" | "bus" | "pickup"; driverName: string; busCompany: string; ticketNumber: string } | null;
+  /** As printed, MEK-7K4P-9QXR. */
+  trackingCode?: string;
 }
 
 /** A buyer's status message, or null when this status isn't worth a message (e.g. waiting for a driver). */
@@ -128,7 +138,8 @@ export function buyerUpdateText(facts: BuyerUpdateFacts): string | null {
       : facts.status === "out_for_delivery" && facts.dispatch?.route === "bus"
         ? [`🚌 ${facts.dispatch.busCompany} · ${facts.dispatch.ticketNumber}`]
         : [];
-  return [`📦 ${facts.shopName} · #${facts.orderNumber}`, line.km, line.en, ...extra].join("\n");
+  const tracking = facts.trackingCode ? [trackingLine(facts.trackingCode)] : [];
+  return [`📦 ${facts.shopName} · #${facts.orderNumber}`, line.km, line.en, ...extra, ...tracking].join("\n");
 }
 
 /** "Stop updates" under each buyer message; carries only the order id. */

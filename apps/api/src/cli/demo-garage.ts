@@ -35,7 +35,8 @@ import { createStore } from "../stores/create-store";
 //
 // --reset deletes the demo shop and makes it again; --remove only deletes it.
 // --photos <folder> (default sample/garage): <product key>.jpg|png|webp, and
-// <key>-2.jpg … <key>-6.jpg for more photos. Products without one show none.
+// <key>-2.jpg … <key>-6.jpg for more photos, logo.png for the shop's logo.
+// Products without one show none.
 
 const SLUG = "mekong-auto-garage";
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -563,8 +564,8 @@ async function main() {
     if (!created.ok) {
       fail(created.reason === "already_has_store" ? "That Telegram account already has a shop (one shop per account). Use another --telegram-id." : "The demo link is taken.");
     }
-    const photos = await loadPhotos(values.photos);
-    await fillStore(db, created.storeId, photos);
+    const { photos, logo } = await loadPhotos(values.photos);
+    await fillStore(db, created.storeId, photos, logo);
     const photoCount = [...photos.values()].reduce((sum, list) => sum + list.length, 0);
     process.stdout.write(
       `Demo garage ready: ${PRODUCTS.length} products, ${ORDERS.length} orders, ${photoCount} photos.\n` +
@@ -585,13 +586,13 @@ async function removeStore(db: SystemDb, storeId: string): Promise<void> {
   });
 }
 
-/** Photo files by product key, in display order, from the folder (relative to where pnpm was run). */
-async function loadPhotos(folder: string | undefined): Promise<Map<string, Buffer[]>> {
+/** Photo files by product key, in display order, and the logo, from the folder (relative to where pnpm was run). */
+async function loadPhotos(folder: string | undefined): Promise<{ photos: Map<string, Buffer[]>; logo: Buffer | null }> {
   const dir = resolve(process.env.INIT_CWD ?? process.cwd(), folder ?? "sample/garage");
   const photos = new Map<string, Buffer[]>();
   if (!existsSync(dir)) {
     if (folder) fail(`Photo folder not found: ${dir}`);
-    return photos;
+    return { photos, logo: null };
   }
   for (const product of PRODUCTS) {
     const list: Buffer[] = [];
@@ -602,12 +603,20 @@ async function loadPhotos(folder: string | undefined): Promise<Map<string, Buffe
     }
     if (list.length) photos.set(product.key, list);
   }
-  return photos;
+  const logoFile = PHOTO_EXTENSIONS.map((ext) => join(dir, `logo.${ext}`)).find((path) => existsSync(path));
+  return { photos, logo: logoFile ? await readFile(logoFile) : null };
 }
 
-async function fillStore(db: SystemDb, storeId: string, photos: Map<string, Buffer[]>): Promise<void> {
+async function fillStore(db: SystemDb, storeId: string, photos: Map<string, Buffer[]>, logo: Buffer | null): Promise<void> {
   const now = Date.now();
-  const storage = photos.size ? createFileStorage(getEnv()) : null;
+  const storage = photos.size || logo ? createFileStorage(getEnv()) : null;
+  let logoKey: string | null = null;
+  if (logo) {
+    const type = detectPhotoType(logo);
+    if (!type) fail("The logo is not a JPEG, PNG or WebP");
+    logoKey = newPhotoKey(storeId, type);
+    await storage!.put(logoKey, logo, type);
+  }
   const photoKeys = new Map<string, string[]>();
   for (const [productKey, files] of photos) {
     const keys: string[] = [];
@@ -637,6 +646,13 @@ async function fillStore(db: SystemDb, storeId: string, photos: Map<string, Buff
           provinceDeliveryEnabled: false,
           deliveryConfiguredAt: new Date(now - 14 * DAY_MS),
           linkSharedAt: new Date(now - 13 * DAY_MS),
+          logoKey,
+          // "On your invoices" (made up, like the rest of the shop).
+          taxNumber: "K001-900112233",
+          telegramLink: "t.me/mekongautogarage",
+          facebookLink: "fb.com/mekongautogarage",
+          invoiceNote:
+            "ធានាអាគុយ 12 ខែ និងកង់ 2 ឆ្នាំ។ សេវាជួសជុលធានា 3 ខែ។ សូមរក្សាបង្កាន់ដៃនេះ។\nWarranty: batteries 12 months, tyres 2 years, workshop work 3 months. Please keep this receipt.",
         },
       });
       for (const [index, zone] of DELIVERY.zones.entries()) {

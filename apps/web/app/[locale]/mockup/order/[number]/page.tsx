@@ -4,7 +4,9 @@ import {
   BUYER_ORDER_STEPS,
   canBuyerCancel,
   formatKhmerPhoneLocal,
+  formatTrackingCode,
   getBuyerProgress,
+  getInvoiceState,
   type OrderStatus,
 } from "@khmio/shared";
 import { Button, cn, ConfirmDialog, TONE_STYLES } from "@khmio/ui";
@@ -14,6 +16,7 @@ import {
   Check,
   CircleCheck,
   Clock,
+  FileText,
   MapPin,
   PackageCheck,
   Phone,
@@ -28,7 +31,8 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { mockStore } from "@/mock/mock-data";
+import { mockStore, mockTrackingCode } from "@/mock/mock-data";
+import { TrackingCodeCard } from "@/components/invoice/tracking-code-card";
 import { orderLineLabel, type OrderRecord } from "@/mock/mock-orders";
 import { BuyerBottomBar, BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { useMerchantProducts } from "../../merchant-products-context";
@@ -85,6 +89,9 @@ function OrderStatus({ order }: { order: OrderRecord }) {
   const profile = useMerchantProfile();
   const { placeLabel, clockTime, paymentLabel } = useOrderText();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const tInvoice = useTranslations("Invoice");
+  const trackingCode = formatTrackingCode(mockStore.slug, mockTrackingCode(order.orderNumber));
+  const invoiceHref = `/${locale}/mockup/order/${encodeURIComponent(order.orderNumber)}/invoice`;
 
   const isPickup = order.fulfilment === "pickup";
   const progress = getBuyerProgress(order.status);
@@ -237,6 +244,8 @@ function OrderStatus({ order }: { order: OrderRecord }) {
         </p>
       )}
 
+      <TrackingCodeCard code={trackingCode} />
+
       {progress !== null && (
         <section className="rounded-2xl border border-border bg-bg p-4" aria-label={t("progressLabel")}>
           <ol className="flex flex-col">
@@ -338,6 +347,12 @@ function OrderStatus({ order }: { order: OrderRecord }) {
           <span className="text-lg tabular-nums">{formatMoney(order.total, order.currency)}</span>
         </div>
         <p className="text-sm text-muted">{paymentLabel(order)}</p>
+        <Link href={invoiceHref} className="block">
+          <Button variant="secondary" className="w-full">
+            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {getInvoiceState(order) === "paid" ? tInvoice("viewReceipt") : tInvoice("viewInvoice")}
+          </Button>
+        </Link>
       </section>
 
       {/* Phone and tablet: the delivery and shop cards follow; from 1024 px they're in the side column. */}

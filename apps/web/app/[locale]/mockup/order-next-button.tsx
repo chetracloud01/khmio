@@ -1,6 +1,6 @@
 "use client";
 
-import { getSellerActions, type OrderAction } from "@khmio/shared";
+import { getDispatchRoute, getSellerActions, type OrderAction } from "@khmio/shared";
 import { Button } from "@khmio/ui";
 import { useLocale } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,8 @@ export function OrderNextButton({ order, fullWidth = false }: { order: OrderReco
         // Inside a row that opens the order: this button must not.
         event.stopPropagation();
         if (ONE_TAP.includes(action)) act(order.orderNumber, action);
+        // A pickup order is "sent" by marking it ready: nothing to fill in.
+        else if (action === "dispatch" && getDispatchRoute(order) === "pickup") act(order.orderNumber, "dispatch", { dispatch: { route: "pickup" } });
         else router.push(sellerOrderHref(locale, order.orderNumber));
       }}
     >

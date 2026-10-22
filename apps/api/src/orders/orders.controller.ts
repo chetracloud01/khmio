@@ -1,9 +1,11 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { orderActionRequestSchema } from "@khmio/shared";
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { formatTrackingCode, orderActionRequestSchema } from "@khmio/shared";
+import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
+import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { assertStoreWritable } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
+import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "./invoice";
 import { readOrderDetail, runSellerAction } from "./order-actions";
 import { sellerSummary } from "./summary";
 
@@ -14,17 +16,22 @@ const ORDER_LIST_LIMIT = 200;
 @Controller("orders")
 @UseGuards(MerchantStoreGuard)
 export class OrdersController {
-  constructor(@Inject(APP_DB) private readonly app: AppDb) {}
+  constructor(
+    @Inject(APP_DB) private readonly app: AppDb,
+    @Inject(FILE_STORAGE) private readonly storage: FileStorage,
+  ) {}
 
   @Get()
   async list(@CurrentStore() context: MerchantStore) {
     return withContext(this.app, context, async (tx) => {
+      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: { slug: true } });
       const orders = await tx.order.findMany({
         orderBy: { createdAt: "desc" },
         take: ORDER_LIST_LIMIT,
         select: {
           id: true,
           orderNumber: true,
+          trackingCode: true,
           status: true,
           paymentMethod: true,
           currency: true,
@@ -39,7 +46,12 @@ export class OrdersController {
           items: { select: { quantity: true } },
         },
       });
-      return orders.map(({ items, ...order }) => ({ ...order, itemCount: items.reduce((sum, item) => sum + item.quantity, 0) }));
+      // The tracking code as printed, so the list's search finds an order by it.
+      return orders.map(({ items, trackingCode, ...order }) => ({
+        ...order,
+        trackingCode: formatTrackingCode(store.slug, trackingCode),
+        itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
+      }));
     });
   }
 
@@ -52,6 +64,17 @@ export class OrdersController {
   @Get(":id")
   async get(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string) {
     return withContext(this.app, context, (tx) => readOrderDetail(tx, id));
+  }
+
+  /** The invoice / receipt for this order (design/screens.md B7), with the buyer's phone in full. */
+  @Get(":id/invoice")
+  async invoice(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string) {
+    return withContext(this.app, context, async (tx) => {
+      const order = await tx.order.findFirst({ where: { id, storeId: context.storeId }, select: invoiceOrderSelect });
+      if (!order) throw new NotFoundException();
+      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: invoiceStoreSelect });
+      return toInvoice(order, store, (key) => this.storage.publicUrl(key), "seller");
+    });
   }
 
   /** Confirm, pack, send, delivered, cash collected, failed, rebook or cancel — only the step that follows the order's status. */

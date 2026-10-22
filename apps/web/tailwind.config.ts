@@ -45,6 +45,16 @@ const config: Config = {
         fg: "rgb(var(--color-fg) / <alpha-value>)",
         muted: "rgb(var(--color-muted) / <alpha-value>)",
         border: "rgb(var(--color-border) / <alpha-value>)",
+        paper: {
+          DEFAULT: "rgb(var(--color-paper) / <alpha-value>)",
+          ink: "rgb(var(--color-paper-ink) / <alpha-value>)",
+          muted: "rgb(var(--color-paper-muted) / <alpha-value>)",
+          line: "rgb(var(--color-paper-line) / <alpha-value>)",
+          paid: "rgb(var(--color-paper-paid) / <alpha-value>)",
+          unpaid: "rgb(var(--color-paper-unpaid) / <alpha-value>)",
+          void: "rgb(var(--color-paper-void) / <alpha-value>)",
+          brand: "rgb(var(--color-paper-brand) / <alpha-value>)",
+        },
         khqr: {
           DEFAULT: "rgb(var(--color-khqr) / <alpha-value>)",
           surface: "rgb(var(--color-khqr-surface) / <alpha-value>)",

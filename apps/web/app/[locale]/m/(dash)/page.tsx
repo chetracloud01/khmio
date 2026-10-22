@@ -1,12 +1,15 @@
 "use client";
 
-import { needsSellerAction } from "@khmio/shared";
-import { Card, EmptyState, Mio, Skeleton } from "@khmio/ui";
+import { needsSellerAction, parseTrackingCode, trackingCodePrefix } from "@khmio/shared";
+import { BottomSheet, Card, EmptyState, Mio, Skeleton } from "@khmio/ui";
+import { PackagePlus, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
+import { formatMoney, useOrderText } from "@/components/order-ui";
+import { FindOrderPanel, OrdersNeedingAction, type ActionRow } from "@/components/seller-cards";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
-import { AttentionStrip, BestSellers, HOME_COLUMNS, HOME_ORDER_ROWS, HomeHeader, HomeStats, OrdersToHandle, SalesChart } from "@/components/seller-home";
+import { SalesOverview } from "@/components/sales-overview";
+import { HomeTopBar, InstallAppCard, InstallSheet, NeedsYouBanner, QuickActions, useInstallPrompt } from "@/components/seller-app";
 import { api, type SellerOrder } from "@/lib/api";
 import { shopStateOf, useMerchant } from "./merchant-context";
 import { OrderNextStep } from "./order-next-step";
@@ -21,9 +24,13 @@ export default function MerchantHomePage() {
   const t = useTranslations("Dashboard");
   const locale = useLocale();
   const { me, store, summary, refreshSummary } = useMerchant();
-  const { placeLabel, timeAgo } = useOrderText();
+  const { placeLabel, timeAgo, statusLabel } = useOrderText();
   const [orders, setOrders] = useState<SellerOrder[] | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const tApp = useTranslations("SellerApp");
+  const [findOpen, setFindOpen] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
+  const install = useInstallPrompt();
 
   const loadOrders = useCallback(() => {
     api<SellerOrder[]>("/orders").then(setOrders, () => setOrders((previous) => previous ?? []));
@@ -34,7 +41,13 @@ export default function MerchantHomePage() {
 
   const base = `/${locale}/m`;
   const header = (
-    <HomeHeader firstName={me.merchant.firstName} state={shopStateOf(me, store)} storefrontHref={`/${locale}/s/${store.slug}`} addProductHref={`${base}/products/new`} />
+    <HomeTopBar
+      firstName={me.merchant.firstName}
+      state={shopStateOf(me, store)}
+      onSearch={() => setFindOpen(true)}
+      storefrontHref={`/${locale}/s/${store.slug}`}
+      codePrefix={trackingCodePrefix(store.slug)}
+    />
   );
   const share = (
     // The setup checklist's "Share your shop" step jumps here.
@@ -58,14 +71,16 @@ export default function MerchantHomePage() {
   }
 
   const toHandle = orders.filter((order) => needsSellerAction(order.status));
-  const rows = toHandle.slice(0, HOME_ORDER_ROWS).map((order) => ({
+  const rows: ActionRow[] = toHandle.map((order) => ({
     key: order.id,
     href: `${base}/orders/${order.id}`,
     number: `#${order.orderNumber}`,
     buyer: order.buyerName,
     details: `${placeLabel(order)} · ${timeAgo(order.createdAt)}`,
     total: formatMoney(order.totalMinor, order.currency),
-    status: <OrderStatusPill order={order} />,
+    status: order.status,
+    fulfilment: order.fulfilment,
+    statusLabel: statusLabel(order),
     next: (
       <OrderNextStep
         order={order}
@@ -77,21 +92,28 @@ export default function MerchantHomePage() {
       />
     ),
   }));
-  const bestSellers = summary.bestSellers.map((item) => ({ name: locale === "km" ? item.nameKm || item.nameEn : item.nameEn || item.nameKm, quantity: item.quantity }));
+
+  const quickActions = [
+    { key: "add", href: `${base}/products/new`, icon: PackagePlus, label: tApp("quickAddProduct"), hint: tApp("addProductHint"), tone: "teal" as const },
+    { key: "share", href: `${base}#share`, icon: Share2, label: tApp("quickShareShop"), hint: tApp("shareShopHint"), tone: "amber" as const },
+  ];
 
   return (
     <div className={`${SELLER_PAGE} gap-5`}>
       {header}
-      <AttentionStrip count={summary.waiting} href={`${base}/orders`} />
+      {install.show && (
+        <InstallAppCard
+          onInstall={() => {
+            // The browser's own prompt where there is one (Android); otherwise the steps for this phone.
+            void install.prompt().then((prompted) => prompted || setInstallOpen(true));
+          }}
+          onDismiss={install.dismiss}
+        />
+      )}
+      <NeedsYouBanner count={summary.waiting} href={`${base}/orders`} />
+      <QuickActions items={quickActions} />
       <SetupChecklist />
-      <HomeStats
-        waiting={summary.waiting}
-        salesToday={summary.salesToday}
-        cashToCollect={summary.cashToCollect}
-        last7Days={summary.ordersLast7Days}
-        previous7Days={summary.ordersPrevious7Days}
-        defaultCurrency="USD"
-      />
+      <SalesOverview days={summary.days} top={summary.topProducts} cashToCollect={summary.cashToCollect} mainCurrency={store.defaultCurrency} />
       {problem && (
         <p role="alert" className="rounded-DEFAULT bg-danger/10 px-4 py-2 text-sm text-danger">
           {problem}
@@ -99,22 +121,25 @@ export default function MerchantHomePage() {
       )}
 
       {orders.length === 0 ? (
-        <div className={HOME_COLUMNS}>
-          <Card className="p-4">
-            <EmptyState art={<Mio size={96} />} title={t("firstOrderTitle")} body={t("firstOrderBody")} />
-          </Card>
-          {share}
-        </div>
+        <Card className="p-4">
+          <EmptyState art={<Mio size={96} />} title={t("firstOrderTitle")} body={t("firstOrderBody")} />
+        </Card>
       ) : (
-        <div className={HOME_COLUMNS}>
-          <OrdersToHandle rows={rows} waiting={summary.waiting} allHref={`${base}/orders`} />
-          <div className="flex min-w-0 flex-col gap-5">
-            <SalesChart days={summary.days} />
-            <BestSellers items={bestSellers} />
-            {share}
-          </div>
-        </div>
+        <OrdersNeedingAction rows={rows} total={summary.waiting} allHref={`${base}/orders`} />
       )}
+      {share}
+
+      <BottomSheet open={findOpen} onClose={() => setFindOpen(false)} closeLabel={tApp("close")} title={tApp("findOrder")}>
+        <FindOrderPanel
+          prefix={trackingCodePrefix(store.slug)}
+          hrefFor={(code) => {
+            // Among the latest orders the list holds.
+            const match = orders.find((order) => parseTrackingCode(order.trackingCode) === code);
+            return match ? `${base}/orders/${match.id}` : null;
+          }}
+        />
+      </BottomSheet>
+      <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} />
     </div>
   );
 }

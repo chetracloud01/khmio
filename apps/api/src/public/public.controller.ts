@@ -1,10 +1,11 @@
 import { withPublicOrder, withPublicStore, type AppDb } from "@khmio/db";
-import { canBuyerCancel, normalizeKhmerPhone, shopSlugSchema } from "@khmio/shared";
+import { canBuyerCancel, formatTrackingCode, normalizeKhmerPhone, parseTrackingCode, shopSlugSchema, toFieldErrors, trackOrderInputSchema } from "@khmio/shared";
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, Post, Req, Res } from "@nestjs/common";
 import { readDeliverySettings } from "../delivery/delivery";
-import { AppException } from "../errors";
+import { AppException, InvalidInputException } from "../errors";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
+import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "../orders/invoice";
 import { ORDER_TOKEN_PATTERN, parsePlaceOrder, placeOrder } from "../orders/place-order";
 import { linkFor, newLinkCode } from "../telegram/links";
 import { productInclude, toProductDto } from "../products/products";
@@ -108,6 +109,7 @@ export class PublicController {
         tx.order.findFirst({
           select: {
             orderNumber: true,
+            trackingCode: true,
             status: true,
             paymentMethod: true,
             currency: true,
@@ -129,7 +131,8 @@ export class PublicController {
             cancelReason: true,
             createdAt: true,
             items: {
-              select: { titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
+              // variantId: "Order again" puts the same options back in the buyer's cart.
+              select: { variantId: true, titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
               orderBy: { createdAt: "asc" },
             },
             events: { select: { status: true, at: true }, orderBy: { at: "asc" } },
@@ -143,10 +146,11 @@ export class PublicController {
       ]);
       if (!order) return null;
       const { logoKey, ...shop } = store;
-      const { dispatches, ...rest } = order;
+      const { dispatches, trackingCode, ...rest } = order;
       // The buyer's phone stays off this page: the link may be forwarded.
       return {
         ...rest,
+        trackingCode: formatTrackingCode(store.slug, trackingCode),
         dispatch: dispatches[0] ?? null,
         canCancel: canBuyerCancel(order),
         followingOnTelegram: followers > 0,
@@ -155,6 +159,37 @@ export class PublicController {
     });
     if (!found) throw new NotFoundException();
     return found;
+  }
+
+  /** The buyer's invoice / receipt (design/screens.md B7): the saved amounts, the shop's invoice details, their phone half hidden. */
+  @Get("orders/:token/invoice")
+  async invoice(@Param("token") token: string) {
+    if (!ORDER_TOKEN_PATTERN.test(token)) throw new NotFoundException();
+    const found = await withPublicOrder(this.app, token, async (tx, storeId) => {
+      const order = await tx.order.findFirst({ select: invoiceOrderSelect });
+      if (!order) return null;
+      const store = await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: invoiceStoreSelect });
+      return toInvoice(order, store, this.url, "buyer");
+    });
+    if (!found) throw new NotFoundException();
+    return found;
+  }
+
+  /**
+   * "Track my order" (design/screens.md B8): the order link for a tracking code and the phone it was placed with.
+   * A wrong pair is one answer (404), never which half was wrong; tries are limited per address.
+   */
+  @Post("track")
+  @HttpCode(200)
+  async track(@Req() req: AddressRequest, @Body() body: unknown) {
+    await this.limits.hit("trackOrder", clientAddress(req));
+    const parsed = trackOrderInputSchema.safeParse(body);
+    if (!parsed.success) throw new InvalidInputException(toFieldErrors(parsed.error));
+    const code = parseTrackingCode(parsed.data.code);
+    if (!code) throw new InvalidInputException({ code: "tracking_code_invalid" });
+    const [row] = await this.app.$queryRaw<{ token: string | null }[]>`SELECT app_order_token_by_tracking(${code}, ${parsed.data.phone}) AS token`;
+    if (!row?.token) throw new NotFoundException();
+    return { token: row.token };
   }
 
   /** "Get updates on Telegram": a t.me link with a one-time code for this order (15 minutes). */

@@ -1,12 +1,13 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { getMissingForSharing, storeDetailsSaveSchema, storeSettingsSchema } from "@khmio/shared";
+import { getMissingForSharing, invoiceDetailsSchema, storeDetailsSaveSchema, storeSettingsSchema } from "@khmio/shared";
 import { Body, Controller, Delete, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
 import { AppException, InvalidInputException } from "../errors";
 import { isStorePhotoKey } from "../files/photos";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { assertStoreWritable, storePlan } from "../merchant/plan";
-import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
+import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
+
 import { linkFor, newLinkCode } from "../telegram/links";
 import { RATE_LIMITER, type RateLimiter } from "../security/rate-limit";
 
@@ -19,9 +20,14 @@ const storeSelect = {
   description: true,
   logoKey: true,
   usdToKhrRate: true,
+  defaultCurrency: true,
   allowCod: true,
   deliveryConfiguredAt: true,
   linkSharedAt: true,
+  taxNumber: true,
+  invoiceNote: true,
+  telegramLink: true,
+  facebookLink: true,
 } as const;
 
 /** The shop details page: name, business type, phone, area, description, logo and the (optional) Bakong ID. */
@@ -56,6 +62,20 @@ export class StoreController {
         data: { actorType: "merchant", actorId: context.merchantId, storeId: context.storeId, action: "store.settings_saved", entity: "store", entityId: context.storeId },
       });
       return this.settings(tx, context.storeId);
+    });
+  }
+
+  /** "On your invoices" (design/screens.md S10): tax number, note, Telegram and Facebook — saved on their own, apart from the shop details. */
+  @Put("invoice")
+  async saveInvoiceDetails(@CurrentStore() context: MerchantStore, @Body() body: unknown) {
+    const input = invoiceDetailsSchema.parse(body);
+    return withContext(this.app, context, async (tx) => {
+      await assertStoreWritable(tx, context.storeId);
+      await tx.store.update({ where: { id: context.storeId }, data: input });
+      await tx.auditLog.create({
+        data: { actorType: "merchant", actorId: context.merchantId, storeId: context.storeId, action: "store.invoice_details_saved", entity: "store", entityId: context.storeId },
+      });
+      return this.details(tx, context.storeId);
     });
   }
 

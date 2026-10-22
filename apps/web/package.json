@@ -13,6 +13,8 @@
   "dependencies": {
     "@khmio/shared": "workspace:*",
     "@khmio/ui": "workspace:*",
+    "html-to-image": "1.11.11",
+    "jspdf": "3.0.1",
     "lucide-react": "^0.462.0",
     "next": "^14.2.15",
     "next-intl": "^3.25.0",

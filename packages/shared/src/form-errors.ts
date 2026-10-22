@@ -9,6 +9,7 @@ export const FORM_ERROR_CODES = [
   "too_short",
   "too_long",
   "phone_invalid",
+  "tracking_code_invalid",
   "bakong_invalid",
   "slug_invalid",
   "price_invalid",

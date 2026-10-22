@@ -83,6 +83,18 @@ export function useShopCart(slug: string) {
   return { ready, quantities: cart.quantities, currency: cart.currency, setQuantity, setCurrency, clear, keepOnly };
 }
 
+/**
+ * "Order again": puts an earlier order's options back in that shop's cart, on
+ * top of what's there. The cart page then drops anything the shop no longer
+ * sells and works out today's prices.
+ */
+export function addToShopCart(slug: string, lines: { variantId: string; quantity: number }[]) {
+  const stored = readJson<StoredCart>(cartKey(slug));
+  const quantities = { ...(stored && typeof stored.quantities === "object" ? stored.quantities : {}) };
+  for (const line of lines) quantities[line.variantId] = Math.min(MAX_LINE_QUANTITY, (quantities[line.variantId] ?? 0) + line.quantity);
+  writeJson(cartKey(slug), { quantities, currency: stored?.currency ?? null });
+}
+
 export interface CartLine {
   product: Product;
   variant: ProductVariant;

@@ -7,7 +7,7 @@ import {
   formatUsd,
   getMinimumPlanForProductCount,
 } from "@khmio/shared";
-import { Button, ConfirmDialog } from "@khmio/ui";
+import { Button, ConfirmDialog, Switch } from "@khmio/ui";
 import { ChevronRight, EyeOff, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -29,9 +29,10 @@ export default function DashboardProductsMockupPage() {
 function ProductsList() {
   const t = useTranslations("ProductsList");
   const tUp = useTranslations("Upgrade");
+  const tStore = useTranslations("Storefront");
   const locale = useLocale();
   const router = useRouter();
-  const { products, categories, brands, uoms, removeProduct } = useMerchantProducts();
+  const { products, categories, brands, uoms, removeProduct, updateProduct } = useMerchantProducts();
   const { subscription } = useMerchantSubscription();
   const atProductLimit = !canAddProduct(subscription.plan, products.length);
   const [pendingDelete, setPendingDelete] = useState<MockProduct[]>([]);
@@ -230,7 +231,12 @@ function ProductsList() {
                 <span className="truncate font-medium">{title(product)}</span>
                 {product.isHidden && hiddenBadge}
               </p>
-              <p className="truncate text-xs text-muted">{categoryName.get(product.categoryId)}</p>
+              <p className="flex items-center gap-2 truncate text-xs text-muted">
+                {categoryName.get(product.categoryId)}
+                {product.variants?.length ? (
+                  <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand">{tStore("optionCount", { count: product.variants.length })}</span>
+                ) : null}
+              </p>
               <p className="mt-1 text-sm font-semibold">
                 {priceText(product)}
                 {product.discountPercent ? (
@@ -238,6 +244,16 @@ function ProductsList() {
                 ) : null}
               </p>
             </div>
+          </div>
+        )}
+        renderCardAction={(product) => (
+          // Show or hide in the shop without opening the product (2026-10-22 seller review).
+          <div className="border-t border-border px-4">
+            <Switch
+              checked={!product.isHidden}
+              onChange={(visible) => updateProduct({ ...product, isHidden: !visible })}
+              label={product.isHidden ? t("hiddenInShop") : t("shownInShop")}
+            />
           </div>
         )}
         exportFileName="products"

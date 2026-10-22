@@ -3,13 +3,13 @@
 import { getMissingForSharing } from "@khmio/shared";
 import { useLocale } from "next-intl";
 import { useEffect, useState } from "react";
-import { ShopLinkCard } from "@/components/shop-link-card";
+import { ShareShopCard } from "@/components/seller-cards";
 import { api } from "@/lib/api";
 import { useMerchant } from "./merchant-context";
 
 /**
- * "Share your shop" on the live home page: the shared shop-link card
- * (components/shop-link-card) with this shop's link. Sharing, copying or
+ * "Share your shop" on the live home page: the shared card
+ * (components/seller-cards ShareShopCard) with this shop's link. Sharing, copying or
  * downloading the QR marks the link as shared — the setup checklist's last
  * step. Shown once the shop is ready for buyers (packages/shared
  * getMissingForSharing): before that, the link would lead them to a shop
@@ -33,5 +33,5 @@ export function ShareShop() {
     await refreshStore().catch(() => undefined);
   }
 
-  return <ShopLinkCard url={url} shopName={store.name} qrFileName={`${store.slug}-qr.png`} shared={store.linkShared} onShared={() => void markShared()} />;
+  return <ShareShopCard url={url} shopName={store.name} qrFileName={`${store.slug}-qr.png`} shared={store.linkShared} onShared={() => void markShared()} />;
 }

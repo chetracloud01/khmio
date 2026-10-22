@@ -37,6 +37,16 @@ export function formatKhmerPhoneLocal(saved: string): string {
   return `${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
 }
 
+/**
+ * A saved number with its middle hidden, "012 ••• 678": for pages a link may
+ * be forwarded to, like the buyer's invoice. The buyer still recognises it.
+ */
+export function maskKhmerPhone(saved: string): string {
+  const parts = formatKhmerPhoneLocal(saved).split(" ");
+  if (parts.length !== 3) return "•••";
+  return `${parts[0]} ${"•".repeat(parts[1]!.length)} ${parts[2]}`;
+}
+
 export const khmerPhoneSchema = z
   .string()
   .transform((val, ctx) => {

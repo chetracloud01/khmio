@@ -1,15 +1,18 @@
 "use client";
 
-import { approximateIn, BUYER_ORDER_STEPS, formatKhmerPhoneLocal, getBuyerProgress } from "@khmio/shared";
+import { approximateIn, BUYER_ORDER_STEPS, formatKhmerPhoneLocal, getBuyerProgress, getInvoiceState } from "@khmio/shared";
 import { Button, cn, ConfirmDialog } from "@khmio/ui";
-import { BellRing, Bus, Check, Clock, MapPin, PackageX, Phone, Send, Store, Truck } from "lucide-react";
+import { BellRing, Bus, Check, Clock, FileText, ListOrdered, MapPin, PackageX, Phone, RotateCcw, Send, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
+import { TrackingCodeCard } from "@/components/invoice/tracking-code-card";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
 import { api, ApiError, type PublicOrder, type TelegramLink } from "@/lib/api";
+import { addToShopCart } from "@/lib/cart";
+import { rememberOrder } from "@/lib/my-orders";
 
 /** How often an open order page asks for news (weak signal friendly; stops once the order is finished). */
 const REFRESH_EVERY_MS = 20_000;
@@ -20,6 +23,8 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
   const tCheckout = useTranslations("Checkout");
   const locale = useLocale();
   const tApp = useTranslations("App");
+  const tInvoice = useTranslations("Invoice");
+  const tBuyer = useTranslations("MyOrders");
   const { paymentLabel, placeLabel, clockTime } = useOrderText();
   const router = useRouter();
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -40,6 +45,12 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [finished, router]);
+
+  // Kept on this phone, so it shows under "My orders" — however the buyer opened it (checkout, Telegram, a shared link).
+  useEffect(() => {
+    if (!order) return;
+    rememberOrder({ token, shopSlug: order.store.slug, shopName: order.store.name, orderNumber: order.orderNumber, placedAt: order.createdAt });
+  }, [order, token]);
 
   async function cancelOrder() {
     setCancelling(true);
@@ -69,8 +80,26 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
   }
 
   const pickup = order.fulfilment === "pickup";
+  // Delivered, collected or cancelled: the same items can go straight back in the cart.
+  const canOrderAgain = order.status === "delivered" || order.status === "completed" || order.status === "cancelled";
+  function orderAgain() {
+    if (!order) return;
+    addToShopCart(
+      order.store.slug,
+      order.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity })),
+    );
+    router.push(`/${locale}/s/${order.store.slug}/cart`);
+  }
   // A pickup order "out for delivery" is waiting at the shop.
-  const shownStatus = pickup && order.status === "out_for_delivery" ? "ready_for_pickup" : pickup && order.status === "failed_delivery" ? "not_collected" : order.status;
+  // For the buyer, "completed" (the seller settled the cash) reads the same as "delivered".
+  const shownStatus =
+    pickup && order.status === "out_for_delivery"
+      ? "ready_for_pickup"
+      : pickup && order.status === "failed_delivery"
+        ? "not_collected"
+        : order.status === "completed"
+          ? "delivered"
+          : order.status;
   const progress = getBuyerProgress(order.status);
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   const shopHref = `/${locale}/s/${order.store.slug}`;
@@ -130,10 +159,20 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
               {t("callShop", { phone: formatKhmerPhoneLocal(order.store.phone) })}
             </a>
           )}
+          {canOrderAgain && (
+            <Button variant="primary" className="w-full" onClick={orderAgain}>
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              {t("orderAgain")}
+            </Button>
+          )}
           <Link href={shopHref} className="block">
             <Button variant="secondary" className="w-full">
               {t("backToShop")}
             </Button>
+          </Link>
+          <Link href={`/${locale}/orders`} className="flex min-h-touch items-center justify-center gap-2 text-sm font-medium text-brand">
+            <ListOrdered className="h-4 w-4" aria-hidden="true" />
+            {tBuyer("myOrders")}
           </Link>
           {!finished && <TelegramUpdates token={token} following={order.followingOnTelegram} />}
           {cancelProblem && (
@@ -190,6 +229,8 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
           )}
         </div>
       </section>
+
+        <TrackingCodeCard code={order.trackingCode} />
 
         {progress !== null && (
           <ol aria-label={t("progressLabel")} className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
@@ -260,6 +301,12 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
               </dd>
             </div>
           </dl>
+          <Link href={`/${locale}/o/${encodeURIComponent(token)}/invoice`} className="block">
+            <Button variant="secondary" className="w-full">
+              <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {getInvoiceState(order) === "paid" ? tInvoice("viewReceipt") : tInvoice("viewInvoice")}
+            </Button>
+          </Link>
         </section>
 
         {order.events.length > 0 && <p className="text-xs text-muted">{clockTime(order.events[order.events.length - 1]!.at)}</p>}

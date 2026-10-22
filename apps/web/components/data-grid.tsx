@@ -11,10 +11,12 @@ import {
   Download,
   Rows3,
   SlidersHorizontal,
+  SquareCheckBig,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 // The standard data grid for every list in the app (admin and merchant):
 // search, quick-filter chips, a filter panel, sortable columns, row selection
@@ -40,6 +42,25 @@ export interface DataGridChip<T> {
   value: string;
   label: string;
   predicate: (row: T) => boolean;
+  /** An icon before the label; `iconClass` colours it while the chip isn't the chosen one. */
+  icon?: LucideIcon;
+  iconClass?: string;
+}
+
+/**
+ * Group headers in the list and the table. `key` decides the group and
+ * `label` names it; with `sortKey`, groups show only while sorted by that
+ * column (days, for a date sort); with `rank`, groups come in that order
+ * (statuses in the order work happens), each keeping the chosen sort inside.
+ */
+export interface DataGridGroup<T> {
+  sortKey?: string;
+  key: (row: T) => string;
+  label: (row: T) => string;
+  rank?: (row: T) => number;
+  /** Shown before the label in the header, e.g. a coloured status icon. */
+  icon?: (row: T) => ReactNode;
+  labelClass?: (row: T) => string;
 }
 
 export interface DataGridFilter<T> {
@@ -67,7 +88,7 @@ interface StoredPrefs {
   pageSize: number;
 }
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZES = [10, 20, 50, 100];
 
 function csvEscape(value: string | number): string {
   const text = String(value);
@@ -93,6 +114,10 @@ export function DataGrid<T>({
   storageKey,
   emptyTitle,
   emptyArt,
+  groupBy,
+  defaultPageSize,
+  selectOnDemand = false,
+  renderCardAside,
 }: {
   rows: T[];
   getRowId: (row: T) => string;
@@ -120,6 +145,17 @@ export function DataGrid<T>({
   emptyTitle?: string;
   /** A picture above the empty message, such as Mio. */
   emptyArt?: ReactNode;
+  /**
+   * Group headers in the list and the table (e.g. Today · Yesterday · 20 Oct)
+   * while it's sorted by `sortKey`; `key` decides the group, `label` names it.
+   */
+  groupBy?: DataGridGroup<T> | ((chip: string) => DataGridGroup<T> | null);
+  /** Rows per page until the viewer picks another (10, 20, 50 or 100). */
+  defaultPageSize?: number;
+  /** Checkboxes only after "Select" is tapped (bulk actions are occasional); otherwise always shown. */
+  selectOnDemand?: boolean;
+  /** Beside a phone card, outside its tap area (e.g. a show/hide switch); it replaces the card's arrow. */
+  renderCardAside?: (row: T) => ReactNode;
 }) {
   const t = useTranslations("DataGrid");
   const [search, setSearch] = useState(initialSearch);
@@ -130,11 +166,13 @@ export function DataGrid<T>({
   const [sort, setSort] = useState<SortState>(initialSort);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** With selectOnDemand: whether "Select" was tapped, showing the checkboxes. */
+  const [selecting, setSelecting] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(
     () => new Set(columns.filter((column) => column.defaultHidden).map((column) => column.key)),
   );
   const [density, setDensity] = useState<Density>("comfortable");
-  const [pageSize, setPageSize] = useState(PAGE_SIZES[0] ?? 10);
+  const [pageSize, setPageSize] = useState(defaultPageSize && PAGE_SIZES.includes(defaultPageSize) ? defaultPageSize : (PAGE_SIZES[0] ?? 10));
   // State, not a ref: saving must wait until the loaded values have actually
   // rendered, or the defaults get written over the saved choice first.
   const [prefsLoaded, setPrefsLoaded] = useState(false);
@@ -169,6 +207,9 @@ export function DataGrid<T>({
   const visibleColumns = columns.filter((column) => !hidden.has(column.key));
   const activeFilterCount = Object.values(filterValues).filter(Boolean).length;
 
+  const groupSpec = typeof groupBy === "function" ? groupBy(chip) : (groupBy ?? null);
+  const grouping = groupSpec && (!groupSpec.sortKey || sort?.key === groupSpec.sortKey) ? groupSpec : null;
+
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
     const chipDef = chips?.find((item) => item.value === chip);
@@ -193,13 +234,32 @@ export function DataGrid<T>({
         return sort.direction === "asc" ? order : -order;
       });
     }
+    // Groups in their own order (stable: the chosen sort still holds inside each group).
+    if (grouping?.rank) {
+      const rank = grouping.rank;
+      result = [...result].sort((a, b) => rank(a) - rank(b));
+    }
     return result;
-  }, [rows, search, chip, chips, filters, filterValues, searchText, sort, columns]);
+  }, [rows, search, chip, chips, filters, filterValues, searchText, sort, columns, grouping]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
   const start = (currentPage - 1) * pageSize;
   const pageRows = filtered.slice(start, start + pageSize);
+
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (grouping) for (const row of filtered) counts.set(grouping.key(row), (counts.get(grouping.key(row)) ?? 0) + 1);
+    return counts;
+  }, [filtered, grouping]);
+  /** The group header to show before this row, or null when it continues the previous row's group. */
+  const groupStart = (index: number): { key: string; label: string; count: number; icon: ReactNode; labelClass: string } | null => {
+    if (!grouping) return null;
+    const row = pageRows[index]!;
+    const key = grouping.key(row);
+    if (index > 0 && grouping.key(pageRows[index - 1]!) === key) return null;
+    return { key, label: grouping.label(row), count: groupCounts.get(key) ?? 0, icon: grouping.icon?.(row) ?? null, labelClass: grouping.labelClass?.(row) ?? "" };
+  };
 
   // Drop selections that are no longer visible after filtering.
   const filteredIds = useMemo(() => new Set(filtered.map(getRowId)), [filtered, getRowId]);
@@ -267,7 +327,32 @@ export function DataGrid<T>({
 
   const sortableColumns = columns.filter((column) => column.sortable && column.value);
   const cellPadding = density === "compact" ? "px-4 py-1.5" : "px-4 py-3";
-  const hasSelection = Boolean(bulkActions?.length);
+  const hasSelection = Boolean(bulkActions?.length) && (!selectOnDemand || selecting);
+
+  const sortControl = (
+    <label className="flex items-center gap-2 text-sm">
+      <ArrowUpDown className="h-4 w-4 text-muted" aria-hidden="true" />
+      <span className="text-muted">{t("sortBy")}</span>
+      <select
+        value={sort ? `${sort.key}:${sort.direction}` : ""}
+        onChange={(e) => {
+          const [key, direction] = e.target.value.split(":");
+          setSort(key && (direction === "asc" || direction === "desc") ? { key, direction } : null);
+        }}
+        className="min-h-touch flex-1 rounded-DEFAULT border border-border bg-bg px-3 text-sm text-fg"
+      >
+        <option value="">{t("defaultOrder")}</option>
+        {sortableColumns.flatMap((column) => [
+          <option key={`${column.key}:asc`} value={`${column.key}:asc`}>
+            {column.header} ↑
+          </option>,
+          <option key={`${column.key}:desc`} value={`${column.key}:desc`}>
+            {column.header} ↓
+          </option>,
+        ])}
+      </select>
+    </label>
+  );
 
   const toolButton = (active: boolean) =>
     cn(
@@ -293,6 +378,7 @@ export function DataGrid<T>({
                 onClick={() => {
                   action.run(targets);
                   setSelected(new Set());
+                  setSelecting(false);
                 }}
               >
                 {action.label}
@@ -302,7 +388,10 @@ export function DataGrid<T>({
           })}
           <button
             type="button"
-            onClick={() => setSelected(new Set())}
+            onClick={() => {
+              setSelected(new Set());
+              setSelecting(false);
+            }}
             aria-label={t("clearSelection")}
             className="flex h-11 w-11 items-center justify-center rounded-DEFAULT text-muted hover:bg-canvas"
           >
@@ -312,7 +401,7 @@ export function DataGrid<T>({
       ) : (
         <div className="flex flex-col gap-3 border-b border-border p-3 md:p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="min-w-0 flex-1 basis-56">
+            <div className="min-w-0 flex-1 basis-0 sm:basis-56">
               <SearchInput
                 placeholder={searchPlaceholder}
                 value={search}
@@ -342,7 +431,8 @@ export function DataGrid<T>({
                 onClick={() => setColumnsOpen((open) => !open)}
                 aria-expanded={columnsOpen}
                 aria-label={t("columns")}
-                className={toolButton(columnsOpen)}
+                // Columns only shape the laptop's table: phones show cards.
+                className={cn(toolButton(columnsOpen), "hidden lg:inline-flex")}
               >
                 <Columns3 className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline">{t("columns")}</span>
@@ -399,6 +489,12 @@ export function DataGrid<T>({
                 </>
               )}
             </div>
+            {selectOnDemand && bulkActions && bulkActions.length > 0 && (
+              <button type="button" onClick={() => setSelecting((on) => !on)} aria-pressed={selecting} className={toolButton(selecting)} aria-label={selecting ? t("doneSelecting") : t("select")}>
+                <SquareCheckBig className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">{selecting ? t("doneSelecting") : t("select")}</span>
+              </button>
+            )}
             <button type="button" onClick={exportCsv} className={toolButton(false)} aria-label={t("exportCsv")}>
               <Download className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">{t("exportCsv")}</span>
@@ -407,6 +503,8 @@ export function DataGrid<T>({
 
           {filtersOpen && filters && (
             <div className="flex flex-wrap items-end gap-3 rounded-DEFAULT bg-canvas p-3">
+              {/* Phone: sorting lives here with the filters, so the toolbar stays one row. */}
+              {sortableColumns.length > 0 && <div className="w-full lg:hidden">{sortControl}</div>}
               {filters.map((filter) => (
                 <label key={filter.key} className="flex min-w-[160px] flex-1 flex-col gap-1 text-sm sm:flex-none">
                   <span className="font-medium text-fg">{filter.label}</span>
@@ -461,6 +559,7 @@ export function DataGrid<T>({
                       active ? "border-brand bg-brand text-on-brand" : "border-border bg-bg text-muted hover:text-fg",
                     )}
                   >
+                    {"icon" in option && option.icon && <option.icon className={cn("h-4 w-4 shrink-0", !active && option.iconClass)} aria-hidden="true" />}
                     {option.label}
                     <span
                       className={cn(
@@ -476,30 +575,8 @@ export function DataGrid<T>({
             </div>
           )}
 
-          {sortableColumns.length > 0 && (
-            <label className="flex items-center gap-2 text-sm lg:hidden">
-              <ArrowUpDown className="h-4 w-4 text-muted" aria-hidden="true" />
-              <span className="text-muted">{t("sortBy")}</span>
-              <select
-                value={sort ? `${sort.key}:${sort.direction}` : ""}
-                onChange={(e) => {
-                  const [key, direction] = e.target.value.split(":");
-                  setSort(key && (direction === "asc" || direction === "desc") ? { key, direction } : null);
-                }}
-                className="min-h-touch flex-1 rounded-DEFAULT border border-border bg-bg px-3 text-sm text-fg"
-              >
-                <option value="">{t("defaultOrder")}</option>
-                {sortableColumns.flatMap((column) => [
-                  <option key={`${column.key}:asc`} value={`${column.key}:asc`}>
-                    {column.header} ↑
-                  </option>,
-                  <option key={`${column.key}:desc`} value={`${column.key}:desc`}>
-                    {column.header} ↓
-                  </option>,
-                ])}
-              </select>
-            </label>
-          )}
+          {/* Lists without filters keep sorting as its own row on a phone. */}
+          {sortableColumns.length > 0 && !(filters && filters.length > 0) && <div className="lg:hidden">{sortControl}</div>}
         </div>
       )}
 
@@ -568,12 +645,24 @@ export function DataGrid<T>({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {pageRows.map((row) => {
+                {pageRows.map((row, index) => {
                   const id = getRowId(row);
                   const isSelected = selected.has(id);
+                  const group = groupStart(index);
                   return (
+                    <Fragment key={id}>
+                    {group && (
+                      <tr className="bg-canvas">
+                        <th colSpan={visibleColumns.length + (hasSelection ? 1 : 0)} scope="rowgroup" className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                          <span className="inline-flex items-center gap-2">
+                            {group.icon}
+                            <span className={group.labelClass}>{group.label}</span>
+                            <span className="rounded-full bg-bg px-2 py-0.5 tabular-nums">{group.count}</span>
+                          </span>
+                        </th>
+                      </tr>
+                    )}
                     <tr
-                      key={id}
                       onClick={onRowClick ? () => onRowClick(row) : undefined}
                       className={cn(
                         "transition-colors",
@@ -605,6 +694,7 @@ export function DataGrid<T>({
                         </td>
                       ))}
                     </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -612,13 +702,24 @@ export function DataGrid<T>({
           </div>
 
           <ul className="grid grid-cols-1 gap-px bg-border sm:grid-cols-2 lg:hidden">
-            {pageRows.map((row) => {
+            {pageRows.map((row, index) => {
               const id = getRowId(row);
               const isSelected = selected.has(id);
+              const group = groupStart(index);
               return (
-                <li key={id} className={cn("flex items-stretch bg-bg", isSelected && "bg-brand/5")}>
+                <Fragment key={id}>
+                {group && (
+                  <li className="flex items-center justify-between bg-canvas px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted sm:col-span-2">
+                    <span className="flex items-center gap-2">
+                      {group.icon}
+                      <span className={group.labelClass}>{group.label}</span>
+                    </span>
+                    <span className="rounded-full bg-bg px-2 py-0.5 tabular-nums">{group.count}</span>
+                  </li>
+                )}
+                <li className={cn("flex items-stretch bg-bg", isSelected && "bg-brand/5")}>
                   {hasSelection && (
-                    <label className="flex shrink-0 cursor-pointer items-start py-4 pl-4 pr-1">
+                    <label className="flex w-12 shrink-0 cursor-pointer items-center justify-center pl-2">
                       <input
                         type="checkbox"
                         className="mt-0.5 h-5 w-5 accent-brand"
@@ -629,7 +730,14 @@ export function DataGrid<T>({
                     </label>
                   )}
                   <div className="flex min-w-0 flex-1 flex-col">
-                    {onRowClick ? (
+                    {onRowClick && renderCardAside ? (
+                      <div className="flex min-w-0 flex-1 items-center">
+                        <button type="button" onClick={() => onRowClick(row)} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-2 text-left hover:bg-canvas/70">
+                          <div className="min-w-0 flex-1">{renderCard(row)}</div>
+                        </button>
+                        <div className="shrink-0 pr-3">{renderCardAside(row)}</div>
+                      </div>
+                    ) : onRowClick ? (
                       <button
                         type="button"
                         onClick={() => onRowClick(row)}
@@ -644,6 +752,7 @@ export function DataGrid<T>({
                     {renderCardAction?.(row)}
                   </div>
                 </li>
+                </Fragment>
               );
             })}
           </ul>

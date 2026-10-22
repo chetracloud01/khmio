@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeKhmerPhone } from "./phone";
+import { maskKhmerPhone, normalizeKhmerPhone } from "./phone";
 
 describe("normalizeKhmerPhone", () => {
   it("normalizes a 9-digit number with leading 0", () => {
@@ -20,5 +20,12 @@ describe("normalizeKhmerPhone", () => {
 
   it("rejects too few digits", () => {
     expect(normalizeKhmerPhone("012 34")).toBeNull();
+  });
+});
+
+describe("maskKhmerPhone", () => {
+  it("hides the middle and keeps the ends", () => {
+    expect(maskKhmerPhone("85512345678")).toBe("012 ••• 678");
+    expect(maskKhmerPhone("855971234567")).toBe("097 ••• 4567");
   });
 });

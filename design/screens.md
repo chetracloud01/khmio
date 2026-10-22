@@ -96,6 +96,35 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
 - Cash on delivery orders land here directly, as "COD pending".
 - **Change:** today this is a one-time "Order placed" screen with no
   statuses and no link.
+- **Change (invoice):** shows the order's tracking code (copy button) and a
+  "View invoice" button (B7); "Order placed" says to keep the code to track
+  the order without Telegram.
+
+### B7. Invoice / receipt `/o/[token]/invoice` — Built · L
+- One document for buyer and seller (the seller opens it from S5).
+- Header: shop logo, name, phone, address (the pickup address), tax number
+  (VAT TIN) and Telegram / Facebook page — each only when the seller set it.
+- Title "Invoice" until the order is paid or completed, then "Receipt";
+  order number, date, tracking code; a stamp: UNPAID / PAID / CANCELLED.
+- Buyer: name, phone, delivery address and landmark, or "Pickup at the shop".
+- Items: product, option, quantity, unit price, line total. Totals:
+  subtotal, discount, delivery, VAT, total in the order's currency with
+  "≈" the other currency underneath — the saved amounts, never recomputed.
+- Payment: cash on delivery or KHQR (with reference when paid).
+- Footer: the seller's invoice note (e.g. warranty), a QR code to the order
+  page, "Thank you".
+- Two sizes: A4 and 80 mm receipt (switch above the document).
+- Buttons (never printed): Print · Download PDF · Save image · Share (the
+  phone's share sheet with the file, for Telegram, Messenger…). The PDF and
+  image are a picture of the document, so Khmer always renders correctly.
+
+### B8. Track my order `/track` — Built · L
+- For buyers without Telegram: tracking code + phone number → B6.
+- The code is 8 letters and digits without look-alikes (no 0/O, 1/I),
+  shown as `MEK-7K4P-9QXR` (first three letters of the shop's link, then the code).
+- Wrong code or phone: one message for both ("We couldn't find that
+  order"), never which one was wrong; too many tries are slowed down.
+- Linked from the shop page footer, the "Order placed" screen and B7's QR.
 
 ## Seller
 
@@ -139,7 +168,8 @@ Phone first; sidebar from tablet width; tables on desktop.
   up · province bus (company, ticket number).
 - COD: "Cash received from driver" before the order completes.
 - Problems: cancel with a reason; failed delivery → rebook.
-- Print or share the order slip.
+- Print or share the order slip. **Change (invoice):** "Invoice" opens B7 for this order;
+  search also finds an order by its tracking code.
 - Desktop: two columns (order on the left, actions and timeline on the right).
 
 ### S6. Products list — Built · L
@@ -169,6 +199,9 @@ Phone first; sidebar from tablet width; tables on desktop.
 
 ### S10. Shop profile — Built · L
 - Shop details, getting paid (Bakong ID), order alerts, login methods.
+- **Change (invoice):** an "On your invoices" section — tax number (VAT TIN),
+  invoice note (up to 300 characters), Telegram and Facebook page; with a
+  small preview of the invoice header.
 
 ### S11. Verification (KYC) — Built · L
 ### S12. Plan and billing — Built · L

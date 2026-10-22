@@ -32,6 +32,22 @@
   --color-khqr-surface: 255 255 255;
   --color-khqr-ink: 17 24 39;
 
+  /* Invoices and receipts (design/screens.md B7): white paper with dark ink in
+     both themes, because they're printed, saved as images and shared. */
+  --color-paper: 255 255 255;
+  --color-paper-ink: 17 24 39;
+  --color-paper-muted: 75 85 99; /* 7.6:1 on paper */
+  --color-paper-line: 209 213 219;
+  --color-paper-paid: 21 112 54;
+  --color-paper-unpaid: 163 75 8;
+  --color-paper-void: 200 30 30;
+  --color-paper-brand: 14 116 144; /* Khmio Teal, kept in dark mode: white letters on it stay 5.4:1 */
+
+  /* The home's two quick-action icons (Add product, Share shop): bright, the same in both themes, white icons on them. */
+  --color-action-teal: 20 184 166;
+  --color-action-amber: 245 158 11;
+  --color-action-orange: 234 88 12;
+
   /* The admin sidebar: Deep Khmio Teal, dark in both themes (chosen 2026-10-07).
      It follows the viewer's accent (below), so it never clashes. nav-accent is the
      current-page bar and logo square; nav-badge the menu's count badges. */
@@ -133,6 +149,10 @@ body {
   /* A sticky bar that sits on top of the dashboard's phone bottom nav (4rem + home bar). */
   .bottom-above-nav {
     bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  /* No bottom tabs (a full-screen form on a phone): the bar sits at the bottom. */
+  .nav-hidden .bottom-above-nav {
+    bottom: env(safe-area-inset-bottom);
   }
   /* Swipeable rows (categories, offers): scroll by touch or trackpad, no visible bar. */
   .no-scrollbar {

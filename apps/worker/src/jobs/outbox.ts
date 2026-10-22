@@ -1,5 +1,5 @@
 import type { SystemDb } from "@khmio/db";
-import { adminAlertText, ALERT_BUTTONS, buyerCancelledAlert, buyerUpdateText, confirmButtonData, newOrderAlert, STOP_BUTTON_LABEL, stopButtonData, type AdminAlert } from "@khmio/shared";
+import { adminAlertText, ALERT_BUTTONS, buyerCancelledAlert, buyerUpdateText, confirmButtonData, formatTrackingCode, newOrderAlert, STOP_BUTTON_LABEL, stopButtonData, type AdminAlert } from "@khmio/shared";
 import type { Logger } from "pino";
 import { TelegramError, type InlineButton, type TelegramClient } from "../telegram/client";
 
@@ -143,14 +143,31 @@ async function buildMessage(deps: OutboxDeps, kind: string, payload: Record<stri
   const order = typeof payload.orderId === "string"
     ? await deps.db.order.findUnique({
         where: { id: payload.orderId },
-        select: { id: true, orderNumber: true, status: true, totalMinor: true, currency: true, paymentMethod: true, fulfilment: true, districtId: true, provinceId: true, items: { select: { quantity: true } } },
+        select: {
+          id: true,
+          orderNumber: true,
+          trackingCode: true,
+          status: true,
+          totalMinor: true,
+          currency: true,
+          paymentMethod: true,
+          fulfilment: true,
+          districtId: true,
+          provinceId: true,
+          items: { select: { quantity: true } },
+          store: { select: { slug: true } },
+        },
       })
     : null;
   if (!order) throw new Error(`order for ${kind} not found`);
   // Telegram refuses a button that links to a private address (localhost on a developer's PC): leave "Open" out there.
   const open = linksFromTelegram(deps.webOrigin) ? [{ text: ALERT_BUTTONS.open, url: `${deps.webOrigin}/km/m/orders/${order.id}` }] : [];
   if (kind === "order_placed") {
-    const text = newOrderAlert({ ...order, itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0) });
+    const text = newOrderAlert({
+      ...order,
+      trackingCode: formatTrackingCode(order.store.slug, order.trackingCode),
+      itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+    });
     // "Confirm" only while the order still waits for it (it may have been confirmed in the dashboard meanwhile).
     const canConfirm = order.status === "cod_pending" || order.status === "paid";
     return {
@@ -171,12 +188,20 @@ async function buyerUpdate(deps: OutboxDeps, payload: Record<string, unknown>): 
     where: { id: orderId },
     select: {
       orderNumber: true,
+      trackingCode: true,
       fulfilment: true,
-      store: { select: { name: true } },
+      store: { select: { name: true, slug: true } },
       dispatches: { orderBy: { dispatchedAt: "desc" }, take: 1, select: { route: true, driverName: true, busCompany: true, ticketNumber: true } },
     },
   });
   if (!order) return null;
-  const text = buyerUpdateText({ orderNumber: order.orderNumber, shopName: order.store.name, status, fulfilment: order.fulfilment, dispatch: order.dispatches[0] ?? null });
+  const text = buyerUpdateText({
+    orderNumber: order.orderNumber,
+    shopName: order.store.name,
+    status,
+    fulfilment: order.fulfilment,
+    dispatch: order.dispatches[0] ?? null,
+    trackingCode: formatTrackingCode(order.store.slug, order.trackingCode),
+  });
   return text ? { text, buttons: [[{ text: STOP_BUTTON_LABEL, callbackData: stopButtonData(orderId) }]] } : null;
 }

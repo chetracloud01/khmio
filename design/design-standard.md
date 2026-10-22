@@ -214,19 +214,23 @@ has to message the seller.
 From `docs/blueprint.md` "Workflows from start to end". The same names, colours and order on the
 buyer's order page, the seller's order list and Telegram messages.
 
-| Status | Colour | Buyer sees | Seller's next button |
-| --- | --- | --- | --- |
-| Awaiting payment | `warning` | QR and pay-by time | — |
-| Paid | `success` | Receipt | Confirm order |
-| COD pending | `warning` | Order summary, "pay on delivery" | Confirm order |
-| Confirmed | `info` | "The shop accepted your order" | Start packing |
-| Packing | `info` | "Being packed" | Send (driver / pickup / bus) |
-| Waiting for driver | `info` | "Being packed" (no change for the buyer) | — |
-| Out for delivery | `info` | Tracking link or bus ticket number | Mark delivered |
-| Delivered | `success` | Thank-you and reorder link | Cash settled (COD only) |
-| Completed | `success` | — | — |
-| Cancelled | `danger` | Reason | — |
-| Failed delivery | `danger` | Rebook option | Rebook delivery |
+| Status | Colour | Icon | Buyer sees | Seller's next button |
+| --- | --- | --- | --- | --- |
+| Awaiting payment | `warning` | Hourglass | QR and pay-by time | — |
+| Paid | `success` | Bell ringing | Receipt | Confirm order |
+| COD pending | `warning` | Bell ringing | Order summary, "pay on delivery" | Confirm order |
+| Confirmed | `info` | Thumbs up | "The shop accepted your order" | Start packing |
+| Packing | `info` | Open box | "Being packed" | Send (driver / pickup / bus) |
+| Waiting for driver | `brand` | Person searching | "Being packed" (no change for the buyer) | — |
+| Out for delivery | `brand` | Truck (pickup: shop) | Tracking link or bus ticket number | Mark delivered |
+| Delivered | `success` | Hand with coins | Thank-you and reorder link | Cash settled (COD only) |
+| Completed | `success` | Big check | — | — |
+| Cancelled | `danger` | Circle with X | Reason | — |
+| Failed delivery | `danger` | Box with X | Rebook option | Rebook delivery |
+
+The seller's orders list groups by step in this order — To confirm (bell, `warning`), Packing (open box,
+`info`), Sending (truck, `brand`), Delivered (big check, `success`), Problems (warning sign, `danger`) —
+with the same icon on each tab. Icons and colours come from `apps/web/components/order-ui.tsx`.
 
 ## 8. Before a screen counts as done
 
