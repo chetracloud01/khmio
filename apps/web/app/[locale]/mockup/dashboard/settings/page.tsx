@@ -9,7 +9,7 @@ import {
   type FormErrorCode,
   type StoreSettings,
 } from "@khmio/shared";
-import { Card, Input, SegmentedControl, Select } from "@khmio/ui";
+import { Card, Input, SegmentedControl, Select, Switch } from "@khmio/ui";
 import { ChevronRight, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -173,18 +173,7 @@ function SettingsForm() {
         </FormSection>
 
         <FormSection stacked title={t("sectionPayments")} description={t("sectionPaymentsHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              checked={draft.allowCod}
-              onChange={(e) => update("allowCod", e.target.checked, "allowCod")}
-              className="mt-1 h-5 w-5 shrink-0 accent-brand"
-            />
-            <span>
-              <span className="block text-sm font-medium">{t("codLabel")}</span>
-              <span className="block text-xs text-muted">{t("codHint")}</span>
-            </span>
-          </label>
+          <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod, "allowCod")} label={t("codLabel")} description={t("codHint")} />
         </FormSection>
 
         {choosesStockLocation && (

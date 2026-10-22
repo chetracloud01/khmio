@@ -1,7 +1,7 @@
 "use client";
 
 import { BottomSheet, Button, cn, Mio, StatusPill } from "@khmio/ui";
-import { Bell, Check, ChevronRight, Copy, Download, FileText, Inbox, MapPin, Phone, Search, Send, Share, SquarePlus, Store, WifiOff, X, type LucideIcon } from "lucide-react";
+import { Bell, Check, ChevronRight, Copy, Download, FileText, Inbox, MapPin, Phone, Search, Send, Share, SquarePlus, WifiOff, X, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
@@ -16,10 +16,10 @@ import type { ShopState } from "@/components/seller-home";
 
 /**
  * The top of the seller's home: greeting and shop status, then a search bar
- * that opens "find order by code" and, on a phone, a round "View shop" button
- * beside it (a laptop has "View my shop" in its top bar).
+ * that opens "find order by code". "View shop" is in the frame's header (phone)
+ * and top bar (laptop).
  */
-export function HomeTopBar({ firstName, state, onSearch, storefrontHref, codePrefix }: { firstName: string; state: ShopState; onSearch: () => void; storefrontHref: string; codePrefix: string }) {
+export function HomeTopBar({ firstName, state, onSearch, codePrefix }: { firstName: string; state: ShopState; onSearch: () => void; codePrefix: string }) {
   const t = useTranslations("Dashboard");
   const tApp = useTranslations("SellerApp");
   const hour = new Date().getHours();
@@ -30,7 +30,10 @@ export function HomeTopBar({ firstName, state, onSearch, storefrontHref, codePre
       : state.kind === "due"
         ? { tone: "warning" as const, label: t("statusDue") }
         : state.kind === "trial"
-          ? { tone: "brand" as const, label: t("statusTrial", { count: state.daysLeft }) }
+          ? {
+              tone: "brand" as const,
+              label: t("statusTrial", { count: state.daysLeft }),
+            }
           : { tone: "success" as const, label: t("statusOpen") };
   return (
     <div className="flex flex-col gap-3">
@@ -45,49 +48,58 @@ export function HomeTopBar({ firstName, state, onSearch, storefrontHref, codePre
         <button
           type="button"
           onClick={onSearch}
-          className="group flex min-h-[52px] min-w-0 flex-1 items-center gap-3 rounded-full border border-border bg-bg pl-4 pr-1.5 text-left shadow-card transition-colors hover:border-brand/40 md:max-w-md"
+          className="group flex min-h-[52px] w-full min-w-0 items-center gap-3 rounded-full border border-border bg-bg pl-4 pr-1.5 text-left shadow-card transition-colors hover:border-brand/40 md:max-w-md"
         >
           <Search className="h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate text-sm text-muted">{tApp("findOrderPlaceholder")}</span>
           <span className="hidden shrink-0 rounded-full bg-canvas px-3 py-1.5 text-xs font-semibold tracking-wider text-muted tabular-nums min-[380px]:block">{codePrefix}-····</span>
         </button>
-        <Link href={storefrontHref} target="_blank" className="flex shrink-0 flex-col items-center gap-1 md:hidden">
-          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-paper-brand to-nav-bg text-nav-fg shadow-raised">
-            <Store className="h-6 w-6" aria-hidden="true" />
-          </span>
-          <span className="text-xs font-medium leading-normal">{tApp("viewShop")}</span>
-        </Link>
       </div>
     </div>
   );
 }
 
 /** The two things a seller does most, as big cards with a bright icon: Add product and Share shop link. */
-export function QuickActions({ items }: { items: { key: string; href: string; icon: LucideIcon; label: string; hint: string; tone: "teal" | "amber" }[] }) {
+/** A quick action goes to a page (`href`) or opens something on this one (`onClick`, e.g. the Share sheet). */
+export type QuickAction = {
+  key: string;
+  icon: LucideIcon;
+  label: string;
+  hint: string;
+  tone: "teal" | "amber";
+} & ({ href: string; onClick?: never } | { onClick: () => void; href?: never });
+
+export function QuickActions({ items }: { items: QuickAction[] }) {
+  const tile = "group flex min-h-[72px] items-center gap-3 rounded-2xl border border-border bg-bg p-3 text-left shadow-card transition-all hover:border-brand/40 hover:shadow-raised active:scale-[0.99] motion-reduce:transition-none";
   return (
     <nav className="grid grid-cols-2 gap-3">
-      {items.map((item) => (
-        <Link
-          key={item.key}
-          href={item.href}
-          className="group flex min-h-[72px] items-center gap-3 rounded-2xl border border-border bg-bg p-3 shadow-card transition-all hover:border-brand/40 hover:shadow-raised active:scale-[0.99] motion-reduce:transition-none"
-        >
-          <span
-            className={cn(
-              "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[rgb(var(--color-paper))] shadow-raised",
-              item.tone === "teal"
-                ? "bg-gradient-to-br from-[rgb(var(--color-action-teal))] to-[rgb(var(--color-paper-brand))]"
-                : "bg-gradient-to-br from-[rgb(var(--color-action-amber))] to-[rgb(var(--color-action-orange))]",
-            )}
-          >
-            <item.icon className="h-6 w-6" strokeWidth={2.25} aria-hidden="true" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="font-semibold leading-normal">{item.label}</span>
-            <span className="line-clamp-1 text-xs leading-normal text-muted">{item.hint}</span>
-          </span>
-        </Link>
-      ))}
+      {items.map((item) => {
+        const content = (
+          <>
+            <span
+              className={cn(
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-[rgb(var(--color-paper))] shadow-raised",
+                item.tone === "teal" ? "bg-gradient-to-br from-[rgb(var(--color-action-teal))] to-[rgb(var(--color-paper-brand))]" : "bg-gradient-to-br from-[rgb(var(--color-action-amber))] to-[rgb(var(--color-action-orange))]",
+              )}
+            >
+              <item.icon className="h-6 w-6" strokeWidth={2.25} aria-hidden="true" />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate font-semibold leading-normal">{item.label}</span>
+              <span className="line-clamp-1 text-xs leading-normal text-muted">{item.hint}</span>
+            </span>
+          </>
+        );
+        return item.href ? (
+          <Link key={item.key} href={item.href} className={tile}>
+            {content}
+          </Link>
+        ) : (
+          <button key={item.key} type="button" onClick={item.onClick} className={tile}>
+            {content}
+          </button>
+        );
+      })}
     </nav>
   );
 }

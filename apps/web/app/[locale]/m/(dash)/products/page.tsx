@@ -1,13 +1,13 @@
 "use client";
 
 import { canAddProduct } from "@khmio/shared";
-import { Button, ConfirmDialog, PageHeader, Switch } from "@khmio/ui";
+import { Button, ConfirmDialog, Notice, PageHeader, Switch } from "@khmio/ui";
 import { EyeOff, ImageOff, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { DataGrid, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
+import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, type Catalog, type Product } from "@/lib/api";
 import { priceText, startingVariant, usdValue } from "@/lib/product-price";
@@ -77,11 +77,12 @@ export default function ProductsPage() {
     return variant ? usdValue(variant, rate) : 0;
   };
 
+  // Round, with a thin ring so light photos keep their edge.
   const thumbnail = (product: Product, size: string) =>
     product.photos[0] ? (
-      <PhotoThumb photo={product.photos[0]} className={`${size} shrink-0 rounded-DEFAULT object-cover`} />
+      <PhotoThumb photo={product.photos[0]} className={`${size} shrink-0 rounded-full object-cover ring-1 ring-border`} />
     ) : (
-      <div className={`${size} flex shrink-0 items-center justify-center rounded-DEFAULT bg-border/30`} aria-hidden="true">
+      <div className={`${size} flex shrink-0 items-center justify-center rounded-full bg-border/30 ring-1 ring-border`} aria-hidden="true">
         <ImageOff className="h-5 w-5 text-muted" />
       </div>
     );
@@ -109,6 +110,7 @@ export default function ProductsPage() {
       key: "product",
       header: t("colProduct"),
       hideable: false,
+      pin: "start",
       sortable: true,
       value: title,
       cell: (product) => (
@@ -116,7 +118,7 @@ export default function ProductsPage() {
           {thumbnail(product, "h-10 w-10")}
           <div className="min-w-0">
             <p className="flex items-center gap-2">
-              <span className="truncate font-medium">{title(product)}</span>
+              <span className="truncate font-medium"><DataGridHighlight text={title(product)} /></span>
               {!product.isVisible && hiddenBadge}
             </p>
             {product.hasOptions && <p className="text-xs text-muted">{t("variantsCount", { count: product.variants.length })}</p>}
@@ -164,6 +166,7 @@ export default function ProductsPage() {
       key: "shown",
       header: t("colShown"),
       align: "right",
+      pin: "end",
       value: (product) => (product.isVisible ? 1 : 0),
       exportValue: (product) => (product.isVisible ? t("shownInShop") : t("hiddenInShop")),
       // The row opens the product; the switch must not.
@@ -229,14 +232,16 @@ export default function ProductsPage() {
         }
       />
 
-      {atLimit && <p className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">{tApp("productLimit", { count: products.length })}</p>}
+      {atLimit && <Notice tone="warning">{tApp("productLimit", { count: products.length })}</Notice>}
       {deleteError && (
-        <p role="alert" className="rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+        <Notice tone="danger" role="alert">
           {deleteError}
-        </p>
+        </Notice>
       )}
 
       <DataGrid
+        syncUrl
+        rowNumbers
         rows={products}
         getRowId={(product) => product.id}
         columns={columns}
@@ -266,7 +271,7 @@ export default function ProductsPage() {
           <div className="flex items-center gap-3">
             {thumbnail(product, "h-16 w-16")}
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <p className="line-clamp-2 font-medium leading-snug">{title(product)}</p>
+              <p className="line-clamp-2 font-medium leading-snug"><DataGridHighlight text={title(product)} /></p>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                 {categoryName.get(product.categoryId)}
                 {product.hasOptions && <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand">{tStore("optionCount", { count: product.variants.length })}</span>}

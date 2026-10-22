@@ -1,8 +1,8 @@
 "use client";
 
 import { getOrderTab, parseTrackingCode, type Fulfilment, type OrderStatus } from "@khmio/shared";
-import { BottomSheet, cn, type Tone } from "@khmio/ui";
-import { Check, ChevronRight, Copy, Download, History, Link2, QrCode, Search, Send, Share2 } from "lucide-react";
+import { ActionTiles, cn, GroupTitle, IconBadge, PillInput, PillInputButton } from "@khmio/ui";
+import { Check, ChevronLeft, ChevronRight, Copy, Download, History, Link2, QrCode, Search, Send, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,23 +17,10 @@ import { copyText, shareOrCopyLink } from "@/components/share-link";
 // and "Find order by code". The live dashboard and its mockup draw these.
 
 const CARD = "flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-bg p-4 shadow-card";
-const TONE_CIRCLE: Record<Tone, string> = {
-  warning: "bg-warning/10 text-warning",
-  info: "bg-info/10 text-info",
-  success: "bg-success/10 text-success",
-  danger: "bg-danger/10 text-danger",
-  brand: "bg-brand/10 text-brand",
-  muted: "bg-border/40 text-muted",
-};
 
 /** The order's status as a coloured circle with its icon (orange waiting, blue moving, green done, red stopped). */
 export function OrderStatusCircle({ status, fulfilment, label, className }: { status: OrderStatus; fulfilment?: Fulfilment; label: string; className?: string }) {
-  const Icon = orderStatusIcon({ status, fulfilment });
-  return (
-    <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", TONE_CIRCLE[ORDER_STATUS_TONE[status]], className)} title={label}>
-      <Icon className="h-5 w-5" aria-hidden="true" />
-    </span>
-  );
+  return <IconBadge icon={orderStatusIcon({ status, fulfilment })} tone={ORDER_STATUS_TONE[status]} shape="circle" label={label} className={className} />;
 }
 
 /** One order waiting for the seller, already in words; `next` is its next-step button. */
@@ -69,7 +56,14 @@ export function OrdersNeedingAction({ rows, total, allHref, limit = 5 }: { rows:
     return result;
   }, [rows]);
   const shown = rows.filter((row) => tab === "all" || getOrderTab(row.status) === tab).slice(0, limit);
-  const pills = [{ value: "all" as const, label: tApp("filterAll"), count: rows.length }, ...ACTION_TABS.filter((key) => counts[key]).map((key) => ({ value: key, label: tOrders(`tab_${key}`), count: counts[key] ?? 0 }))];
+  const pills = [
+    { value: "all" as const, label: tApp("filterAll"), count: rows.length },
+    ...ACTION_TABS.filter((key) => counts[key]).map((key) => ({
+      value: key,
+      label: tOrders(`tab_${key}`),
+      count: counts[key] ?? 0,
+    })),
+  ];
 
   return (
     <section className={CARD}>
@@ -149,19 +143,51 @@ export function OrdersNeedingAction({ rows, total, allHref, limit = 5 }: { rows:
 }
 
 /**
- * "Share your shop": the link as one pill with Copy, then round buttons for
- * Share, Copy, QR code and Telegram. The QR opens in a sheet to download and
- * print. `onShared` is told when the link went out (the setup checklist's step).
+ * "Share your shop" as a card (the mockup's home): the share panel under a
+ * title. `onShared` is told when the link went out (the setup checklist's step).
  */
 export function ShareShopCard({ url, shopName, qrFileName = "shop-qr.png", shared = false, onShared }: { url: string; shopName: string; qrFileName?: string; shared?: boolean; onShared?: () => void }) {
   const t = useTranslations("Share");
+  return (
+    <section className={CARD}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold leading-normal">{t("title")}</h2>
+        {shared && <SharedPill />}
+      </div>
+      <ShareShopPanel url={url} shopName={shopName} qrFileName={qrFileName} onShared={onShared} />
+    </section>
+  );
+}
+
+/** "Shared" in green, once the shop's link has gone out. */
+export function SharedPill() {
+  const t = useTranslations("Share");
+  return (
+    <span className="flex shrink-0 items-center gap-1 self-start rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      {t("shared")}
+    </span>
+  );
+}
+
+/**
+ * The shop's link and its four ways out — QR code, Copy link, Telegram and
+ * Other apps (the phone's own share list) — for the header's Share sheet and
+ * the mockup's card. The QR code opens in place, with a way back.
+ */
+export function ShareShopPanel({ url, shopName, qrFileName = "shop-qr.png", onShared }: { url: string; shopName: string; qrFileName?: string; onShared?: () => void }) {
+  const t = useTranslations("Share");
   const tApp = useTranslations("SellerApp");
   const [qr, setQr] = useState<string | null>(null);
-  const [qrOpen, setQrOpen] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [note, setNote] = useState<"copied" | "shared" | "manual" | null>(null);
   useEffect(() => {
     if (!url) return;
-    void QRCode.toDataURL(url, { margin: 2, width: 600, errorCorrectionLevel: "M" }).then(setQr);
+    void QRCode.toDataURL(url, {
+      margin: 2,
+      width: 600,
+      errorCorrectionLevel: "M",
+    }).then(setQr);
   }, [url]);
 
   async function share() {
@@ -177,20 +203,29 @@ export function ShareShopCard({ url, shopName, qrFileName = "shop-qr.png", share
   }
   const telegramHref = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shopName)}`;
   const shortUrl = url.replace(/^https?:\/\//, "");
-  const round = "flex flex-col items-center gap-1.5 text-xs font-medium leading-normal";
-  const circle = "flex h-12 w-12 items-center justify-center rounded-full bg-brand/10 text-brand transition-colors hover:bg-brand/15";
 
-  return (
-    <section className={CARD}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold leading-normal">{t("title")}</h2>
-        {shared && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
-            <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("shared")}
-          </span>
+  if (showQr) {
+    return (
+      <div className="flex flex-col items-center gap-3 pb-2 text-center">
+        <button type="button" onClick={() => setShowQr(false)} className="flex min-h-touch items-center gap-1 self-start rounded-full pr-3 text-sm font-medium text-brand">
+          <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          {t("back")}
+        </button>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a QR code made in the browser */}
+        {qr && <img src={qr} alt={t("qrAlt")} width={220} height={220} className="h-56 w-56 rounded-2xl bg-white p-2 shadow-card" />}
+        <p className="max-w-[34ch] text-sm text-muted">{t("qrBody")}</p>
+        {qr && (
+          <a href={qr} download={qrFileName} onClick={() => onShared?.()} className="flex min-h-touch items-center gap-2 rounded-full bg-brand px-5 text-sm font-semibold text-on-brand">
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {t("download")}
+          </a>
         )}
       </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2 rounded-full bg-canvas py-1 pl-4 pr-1">
         <Link2 className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-sm" title={url}>
@@ -201,51 +236,20 @@ export function ShareShopCard({ url, shopName, qrFileName = "shop-qr.png", share
           {note === "copied" ? tApp("copied") : t("copy")}
         </button>
       </div>
-      <div className="grid grid-cols-4 gap-1">
-        <button type="button" onClick={() => void share()} className={round}>
-          <span className={cn(circle, "bg-brand text-on-brand hover:bg-brand")}>
-            <Share2 className="h-5 w-5" aria-hidden="true" />
-          </span>
-          {t("share")}
-        </button>
-        <button type="button" onClick={() => void copy()} className={round}>
-          <span className={circle}>
-            <Copy className="h-5 w-5" aria-hidden="true" />
-          </span>
-          {t("copy")}
-        </button>
-        <button type="button" onClick={() => setQrOpen(true)} className={round}>
-          <span className={circle}>
-            <QrCode className="h-5 w-5" aria-hidden="true" />
-          </span>
-          {tApp("qrCode")}
-        </button>
-        <a href={telegramHref} target="_blank" rel="noreferrer" onClick={() => onShared?.()} className={round}>
-          <span className={circle}>
-            <Send className="h-5 w-5" aria-hidden="true" />
-          </span>
-          Telegram
-        </a>
-      </div>
+      <ActionTiles
+        items={[
+          { key: "qr", icon: QrCode, label: tApp("qrCode"), look: "primary", onClick: () => setShowQr(true) },
+          { key: "copy", icon: Copy, label: t("copy"), onClick: () => void copy() },
+          { key: "telegram", icon: Send, label: "Telegram", look: { className: "bg-[#229ED9] text-white" }, href: telegramHref, external: true, onClick: () => onShared?.() },
+          { key: "other", icon: Share2, label: t("otherApps"), onClick: () => void share() },
+        ]}
+      />
       {note && note !== "copied" && (
         <p role="status" className="text-sm text-muted">
           {note === "manual" ? t("manual") : t("sharedNow")}
         </p>
       )}
-      <BottomSheet open={qrOpen} onClose={() => setQrOpen(false)} closeLabel={tApp("close")} title={tApp("qrCode")}>
-        <div className="flex flex-col items-center gap-3 pb-2 text-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a QR code made in the browser */}
-          {qr && <img src={qr} alt={t("qrAlt")} width={220} height={220} className="h-56 w-56 rounded-2xl bg-white p-2 shadow-card" />}
-          <p className="max-w-[34ch] text-sm text-muted">{t("qrBody")}</p>
-          {qr && (
-            <a href={qr} download={qrFileName} onClick={() => onShared?.()} className="flex min-h-touch items-center gap-2 rounded-full bg-brand px-5 text-sm font-semibold text-on-brand">
-              <Download className="h-4 w-4" aria-hidden="true" />
-              {t("download")}
-            </a>
-          )}
-        </div>
-      </BottomSheet>
-    </section>
+    </div>
   );
 }
 
@@ -293,13 +297,13 @@ export function FindOrderPanel({ hrefFor, prefix }: { hrefFor: (code: string) =>
 
   return (
     <section className="flex flex-col gap-3">
-      <form onSubmit={submit} noValidate className="flex items-center gap-2 rounded-full border border-border bg-canvas p-1 pl-4 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
-        <Search className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-        <label className="sr-only" htmlFor="find-order-panel">
-          {t("title")}
-        </label>
-        <input
+      <form onSubmit={submit} noValidate>
+        <PillInput
           id="find-order-panel"
+          label={t("title")}
+          labelHidden
+          icon={<Search />}
+          code
           value={value}
           onChange={(event) => {
             setValue(event.target.value);
@@ -309,12 +313,9 @@ export function FindOrderPanel({ hrefFor, prefix }: { hrefFor: (code: string) =>
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}
-          aria-invalid={problem ? true : undefined}
-          className="min-h-touch min-w-0 flex-1 bg-transparent text-base uppercase tracking-wider placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:outline-none"
+          invalid={!!problem}
+          action={<PillInputButton type="submit">{t("find")}</PillInputButton>}
         />
-        <button type="submit" className="flex min-h-touch shrink-0 items-center rounded-full bg-brand px-5 text-sm font-semibold text-on-brand">
-          {t("find")}
-        </button>
       </form>
       {problem ? (
         <p role="alert" className="px-2 text-sm text-danger">
@@ -325,10 +326,10 @@ export function FindOrderPanel({ hrefFor, prefix }: { hrefFor: (code: string) =>
       )}
       {recent.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+          <GroupTitle as="span" className="flex items-center gap-1.5">
             <History className="h-3.5 w-3.5" aria-hidden="true" />
             {tApp("recentCodes")}
-          </span>
+          </GroupTitle>
           <div className="flex flex-wrap gap-2">
             {recent.map((code) => (
               <button

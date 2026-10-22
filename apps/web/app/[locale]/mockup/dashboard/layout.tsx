@@ -103,6 +103,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <SellerFrame
       look="teal"
+      shopHref={storefrontHref}
       shop={{
         name: shopName,
         logoUrl: logoDataUrl,

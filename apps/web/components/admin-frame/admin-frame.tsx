@@ -249,7 +249,7 @@ export function AdminFrame({
         </header>
 
         {/* Keyed on the URL so each page fades in when you move between them. */}
-        <main key={pathname} className="mx-auto flex w-full max-w-[1200px] flex-1 animate-page-in flex-col gap-6 p-4 motion-reduce:animate-none md:p-6">
+        <main key={pathname} className="mx-auto flex w-full max-w-[1200px] flex-1 animate-page-in flex-col gap-6 p-4 [--grid-sticky-top:3.8125rem] motion-reduce:animate-none md:p-6">
           {children}
         </main>
       </div>

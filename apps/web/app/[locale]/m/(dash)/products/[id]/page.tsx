@@ -1,8 +1,7 @@
 "use client";
 
 import {
-  convertKhrToUsdCents,
-  convertUsdCentsToKhr,
+  khrInputText,
   MAX_PRODUCT_DESCRIPTION_LENGTH,
   MAX_PRODUCT_PHOTOS,
   parseKhrInput,
@@ -10,16 +9,18 @@ import {
   planHasFeature,
   productInputSchema,
   toFieldErrors,
+  usdInputText,
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
-import { Button, Card, Input, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
+import { Button, Card, Input, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
 import { History, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { MoneyInput } from "@/components/money-input";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
@@ -96,28 +97,6 @@ function clearDraft(slug: string) {
   }
 }
 
-// Fills the KHR box from the USD one (or vice versa) at the store's rate —
-// docs/blueprint.md "Multi-currency pricing and totals". Only from a price
-// that reads correctly; a typo is left for the save check to point out.
-function usdToKhrText(usdValue: string, rate: number): string | undefined {
-  const cents = parseUsdInput(usdValue);
-  if (cents === undefined || Number.isNaN(cents)) return undefined;
-  return convertUsdCentsToKhr(cents, rate).toString();
-}
-
-function khrToUsdText(khrValue: string, rate: number): string | undefined {
-  const riel = parseKhrInput(khrValue);
-  if (riel === undefined || Number.isNaN(riel)) return undefined;
-  return (convertKhrToUsdCents(riel, rate) / 100).toFixed(2);
-}
-
-function centsToText(cents: number | null | undefined): string {
-  return cents != null ? (cents / 100).toFixed(2) : "";
-}
-
-function rielToText(riel: number | null | undefined): string {
-  return riel != null ? riel.toString() : "";
-}
 
 /** Blank discount box = no discount; anything else must read as a whole number (the schema checks the range). */
 function parseDiscountInput(text: string): number | undefined {
@@ -273,10 +252,10 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? catalog.categories[0]?.id ?? "");
   const [brandId, setBrandId] = useState(existing?.brandId ?? "");
   const [uomId, setUomId] = useState(existing ? (existing.unitId ?? "") : (catalog.defaultUnitId ?? ""));
-  const [retailUsd, setRetailUsd] = useState(centsToText(simple?.priceUsdCents));
-  const [retailKhr, setRetailKhr] = useState(rielToText(simple?.priceKhr));
-  const [wholesaleUsd, setWholesaleUsd] = useState(centsToText(simple?.wholesalePriceUsdCents));
-  const [wholesaleKhr, setWholesaleKhr] = useState(rielToText(simple?.wholesalePriceKhr));
+  const [retailUsd, setRetailUsd] = useState(usdInputText(simple?.priceUsdCents));
+  const [retailKhr, setRetailKhr] = useState(khrInputText(simple?.priceKhr));
+  const [wholesaleUsd, setWholesaleUsd] = useState(usdInputText(simple?.wholesalePriceUsdCents));
+  const [wholesaleKhr, setWholesaleKhr] = useState(khrInputText(simple?.wholesalePriceKhr));
   const [discountPercent, setDiscountPercent] = useState(existing?.discountPercent?.toString() ?? "");
   const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>(
     existing?.hasOptions
@@ -285,10 +264,10 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
           labelKm: variant.labelKm,
           labelEn: variant.labelEn,
           sku: variant.sku,
-          retailUsd: centsToText(variant.priceUsdCents),
-          retailKhr: rielToText(variant.priceKhr),
-          wholesaleUsd: centsToText(variant.wholesalePriceUsdCents),
-          wholesaleKhr: rielToText(variant.wholesalePriceKhr),
+          retailUsd: usdInputText(variant.priceUsdCents),
+          retailKhr: khrInputText(variant.priceKhr),
+          wholesaleUsd: usdInputText(variant.wholesalePriceUsdCents),
+          wholesaleKhr: khrInputText(variant.wholesalePriceKhr),
         }))
       : [],
   );
@@ -770,71 +749,48 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
         {!hasVariants && (
           <FormSection stacked title={t("priceTitle")} description={t("priceHelp")}>
             <p className="text-sm font-medium text-fg">{t("retailPriceTitle")}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label={t("priceUsdLabel")}
-                inputMode="decimal"
-                value={retailUsd}
-                onChange={(e) => {
-                  setRetailUsd(e.target.value);
-                  clearErrors("retailPriceUsdCents", "retailPrice");
-                }}
-                onBlur={() => {
-                  if (!retailKhr) {
-                    const khr = usdToKhrText(retailUsd, rate);
-                    if (khr !== undefined) setRetailKhr(khr);
-                  }
-                  checkFields("retailPriceUsdCents", "wholesalePrice");
-                }}
-                error={error("retailPriceUsdCents") ?? error("retailPrice")}
-              />
-              <Input
-                label={t("priceKhrLabel")}
-                inputMode="numeric"
-                value={retailKhr}
-                onChange={(e) => {
-                  setRetailKhr(e.target.value);
-                  clearErrors("retailPriceKhr", "retailPrice");
-                }}
-                onBlur={() => {
-                  if (!retailUsd) {
-                    const usd = khrToUsdText(retailKhr, rate);
-                    if (usd !== undefined) setRetailUsd(usd);
-                  }
-                  checkFields("retailPriceKhr", "wholesalePrice");
-                }}
-                error={error("retailPriceKhr")}
-              />
-            </div>
+            <MoneyInput
+              usd={retailUsd}
+              khr={retailKhr}
+              usdLabel={t("priceUsdLabel")}
+              khrLabel={t("priceKhrLabel")}
+              autoFillRate={rate}
+              onUsdChange={(text) => {
+                setRetailUsd(text);
+                clearErrors("retailPriceUsdCents", "retailPrice");
+              }}
+              onKhrChange={(text) => {
+                setRetailKhr(text);
+                clearErrors("retailPriceKhr", "retailPrice");
+              }}
+              onUsdBlur={() => checkFields("retailPriceUsdCents", "wholesalePrice")}
+              onKhrBlur={() => checkFields("retailPriceKhr", "wholesalePrice")}
+              usdError={error("retailPriceUsdCents") ?? error("retailPrice")}
+              khrError={error("retailPriceKhr")}
+            />
             <p className="text-xs text-muted">{t("autoFillNote")}</p>
 
             {canWholesale && (
               <>
                 <p className="text-sm font-medium text-fg">{t("wholesalePriceTitle")}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label={t("priceUsdLabel")}
-                    inputMode="decimal"
-                    value={wholesaleUsd}
-                    onChange={(e) => {
-                      setWholesaleUsd(e.target.value);
-                      clearErrors("wholesalePriceUsdCents", "wholesalePrice");
-                    }}
-                    onBlur={() => checkFields("wholesalePriceUsdCents", "wholesalePrice")}
-                    error={error("wholesalePriceUsdCents") ?? error("wholesalePrice")}
-                  />
-                  <Input
-                    label={t("priceKhrLabel")}
-                    inputMode="numeric"
-                    value={wholesaleKhr}
-                    onChange={(e) => {
-                      setWholesaleKhr(e.target.value);
-                      clearErrors("wholesalePriceKhr", "wholesalePrice");
-                    }}
-                    onBlur={() => checkFields("wholesalePriceKhr", "wholesalePrice")}
-                    error={error("wholesalePriceKhr")}
-                  />
-                </div>
+                <MoneyInput
+                  usd={wholesaleUsd}
+                  khr={wholesaleKhr}
+                  usdLabel={t("priceUsdLabel")}
+                  khrLabel={t("priceKhrLabel")}
+                  onUsdChange={(text) => {
+                    setWholesaleUsd(text);
+                    clearErrors("wholesalePriceUsdCents", "wholesalePrice");
+                  }}
+                  onKhrChange={(text) => {
+                    setWholesaleKhr(text);
+                    clearErrors("wholesalePriceKhr", "wholesalePrice");
+                  }}
+                  onUsdBlur={() => checkFields("wholesalePriceUsdCents", "wholesalePrice")}
+                  onKhrBlur={() => checkFields("wholesalePriceKhr", "wholesalePrice")}
+                  usdError={error("wholesalePriceUsdCents") ?? error("wholesalePrice")}
+                  khrError={error("wholesalePriceKhr")}
+                />
                 <p className="text-xs text-muted">{t("wholesaleHint")}</p>
               </>
             )}
@@ -877,63 +833,44 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
                   error={error(key("sku"))}
                 />
                 <p className="text-xs font-medium text-muted">{t("retailPriceTitle")}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label={t("optionPriceUsd")}
-                    inputMode="decimal"
-                    value={row.retailUsd}
-                    onChange={(e) => {
-                      updateVariantRow(row.id, { retailUsd: e.target.value });
-                      clearErrors(key("retailPriceUsdCents"), key("retailPrice"));
-                    }}
-                    onBlur={() => {
-                      if (row.retailKhr) return;
-                      const khr = usdToKhrText(row.retailUsd, rate);
-                      if (khr !== undefined) updateVariantRow(row.id, { retailKhr: khr });
-                    }}
-                    error={error(key("retailPriceUsdCents")) ?? error(key("retailPrice"))}
-                  />
-                  <Input
-                    label={t("optionPriceKhr")}
-                    inputMode="numeric"
-                    value={row.retailKhr}
-                    onChange={(e) => {
-                      updateVariantRow(row.id, { retailKhr: e.target.value });
-                      clearErrors(key("retailPriceKhr"), key("retailPrice"));
-                    }}
-                    onBlur={() => {
-                      if (row.retailUsd) return;
-                      const usd = khrToUsdText(row.retailKhr, rate);
-                      if (usd !== undefined) updateVariantRow(row.id, { retailUsd: usd });
-                    }}
-                    error={error(key("retailPriceKhr"))}
-                  />
-                </div>
+                <MoneyInput
+                  className="gap-2"
+                  usd={row.retailUsd}
+                  khr={row.retailKhr}
+                  usdLabel={t("optionPriceUsd")}
+                  khrLabel={t("optionPriceKhr")}
+                  autoFillRate={rate}
+                  onUsdChange={(text) => {
+                    updateVariantRow(row.id, { retailUsd: text });
+                    clearErrors(key("retailPriceUsdCents"), key("retailPrice"));
+                  }}
+                  onKhrChange={(text) => {
+                    updateVariantRow(row.id, { retailKhr: text });
+                    clearErrors(key("retailPriceKhr"), key("retailPrice"));
+                  }}
+                  usdError={error(key("retailPriceUsdCents")) ?? error(key("retailPrice"))}
+                  khrError={error(key("retailPriceKhr"))}
+                />
                 {canWholesale && (
                   <>
                     <p className="text-xs font-medium text-muted">{t("wholesalePriceTitle")}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        label={t("optionPriceUsd")}
-                        inputMode="decimal"
-                        value={row.wholesaleUsd}
-                        onChange={(e) => {
-                          updateVariantRow(row.id, { wholesaleUsd: e.target.value });
-                          clearErrors(key("wholesalePriceUsdCents"), key("wholesalePrice"));
-                        }}
-                        error={error(key("wholesalePriceUsdCents")) ?? error(key("wholesalePrice"))}
-                      />
-                      <Input
-                        label={t("optionPriceKhr")}
-                        inputMode="numeric"
-                        value={row.wholesaleKhr}
-                        onChange={(e) => {
-                          updateVariantRow(row.id, { wholesaleKhr: e.target.value });
-                          clearErrors(key("wholesalePriceKhr"), key("wholesalePrice"));
-                        }}
-                        error={error(key("wholesalePriceKhr"))}
-                      />
-                    </div>
+                    <MoneyInput
+                      className="gap-2"
+                      usd={row.wholesaleUsd}
+                      khr={row.wholesaleKhr}
+                      usdLabel={t("optionPriceUsd")}
+                      khrLabel={t("optionPriceKhr")}
+                      onUsdChange={(text) => {
+                        updateVariantRow(row.id, { wholesaleUsd: text });
+                        clearErrors(key("wholesalePriceUsdCents"), key("wholesalePrice"));
+                      }}
+                      onKhrChange={(text) => {
+                        updateVariantRow(row.id, { wholesaleKhr: text });
+                        clearErrors(key("wholesalePriceKhr"), key("wholesalePrice"));
+                      }}
+                      usdError={error(key("wholesalePriceUsdCents")) ?? error(key("wholesalePrice"))}
+                      khrError={error(key("wholesalePriceKhr"))}
+                    />
                   </>
                 )}
                 <button
@@ -958,9 +895,9 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
         </FormSection>
 
         {saveError && (
-          <p role="alert" className="mb-3 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+          <Notice tone="danger" role="alert" className="mb-3">
             {saveError}
-          </p>
+          </Notice>
         )}
 
         <FormActions

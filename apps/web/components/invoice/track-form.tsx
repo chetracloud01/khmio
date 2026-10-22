@@ -1,7 +1,7 @@
 "use client";
 
 import { formatKhmerPhoneLocal, toFieldErrors, trackOrderInputSchema } from "@khmio/shared";
-import { cn, Mio } from "@khmio/ui";
+import { GroupTitle, Mio, Notice, PillInput } from "@khmio/ui";
 import { History, Phone, Search, Ticket } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
@@ -93,12 +93,6 @@ export function TrackForm({
     void run(code, phone);
   }
 
-  const pill = (invalid: boolean) =>
-    cn(
-      "flex items-center gap-3 rounded-full border bg-canvas pl-4 pr-2 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30",
-      invalid ? "border-danger" : "border-border",
-    );
-
   return (
     <BuyerShell className="gap-6 p-4 pt-10">
       <header className="flex flex-col items-center gap-2 text-center">
@@ -108,44 +102,35 @@ export function TrackForm({
       </header>
 
       <form onSubmit={submit} noValidate className="flex flex-col gap-3 rounded-2xl border border-border bg-bg p-4 shadow-card">
-        <label className="flex flex-col gap-1.5">
-          <span className="px-1 text-sm font-medium">{t("codeLabel")}</span>
-          <span className={pill(Boolean(errors.code))}>
-            <Ticket className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
-            <input
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              placeholder={t("codePlaceholder")}
-              autoCapitalize="characters"
-              autoComplete="off"
-              spellCheck={false}
-              aria-invalid={errors.code ? true : undefined}
-              className="min-h-[52px] min-w-0 flex-1 bg-transparent text-base uppercase tracking-wider placeholder:normal-case placeholder:tracking-normal placeholder:text-muted focus:outline-none"
-            />
-          </span>
-          {errors.code && <span className="px-1 text-sm text-danger">{errors.code}</span>}
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="px-1 text-sm font-medium">{t("phoneLabel")}</span>
-          <span className={pill(Boolean(errors.phone))}>
-            <Phone className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
-            <input
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              placeholder={t("phonePlaceholder")}
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              aria-invalid={errors.phone ? true : undefined}
-              className="min-h-[52px] min-w-0 flex-1 bg-transparent text-base focus:outline-none"
-            />
-          </span>
-          {errors.phone && <span className="px-1 text-sm text-danger">{errors.phone}</span>}
-        </label>
+        <PillInput
+          label={t("codeLabel")}
+          size="lg"
+          icon={<Ticket className="text-brand" />}
+          code
+          value={code}
+          onChange={(event) => setCode(event.target.value)}
+          placeholder={t("codePlaceholder")}
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
+          error={errors.code}
+        />
+        <PillInput
+          label={t("phoneLabel")}
+          size="lg"
+          icon={<Phone className="text-brand" />}
+          value={phone}
+          onChange={(event) => setPhone(event.target.value)}
+          placeholder={t("phonePlaceholder")}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          error={errors.phone}
+        />
         {problem && (
-          <p role="alert" className="rounded-xl border border-danger/40 bg-danger/5 p-3 text-sm">
+          <Notice tone="danger" role="alert">
             {problem}
-          </p>
+          </Notice>
         )}
         <button
           type="submit"
@@ -159,10 +144,10 @@ export function TrackForm({
 
       {last && (
         <section className="flex flex-col gap-2">
-          <span className="flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
+          <GroupTitle as="span" className="flex items-center gap-1.5">
             <History className="h-3.5 w-3.5" aria-hidden="true" />
             {t("lastTracked")}
-          </span>
+          </GroupTitle>
           <button
             type="button"
             onClick={() => {

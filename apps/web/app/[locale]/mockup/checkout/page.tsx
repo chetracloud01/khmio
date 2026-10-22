@@ -17,7 +17,7 @@ import {
   type FormErrorCode,
   type Fulfilment,
 } from "@khmio/shared";
-import { Button, cn, Input, Select } from "@khmio/ui";
+import { Button, Checkbox, cn, Input, Select } from "@khmio/ui";
 import { AlertTriangle, Check, Clock, MapPin, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -505,15 +505,7 @@ export default function CheckoutMockupPage() {
             </>
           )}
 
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={rememberDetails}
-              onChange={(e) => setRememberDetails(e.target.checked)}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm">{t("rememberDetails")}</span>
-          </label>
+          <Checkbox checked={rememberDetails} onChange={(e) => setRememberDetails(e.target.checked)} label={t("rememberDetails")} />
         </BuyerSection>
 
         <BuyerSection number={3} title={t("sectionPay")}>

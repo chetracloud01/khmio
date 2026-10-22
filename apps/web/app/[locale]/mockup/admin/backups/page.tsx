@@ -1,7 +1,7 @@
 "use client";
 
 import { adminRoleSchema, type AdminRole } from "@khmio/shared";
-import { BottomSheet, Button, Card, cn, ConfirmDialog, Input, SegmentedControl, Switch, TONE_STYLES } from "@khmio/ui";
+import { BottomSheet, Button, Card, Checkbox, cn, ConfirmDialog, Input, SegmentedControl, Switch, TONE_STYLES } from "@khmio/ui";
 import { AlertTriangle, ArchiveRestore, CircleCheck, DatabaseBackup, ExternalLink, Lock, ShieldCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -362,22 +362,19 @@ function RestoreShopSheet({ backups, onClose, when }: { backups: MockBackup[]; o
           <>
             <h3 className="font-semibold">{t("bakStepParts")}</h3>
             {CATALOG_PARTS.map((part) => (
-              <label key={part} className="flex min-h-touch cursor-pointer items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={parts.has(part)}
-                  onChange={(e) =>
-                    setParts((current) => {
-                      const next = new Set(current);
-                      if (e.target.checked) next.add(part);
-                      else next.delete(part);
-                      return next;
-                    })
-                  }
-                  className="h-5 w-5 shrink-0 accent-brand"
-                />
-                <span>{t(`bakPart_${part}`)}</span>
-              </label>
+              <Checkbox
+                key={part}
+                checked={parts.has(part)}
+                onChange={(e) =>
+                  setParts((current) => {
+                    const next = new Set(current);
+                    if (e.target.checked) next.add(part);
+                    else next.delete(part);
+                    return next;
+                  })
+                }
+                label={t(`bakPart_${part}`)}
+              />
             ))}
             {parts.size === 0 && <p className="text-danger">{t("bakChooseOne")}</p>}
             <p className="rounded-DEFAULT bg-border/10 p-3">{t("bakNever")}</p>

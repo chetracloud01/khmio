@@ -1,7 +1,7 @@
 "use client";
 
-import { SegmentedControl } from "@khmio/ui";
-import { FileDown, ImageDown, Loader2, Printer, Share2, type LucideIcon } from "lucide-react";
+import { ActionTiles, SegmentedControl } from "@khmio/ui";
+import { FileDown, ImageDown, Loader2, Printer, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState, type RefObject } from "react";
 import { INVOICE_EXPORT_WIDTH, type InvoiceSize } from "./invoice-document";
@@ -205,33 +205,19 @@ export function InvoiceActions({
           <span className="text-sm leading-normal text-nav-fg/85">{t("shareHint")}</span>
         </span>
       </button>
-      <div className="grid grid-cols-3 gap-2">
-        <ActionTile icon={Printer} label={t("print")} onClick={() => window.print()} disabled={busy !== null} />
-        <ActionTile icon={ImageDown} label={t("saveImage")} onClick={() => void saveImage()} busy={busy === "image"} disabled={busy !== null} />
-        <ActionTile icon={FileDown} label={t("downloadPdf")} onClick={() => void savePdf()} busy={busy === "pdf"} disabled={busy !== null} />
-      </div>
+      <ActionTiles
+        variant="boxed"
+        columns={3}
+        items={[
+          { key: "print", icon: Printer, label: t("print"), onClick: () => window.print(), disabled: busy !== null },
+          { key: "image", icon: ImageDown, label: t("saveImage"), onClick: () => void saveImage(), busy: busy === "image", disabled: busy !== null },
+          { key: "pdf", icon: FileDown, label: t("downloadPdf"), onClick: () => void savePdf(), busy: busy === "pdf", disabled: busy !== null },
+        ]}
+      />
       <p className="min-h-[1.5em] text-sm text-muted" role="status" aria-live="polite">
         {busy ? t("working") : message}
       </p>
     </div>
-  );
-}
-
-/** A square tile with a round icon over its label: Print, Image, PDF. */
-function ActionTile({ icon: Icon, label, onClick, busy = false, disabled }: { icon: LucideIcon; label: string; onClick: () => void; busy?: boolean; disabled: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-busy={busy}
-      className="flex min-h-[80px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-border bg-bg p-2 text-sm font-medium shadow-card transition-colors hover:border-brand/40 hover:bg-brand/5 active:scale-[0.98] disabled:opacity-60 motion-reduce:transition-none"
-    >
-      <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-brand">
-        {busy ? <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Icon className="h-5 w-5" aria-hidden="true" />}
-      </span>
-      <span className="leading-normal">{label}</span>
-    </button>
   );
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { approximateIn, type Currency } from "@khmio/shared";
-import { Button } from "@khmio/ui";
-import { AlertTriangle, ImageOff, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Button, Notice } from "@khmio/ui";
+import { ImageOff, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -110,16 +110,14 @@ export default function CartPage() {
 
       <main className="flex flex-col gap-4 p-4">
         {dropped && (
-          <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          <Notice tone="warning" role="status">
             {t("stockAdjusted")}
-          </p>
+          </Notice>
         )}
         {!ordering && (
-          <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          <Notice tone="warning" role="status">
             {tCheckout("noPaymentMethods")}
-          </p>
+          </Notice>
         )}
 
         {!total ? (

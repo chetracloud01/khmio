@@ -1,17 +1,17 @@
 "use client";
 
 import { formatKhr, MAX_VAT_PERCENT, storeSettingsSchema, toFieldErrors, type FormErrorCode } from "@khmio/shared";
-import { Card, Input, PageHeader, SegmentedControl } from "@khmio/ui";
+import { Card, Input, Notice, SegmentedControl, Switch } from "@khmio/ui";
 import { ChevronRight, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
-import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
+import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, type StoreSettingsResponse } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
-import { BackToMyShop } from "@/components/seller-frame/back-to-my-shop";
+import { SubPage } from "@/components/seller-frame/sub-page";
 
 type Field = "defaultCurrency" | "usdToKhrRate" | "allowCod" | "vatPercent";
 
@@ -112,9 +112,7 @@ function SettingsForm({ initial }: { initial: StoreSettingsResponse }) {
   const status = dirty ? t("unsavedChanges") : justSaved ? t("saved") : undefined;
 
   return (
-    <div ref={formRef} className={`${SELLER_FORM} gap-5`}>
-      <BackToMyShop />
-      <PageHeader title={t("title")} description={t("description")} />
+    <SubPage ref={formRef} title={t("title")} description={t("description")}>
 
       <Card className="flex flex-col p-4">
         <FormSection stacked title={t("sectionCurrency")} description={t("sectionCurrencyHelp")}>
@@ -153,14 +151,8 @@ function SettingsForm({ initial }: { initial: StoreSettingsResponse }) {
         </FormSection>
 
         <FormSection stacked title={t("sectionPayments")} description={t("sectionPaymentsHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-start gap-3">
-            <input type="checkbox" checked={draft.allowCod} onChange={(e) => update("allowCod", e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-brand" />
-            <span>
-              <span className="block text-sm font-medium">{t("codLabel")}</span>
-              <span className="block text-xs text-muted">{t("codHint")}</span>
-            </span>
-          </label>
-          {!draft.allowCod && <p className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">{tApp("codOffWarning")}</p>}
+          <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod)} label={t("codLabel")} description={t("codHint")} />
+          {!draft.allowCod && <Notice tone="warning">{tApp("codOffWarning")}</Notice>}
         </FormSection>
 
         <FormSection stacked title={t("sectionTax")} description={t("sectionTaxHelp")}>
@@ -176,9 +168,9 @@ function SettingsForm({ initial }: { initial: StoreSettingsResponse }) {
         </FormSection>
 
         {saveError && (
-          <p role="alert" className="mb-3 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+          <Notice tone="danger" role="alert" className="mb-3">
             {saveError}
-          </p>
+          </Notice>
         )}
 
         <FormActions
@@ -195,6 +187,6 @@ function SettingsForm({ initial }: { initial: StoreSettingsResponse }) {
           className={SELLER_FORM_BAR}
         />
       </Card>
-    </div>
+    </SubPage>
   );
 }

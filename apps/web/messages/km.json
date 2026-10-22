@@ -66,7 +66,35 @@
     "confirmTitle": "ដកផលិតផលនេះចេញ?",
     "confirmBody": "វាចេញពីហាងភ្លាមៗ។ ការបញ្ជាទិញដែលមានវារក្សាច្បាប់ចម្លងរបស់ខ្លួន។",
     "confirmYes": "ដកចេញ",
-    "statOrdersDetail": "ម្សិលមិញ 35"
+    "statOrdersDetail": "ម្សិលមិញ 35",
+    "searchPlaceholder": "ស្វែងរកទំនិញ",
+    "clear": "សម្អាត",
+    "codeLabel": "លេខកូដតាមដាន",
+    "codePlaceholder": "ឧ. MEK-7K4P-9QXR",
+    "find": "ស្វែងរក",
+    "switchLabel": "ទទួលប្រាក់ពេលដឹកដល់",
+    "switchHint": "ការកំណត់ដែលបើក ឬបិទ",
+    "checkboxLabel": "ចងចាំព័ត៌មានរបស់ខ្ញុំលើទូរស័ព្ទនេះ",
+    "kitTitle": "ផ្នែករួម",
+    "noticeWarning": "បញ្ចូលលេខ Bakong ដើម្បីឱ្យអ្នកទិញបង់តាម KHQR។",
+    "noticeDanger": "រក្សាទុកមិនបាន។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកម្តងទៀត។",
+    "noticeInfo": "ការបញ្ជាទិញទៅខេត្តត្រូវបង់ប្រាក់មុនពេលផ្ញើ។",
+    "noticeSuccessTitle": "បានរក្សាទុក",
+    "noticeSuccess": "ការផ្លាស់ប្តូររបស់អ្នកបង្ហាញក្នុងហាងហើយ។",
+    "menuTitle": "ហាងរបស់អ្នក",
+    "menuShop": "ព័ត៌មានហាង",
+    "menuShopDetail": "ឈ្មោះ ឡូហ្គោ លេខទូរស័ព្ទ",
+    "menuDelivery": "ការដឹកជញ្ជូន",
+    "menuDeliveryDetail": "តំបន់ និងថ្លៃដឹក",
+    "menuLanguage": "ភាសា",
+    "groupTitleSample": "ចំណងជើងក្រុម",
+    "tileQr": "កូដ QR",
+    "tileCopy": "ចម្លងតំណ",
+    "tileOther": "កម្មវិធីផ្សេង",
+    "tilePrint": "បោះពុម្ព",
+    "tilePdf": "PDF",
+    "priceUsd": "តម្លៃ (USD)",
+    "priceKhr": "តម្លៃ (KHR)"
   },
   "Storefront": {
     "verified": "ហាងបានផ្ទៀងផ្ទាត់",
@@ -422,7 +450,9 @@
     "colStatus": "ស្ថានភាព",
     "colNext": "ជំហានបន្ទាប់",
     "firstOrderTitle": "ហាងរបស់អ្នករួចរាល់សម្រាប់ការបញ្ជាទិញដំបូង",
-    "firstOrderBody": "ចែករំលែកតំណរបស់អ្នកនៅលើ Facebook, TikTok ឬ Telegram។ ការបញ្ជាទិញថ្មីនឹងបង្ហាញនៅទីនេះ និងក្នុង Telegram របស់អ្នក។"
+    "firstOrderBody": "ចែករំលែកតំណរបស់អ្នកនៅលើ Facebook, TikTok ឬ Telegram។ ការបញ្ជាទិញថ្មីនឹងបង្ហាញនៅទីនេះ និងក្នុង Telegram របស់អ្នក។",
+    "taglineArea_phnom_penh": "ភ្នំពេញ",
+    "taglineArea_province": "ខេត្ត"
   },
   "BusinessType": {
     "shop": "ហាងលក់ទំនិញ",
@@ -482,7 +512,13 @@
     "deliveryDetail": "តំបន់ និងថ្លៃ មកយកផ្ទាល់ ខេត្ត អ្នកដឹក",
     "invoiceSettingsDetail": "លេខពន្ធ កំណត់ចំណាំ Telegram និង Facebook លើបង្កាន់ដៃ",
     "telegramAlerts": "ការជូនដំណឹង Telegram",
-    "telegramAlertsDetail": "ការបញ្ជាទិញថ្មីទៅកាន់ chat របស់អ្នក និងក្រុមបុគ្គលិក"
+    "telegramAlertsDetail": "ការបញ្ជាទិញថ្មីទៅកាន់ chat របស់អ្នក និងក្រុមបុគ្គលិក",
+    "languageAndDisplay": "ភាសា និងការបង្ហាញ",
+    "language": "ភាសា",
+    "languageDetail": "សម្រាប់ផ្ទាំងគ្រប់គ្រងរបស់អ្នកលើឧបករណ៍នេះ",
+    "display": "រូបរាង",
+    "displayDetail": "ភ្លឺ ងងឹត និងពណ៌របស់អ្នក",
+    "shopDetailsDetail": "ឈ្មោះ ឡូហ្គោ លេខទូរស័ព្ទ តំបន់ និងគណនី Bakong"
   },
   "ProductsList": {
     "title": "ទំនិញ",
@@ -1234,7 +1270,22 @@
     "noResults": "គ្មានលទ្ធផលត្រូវគ្នា",
     "noResultsBody": "សាកល្បងស្វែងរកផ្សេង ឬសម្អាតតម្រង។",
     "select": "ជ្រើសរើស",
-    "doneSelecting": "រួចរាល់"
+    "doneSelecting": "រួចរាល់",
+    "loading": "កំពុងផ្ទុក…",
+    "loadFailed": "មិនអាចផ្ទុកបញ្ជីនេះបានទេ។ សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកម្តងទៀត។",
+    "retry": "សាកម្តងទៀត",
+    "view": "បង្ហាញ",
+    "clearSearch": "សម្អាតការស្វែងរក",
+    "clearAll": "សម្អាតទាំងអស់",
+    "removeFilter": "ដកតម្រង {filter}",
+    "noResultsFor": "រកមិនឃើញ “{query}”",
+    "showMore": "បង្ហាញ {count} ទៀត",
+    "pages": "ទំព័រ",
+    "pageNumber": "ទំព័រ {page}",
+    "ascending": "តិចទៅច្រើន",
+    "descending": "ច្រើនទៅតិច",
+    "close": "បិទ",
+    "rowNumber": "លេខជួរ"
   },
   "StoreSettings": {
     "title": "ការកំណត់ហាង",
@@ -1740,7 +1791,11 @@
     "manual": "សូមចម្លងតំណខាងលើដោយដៃ។",
     "qrAlt": "QR នៃតំណហាងរបស់អ្នក",
     "qrBody": "អ្នកទិញស្កេនវាដោយកាមេរ៉ាទូរស័ព្ទ ដើម្បីបើកហាងរបស់អ្នក។",
-    "download": "ទាញយក QR"
+    "download": "ទាញយក QR",
+    "back": "ត្រឡប់",
+    "otherApps": "កម្មវិធីផ្សេង",
+    "shareShop": "ចែករំលែកហាង",
+    "notReady": "ហាងរបស់អ្នកមិនទាន់រួចរាល់សម្រាប់អ្នកទិញនៅឡើយ។ សូមបញ្ចប់ជំហានរៀបចំនៅទំព័រដើម រួចចែករំលែកតំណរបស់អ្នក។"
   },
   "Telegram": {
     "title": "ការជូនដំណឹងតាម Telegram",
@@ -2204,7 +2259,7 @@
     "offlineBody": "ហាង និងការបញ្ជាទិញរបស់អ្នកមានសុវត្ថិភាព។ សូមពិនិត្យ Wi-Fi ឬទិន្នន័យទូរស័ព្ទ ហើយព្យាយាមម្តងទៀត។",
     "offlineRetry": "ព្យាយាមម្តងទៀត",
     "quickAddProduct": "បន្ថែមទំនិញ",
-    "quickShareShop": "ចែករំលែកហាង",
+    "quickShareShop": "ចែករំលែក",
     "quickDelivery": "ការដឹកជញ្ជូន",
     "quickInvoice": "ការកំណត់វិក្កយបត្រ",
     "callBuyer": "ហៅ",
@@ -2238,7 +2293,9 @@
     "recentCodes": "បានរកឃើញថ្មីៗ",
     "findOrderPlaceholder": "ស្វែងរកការបញ្ជាទិញតាមលេខកូដ…",
     "viewShop": "មើលហាង",
-    "findOrderHelp": "សុំលេខកូដពីអ្នកទិញ ដែលមាននៅលើបង្កាន់ដៃ ឬសារ Telegram — វាមានរាងដូច MEK-7K4P-9QXR។"
+    "findOrderHelp": "សុំលេខកូដពីអ្នកទិញ ដែលមាននៅលើបង្កាន់ដៃ ឬសារ Telegram — វាមានរាងដូច MEK-7K4P-9QXR។",
+    "switchLanguage": "ភាសាខ្មែរ / English",
+    "headerShare": "ចែករំលែក"
   },
   "MyOrders": {
     "myOrders": "ការបញ្ជាទិញរបស់ខ្ញុំ",

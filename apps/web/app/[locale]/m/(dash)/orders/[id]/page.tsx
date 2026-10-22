@@ -13,7 +13,7 @@ import {
   type OrderCancelReason,
   type SellerOrderAction,
 } from "@khmio/shared";
-import { BottomSheet, Button, Card, Input, Select } from "@khmio/ui";
+import { BottomSheet, Button, Card, Input, Notice, Select } from "@khmio/ui";
 import { ArrowLeft, Bus, MapPin, Phone, Store, Truck, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -195,9 +195,9 @@ function OrderDetail({
           <OrderStatusPill order={order} />
         </div>
         {problem && (
-          <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+          <Notice tone="warning" role="alert">
             {problem}
-          </p>
+          </Notice>
         )}
         {order.status === "awaiting_payment" && <p className="text-sm text-muted">{t("hint_awaiting_payment")}</p>}
         {actions.length === 0 && <p className="text-sm text-muted">{t(order.status === "cancelled" ? "hint_cancelled" : "hint_completed")}</p>}

@@ -1,7 +1,7 @@
 "use client";
 
 import { approximateIn, BUYER_ORDER_STEPS, formatKhmerPhoneLocal, getBuyerProgress, getInvoiceState } from "@khmio/shared";
-import { Button, cn, ConfirmDialog } from "@khmio/ui";
+import { Button, cn, ConfirmDialog, GroupTitle, Notice } from "@khmio/ui";
 import { BellRing, Bus, Check, Clock, FileText, ListOrdered, MapPin, PackageX, Phone, RotateCcw, Send, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -150,7 +150,7 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
   const shopCard = (
       <section className="flex flex-col gap-3 rounded-2xl border border-border bg-bg p-4">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("buyerOrderedFrom")}</h2>
+          <GroupTitle className="px-0">{t("buyerOrderedFrom")}</GroupTitle>
           <p className="font-semibold">{order.store.name}</p>
         </div>
           {order.store.phone && (
@@ -176,9 +176,9 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
           </Link>
           {!finished && <TelegramUpdates token={token} following={order.followingOnTelegram} />}
           {cancelProblem && (
-            <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+            <Notice tone="warning" role="alert">
               {cancelProblem}
-            </p>
+            </Notice>
           )}
           {order.canCancel && (
             <Button variant="secondary" className="w-full text-danger" loading={cancelling} onClick={() => setConfirmCancel(true)}>

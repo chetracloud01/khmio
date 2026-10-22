@@ -77,7 +77,8 @@ export function SalesOverview({
 }) {
   const t = useTranslations("SellerApp");
   const locale = useLocale();
-  const [period, setPeriod] = useState<SalesPeriod>("week");
+  // Opens on today: what a seller checks first each time they look.
+  const [period, setPeriod] = useState<SalesPeriod>("today");
   const other = otherOf(mainCurrency);
   const length = SALES_PERIOD_DAYS[period];
 

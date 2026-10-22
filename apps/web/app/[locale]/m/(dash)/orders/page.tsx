@@ -1,18 +1,17 @@
 "use client";
 
-import { formatKhmerPhoneLocal, getOrderTab, ORDER_TABS } from "@khmio/shared";
-import { cn, Mio, PageHeader } from "@khmio/ui";
+import { formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, type ListPage, type ListQuery } from "@khmio/shared";
+import { cn, Mio, Notice, PageHeader } from "@khmio/ui";
 import { AlertTriangle, Phone, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
-import { DataGrid, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
+import { useCallback, useState } from "react";
+import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { formatMoney, ORDER_STATUS_TONE, ORDER_TAB_ICON, ORDER_TAB_TONE, orderStatusIcon, TONE_TEXT, useOrderText } from "@/components/order-ui";
 import { OrderStatusCircle } from "@/components/seller-cards";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { api, type SellerOrder } from "@/lib/api";
 import { OrderNextStep } from "../order-next-step";
-import { PageLoading, PageOffline } from "../page-states";
 
 /** An order still to confirm this long gets a "Waiting 25 min" warning. */
 const LATE_AFTER_MINUTES = 15;
@@ -25,25 +24,20 @@ const phnomPenhDay = (iso: string) => new Date(new Date(iso).getTime() + PHNOM_P
 // on a laptop, compact rows on a phone (2026-10-22 review), grouped by day
 // while sorted by date. Each order carries its one next step — a one-tap pill,
 // or a link into the order when the step needs details — and an order still
-// waiting to be confirmed after 15 minutes says so.
+// waiting to be confirmed after 15 minutes says so. Read page by page from
+// the server (GET /orders/page), so a shop with thousands of orders still
+// finds any of them.
 export default function OrdersPage() {
   const t = useTranslations("Orders");
   const tInvoice = useTranslations("Invoice");
   const locale = useLocale();
   const router = useRouter();
   const { paymentLabel, placeLabel, timeAgo, statusLabel } = useOrderText();
-  const [orders, setOrders] = useState<SellerOrder[] | null>(null);
-  const [failed, setFailed] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-
-  const load = useCallback(() => {
-    setFailed(false);
-    api<SellerOrder[]>("/orders").then(setOrders, () => setFailed(true));
-  }, []);
-  useEffect(load, [load]);
-
-  if (failed) return <PageOffline onRetry={load} />;
-  if (!orders) return <PageLoading />;
+  /** Bumped after an order moves on, so the list reads its page again. */
+  const [reloadKey, setReloadKey] = useState(0);
+  const load = useCallback(() => setReloadKey((key) => key + 1), []);
+  const loadPage = useCallback((query: ListQuery) => api<ListPage<SellerOrder>>(`/orders/page?${listQueryToSearchParams(query)}`), []);
 
   const href = (order: SellerOrder) => `/${locale}/m/orders/${order.id}`;
   /** The one next step as a compact pill: a button when it's one tap, otherwise a link into the order (shared with the home page). */
@@ -72,7 +66,7 @@ export default function OrdersPage() {
     const minutes = lateBy(order);
     if (minutes === null) return null;
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
         <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
         {minutes < 60 ? t("waitingFor", { minutes }) : t("waitingForHours", { hours: Math.floor(minutes / 60) })}
       </span>
@@ -93,6 +87,8 @@ export default function OrdersPage() {
     return tab === "awaiting" ? ORDER_TABS.length : ORDER_TABS.indexOf(tab);
   };
   const statusGroups: DataGridGroup<SellerOrder> = {
+    // Grouped by step while sorted by date (the server walks the steps in this order across pages).
+    sortKey: "order",
     key: (order) => getOrderTab(order.status),
     label: (order) => {
       const tab = getOrderTab(order.status);
@@ -112,12 +108,13 @@ export default function OrdersPage() {
       key: "order",
       header: t("colOrder"),
       hideable: false,
+      pin: "start",
       sortable: true,
       value: (order) => Date.parse(order.createdAt),
       exportValue: (order) => order.orderNumber,
       cell: (order) => (
         <div className="flex flex-col items-start gap-1">
-          <p className="font-semibold">#{order.orderNumber}</p>
+          <p className="font-semibold"><DataGridHighlight text={`#${order.orderNumber}`} /></p>
           <p className="text-xs text-muted">{timeAgo(order.createdAt)}</p>
           {lateChip(order)}
         </div>
@@ -132,7 +129,7 @@ export default function OrdersPage() {
         <div className="flex min-w-0 items-center gap-2">
           {callButton(order)}
           <div className="min-w-0">
-            <p className="truncate font-medium">{order.buyerName}</p>
+            <p className="truncate font-medium"><DataGridHighlight text={order.buyerName} /></p>
             <p className="text-xs text-muted tabular-nums">{formatKhmerPhoneLocal(order.buyerPhone)}</p>
           </div>
         </div>
@@ -179,36 +176,31 @@ export default function OrdersPage() {
         </span>
       ),
     },
-    { key: "next", header: t("colNext"), align: "right", hideable: false, exportValue: () => "", cell: (order) => <div className="flex justify-end">{nextStep(order)}</div> },
+    { key: "next", header: t("colNext"), align: "right", hideable: false, pin: "end", exportValue: () => "", cell: (order) => <div className="flex justify-end">{nextStep(order)}</div> },
   ];
 
-  // Open on what needs the seller first; everything when nothing does.
-  const initialChip = orders.some((order) => getOrderTab(order.status) === "to_confirm") ? "to_confirm" : "all";
 
   return (
     <div className={`${SELLER_PAGE} gap-4`}>
       <PageHeader title={t("title")} description={t("description")} />
 
       {problem && (
-        <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+        <Notice tone="warning" role="alert">
           {problem}
-        </p>
+        </Notice>
       )}
 
       <DataGrid
-        rows={orders}
+        rowNumbers
+        syncUrl
+        server={{ load: loadPage, reloadKey }}
         getRowId={(order) => order.id}
         columns={columns}
-        searchText={(order) => `${order.orderNumber} ${order.buyerName} ${order.buyerPhone} ${formatKhmerPhoneLocal(order.buyerPhone)} ${order.trackingCode} ${order.trackingCode.replace(/-/g, "")}`}
         searchPlaceholder={t("searchPlaceholder")}
-        chips={ORDER_TABS.map((tab) => ({
-          value: tab,
-          label: t(`tab_${tab}`),
-          icon: ORDER_TAB_ICON[tab],
-          iconClass: TONE_TEXT[ORDER_TAB_TONE[tab]],
-          predicate: (order: SellerOrder) => getOrderTab(order.status) === tab,
-        }))}
-        initialChip={initialChip}
+        chips={ORDER_TABS.map((tab) => ({ value: tab, label: t(`tab_${tab}`), icon: ORDER_TAB_ICON[tab], iconClass: TONE_TEXT[ORDER_TAB_TONE[tab]] }))}
+        // Open on what needs the seller first; everything when nothing does.
+        initialChip="to_confirm"
+        initialChipFallback="all"
         filters={[
           {
             key: "payment",
@@ -217,7 +209,6 @@ export default function OrdersPage() {
               { value: "online", label: t("filterOnline") },
               { value: "cod", label: t("filterCash") },
             ],
-            predicate: (order, value) => (order.paymentMethod === "cod") === (value === "cod"),
           },
           {
             key: "fulfilment",
@@ -226,7 +217,6 @@ export default function OrdersPage() {
               { value: "delivery", label: t("filterDelivery") },
               { value: "pickup", label: t("filterPickup") },
             ],
-            predicate: (order, value) => order.fulfilment === value,
           },
         ]}
         onRowClick={(order) => router.push(href(order))}
@@ -240,12 +230,12 @@ export default function OrdersPage() {
             <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
               {/* The buyer leads (whole name), the order number goes with the details. */}
               <p className="flex w-full items-baseline justify-between gap-2">
-                <span className="min-w-0 truncate font-semibold">{order.buyerName}</span>
+                <span className="min-w-0 truncate font-semibold"><DataGridHighlight text={order.buyerName} /></span>
                 <span className="shrink-0 font-semibold tabular-nums">{formatMoney(order.totalMinor, order.currency)}</span>
               </p>
               <p className="w-full truncate text-xs text-muted">
                 <span className="sr-only">{statusLabel(order)} · </span>
-                <span className="font-semibold text-fg">#{order.orderNumber}</span> · {placeLabel(order)} · {t("itemCount", { count: order.itemCount })} · {timeAgo(order.createdAt)}
+                <span className="font-semibold text-fg"><DataGridHighlight text={`#${order.orderNumber}`} /></span> · {placeLabel(order)} · {t("itemCount", { count: order.itemCount })} · {timeAgo(order.createdAt)}
               </p>
               {lateChip(order)}
             </div>

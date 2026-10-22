@@ -66,7 +66,35 @@
     "confirmTitle": "Remove this product?",
     "confirmBody": "It leaves the shop at once. Orders that have it keep their own copy.",
     "confirmYes": "Remove",
-    "statOrdersDetail": "35 yesterday"
+    "statOrdersDetail": "35 yesterday",
+    "searchPlaceholder": "Search products",
+    "clear": "Clear",
+    "codeLabel": "Tracking code",
+    "codePlaceholder": "e.g. MEK-7K4P-9QXR",
+    "find": "Find",
+    "switchLabel": "Accept cash on delivery",
+    "switchHint": "A setting that is on or off",
+    "checkboxLabel": "Remember my details on this phone",
+    "kitTitle": "Shared parts",
+    "noticeWarning": "Add your Bakong ID so buyers can pay by KHQR.",
+    "noticeDanger": "Couldn't save. Check your internet and try again.",
+    "noticeInfo": "Province orders must be paid before sending.",
+    "noticeSuccessTitle": "Saved",
+    "noticeSuccess": "Your changes are live in your shop.",
+    "menuTitle": "Your shop",
+    "menuShop": "Shop details",
+    "menuShopDetail": "Name, logo, phone",
+    "menuDelivery": "Delivery",
+    "menuDeliveryDetail": "Zones and fees",
+    "menuLanguage": "Language",
+    "groupTitleSample": "Group title",
+    "tileQr": "QR code",
+    "tileCopy": "Copy link",
+    "tileOther": "Other apps",
+    "tilePrint": "Print",
+    "tilePdf": "PDF",
+    "priceUsd": "Price (USD)",
+    "priceKhr": "Price (KHR)"
   },
   "Storefront": {
     "verified": "Verified merchant",
@@ -422,7 +450,9 @@
     "colStatus": "Status",
     "colNext": "Next step",
     "firstOrderTitle": "Your shop is ready for its first order",
-    "firstOrderBody": "Share your link on Facebook, TikTok or Telegram. New orders show up here, and on your Telegram."
+    "firstOrderBody": "Share your link on Facebook, TikTok or Telegram. New orders show up here, and on your Telegram.",
+    "taglineArea_phnom_penh": "Phnom Penh",
+    "taglineArea_province": "Province"
   },
   "BusinessType": {
     "shop": "Shop",
@@ -482,7 +512,13 @@
     "deliveryDetail": "Zones and fees, pickup, provinces, drivers",
     "invoiceSettingsDetail": "Tax number, note, Telegram and Facebook on receipts",
     "telegramAlerts": "Telegram alerts",
-    "telegramAlertsDetail": "New orders to your chat and staff groups"
+    "telegramAlertsDetail": "New orders to your chat and staff groups",
+    "languageAndDisplay": "Language & display",
+    "language": "Language",
+    "languageDetail": "For your dashboard on this device",
+    "display": "Theme",
+    "displayDetail": "Light, dark and your colour",
+    "shopDetailsDetail": "Name, logo, phone, area and Bakong account"
   },
   "ProductsList": {
     "title": "Products",
@@ -1234,7 +1270,22 @@
     "noResults": "No matches",
     "noResultsBody": "Try a different search or clear the filters.",
     "select": "Select",
-    "doneSelecting": "Done"
+    "doneSelecting": "Done",
+    "loading": "Loading…",
+    "loadFailed": "Couldn't load this list. Check your internet and try again.",
+    "retry": "Try again",
+    "view": "View",
+    "clearSearch": "Clear search",
+    "clearAll": "Clear all",
+    "removeFilter": "Remove filter {filter}",
+    "noResultsFor": "No results for “{query}”",
+    "showMore": "Show {count} more",
+    "pages": "Pages",
+    "pageNumber": "Page {page}",
+    "ascending": "low to high",
+    "descending": "high to low",
+    "close": "Close",
+    "rowNumber": "Row number"
   },
   "StoreSettings": {
     "title": "Store settings",
@@ -1740,7 +1791,11 @@
     "manual": "Copy the link above by hand.",
     "qrAlt": "QR code of your shop link",
     "qrBody": "Buyers scan it with their phone camera to open your shop.",
-    "download": "Download QR code"
+    "download": "Download QR code",
+    "back": "Back",
+    "otherApps": "Other apps",
+    "shareShop": "Share shop",
+    "notReady": "Your shop isn't ready for buyers yet. Finish the setup steps on Home, then share your link."
   },
   "Telegram": {
     "title": "Telegram alerts",
@@ -2238,7 +2293,9 @@
     "recentCodes": "Recently found",
     "findOrderPlaceholder": "Find order by tracking code…",
     "viewShop": "View shop",
-    "findOrderHelp": "Ask the buyer for the code on their receipt or Telegram message — it looks like MEK-7K4P-9QXR."
+    "findOrderHelp": "Ask the buyer for the code on their receipt or Telegram message — it looks like MEK-7K4P-9QXR.",
+    "switchLanguage": "ភាសាខ្មែរ / English",
+    "headerShare": "Share"
   },
   "MyOrders": {
     "myOrders": "My orders",

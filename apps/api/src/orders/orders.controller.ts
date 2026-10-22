@@ -1,12 +1,13 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { formatTrackingCode, orderActionRequestSchema } from "@khmio/shared";
-import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
+import { orderActionRequestSchema } from "@khmio/shared";
+import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { assertStoreWritable } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
 import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "./invoice";
 import { readOrderDetail, runSellerAction } from "./order-actions";
+import { orderListSelect, parseOrderListQuery, readOrderListPage, toListedOrder } from "./order-list";
 import { sellerSummary } from "./summary";
 
 /** Most orders the list returns; older ones stay in the database. */
@@ -25,33 +26,23 @@ export class OrdersController {
   async list(@CurrentStore() context: MerchantStore) {
     return withContext(this.app, context, async (tx) => {
       const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: { slug: true } });
-      const orders = await tx.order.findMany({
-        orderBy: { createdAt: "desc" },
-        take: ORDER_LIST_LIMIT,
-        select: {
-          id: true,
-          orderNumber: true,
-          trackingCode: true,
-          status: true,
-          paymentMethod: true,
-          currency: true,
-          totalMinor: true,
-          buyerName: true,
-          buyerPhone: true,
-          fulfilment: true,
-          area: true,
-          districtId: true,
-          provinceId: true,
-          createdAt: true,
-          items: { select: { quantity: true } },
-        },
-      });
+      const orders = await tx.order.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: "desc" }, take: ORDER_LIST_LIMIT, select: orderListSelect });
       // The tracking code as printed, so the list's search finds an order by it.
-      return orders.map(({ items, trackingCode, ...order }) => ({
-        ...order,
-        trackingCode: formatTrackingCode(store.slug, trackingCode),
-        itemCount: items.reduce((sum, item) => sum + item.quantity, 0),
-      }));
+      return orders.map((order) => toListedOrder(order, store.slug));
+    });
+  }
+
+  /**
+   * One page of the orders for the Orders list (the data grid's server mode):
+   * search, tab, filters, sort and page in the address (packages/shared
+   * ORDER_LIST_SPEC; anything else is refused). Before ":id".
+   */
+  @Get("page")
+  async page(@CurrentStore() context: MerchantStore, @Query() params: unknown) {
+    const query = parseOrderListQuery(params);
+    return withContext(this.app, context, async (tx) => {
+      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: { slug: true } });
+      return readOrderListPage(tx, context.storeId, store.slug, query);
     });
   }
 

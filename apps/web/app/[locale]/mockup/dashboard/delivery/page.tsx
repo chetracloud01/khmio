@@ -3,21 +3,24 @@
 import {
   deliverySettingsSchema,
   formatKhmerPhoneLocal,
+  khrInputText,
   MAX_DELIVERY_ZONES,
   parseKhrInput,
   parseUsdInput,
   PHNOM_PENH_DISTRICTS,
   placeName,
   toFieldErrors,
+  usdInputText,
   type DeliverySettings,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Card, cn, Input, Select } from "@khmio/ui";
+import { Button, Card, cn, Input, Select, Switch } from "@khmio/ui";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { useDeliverySettings } from "../../delivery-settings-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
+import { MoneyInput } from "@/components/money-input";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 
 interface ZoneDraft {
@@ -42,23 +45,21 @@ interface Draft {
   drivers: DriverDraft[];
 }
 
-const usdText = (cents: number | undefined) => (cents !== undefined ? (cents / 100).toFixed(2) : "");
-const khrText = (riel: number | undefined) => (riel !== undefined ? String(riel) : "");
 
 function toDraft(settings: DeliverySettings): Draft {
   return {
     zones: settings.zones.map((zone) => ({
       id: zone.id,
       name: zone.name,
-      feeUsd: usdText(zone.feeUsdCents),
-      feeKhr: khrText(zone.feeKhr),
+      feeUsd: usdInputText(zone.feeUsdCents),
+      feeKhr: khrInputText(zone.feeKhr),
       districtIds: zone.districtIds,
     })),
     pickup: settings.pickup,
     province: {
       enabled: settings.province.enabled,
-      feeUsd: usdText(settings.province.feeUsdCents),
-      feeKhr: khrText(settings.province.feeKhr),
+      feeUsd: usdInputText(settings.province.feeUsdCents),
+      feeKhr: khrInputText(settings.province.feeKhr),
       note: settings.province.note,
     },
     drivers: settings.drivers.map((driver) => ({ ...driver, phone: formatKhmerPhoneLocal(driver.phone) })),
@@ -195,10 +196,18 @@ function DeliveryForm() {
     usdKey: string,
     khrKey: string,
   ) => (
-    <div className="grid grid-cols-2 gap-3">
-      <Input label={t("feeUsd")} inputMode="decimal" placeholder="1.00" value={usd} onChange={(e) => onUsd(e.target.value)} error={error(usdKey)} />
-      <Input label={t("feeKhr")} inputMode="numeric" placeholder="4000" value={khr} onChange={(e) => onKhr(e.target.value)} error={error(khrKey)} />
-    </div>
+    <MoneyInput
+      usd={usd}
+      khr={khr}
+      usdLabel={t("feeUsd")}
+      khrLabel={t("feeKhr")}
+      onUsdChange={onUsd}
+      onKhrChange={onKhr}
+      usdPlaceholder="1.00"
+      usdError={error(usdKey)}
+      khrPlaceholder="4000"
+      khrError={error(khrKey)}
+    />
   );
 
   return (
@@ -301,15 +310,7 @@ function DeliveryForm() {
         </FormSection>
 
         <FormSection stacked title={t("sectionPickup")} description={t("sectionPickupHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.pickup.enabled}
-              onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, enabled: e.target.checked } }, "pickup.address", "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("pickupEnabled")}</span>
-          </label>
+          <Switch checked={draft.pickup.enabled} onChange={(enabled) => change({ ...draft, pickup: { ...draft.pickup, enabled } }, "pickup.address", "zones")} label={t("pickupEnabled")} />
           {draft.pickup.enabled && (
             <>
               <Input
@@ -333,15 +334,7 @@ function DeliveryForm() {
         </FormSection>
 
         <FormSection stacked title={t("sectionProvince")} description={t("sectionProvinceHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.province.enabled}
-              onChange={(e) => change({ ...draft, province: { ...draft.province, enabled: e.target.checked } }, "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("provinceEnabled")}</span>
-          </label>
+          <Switch checked={draft.province.enabled} onChange={(enabled) => change({ ...draft, province: { ...draft.province, enabled } }, "zones")} label={t("provinceEnabled")} />
           {draft.province.enabled && (
             <>
               {feeInputs(

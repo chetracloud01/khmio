@@ -57,6 +57,15 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
   );
 }
 
+/** The small grey heading over a group of rows or fields ("YOUR SHOP", "LANGUAGE & DISPLAY"). */
+export function GroupTitle({ id, as: Tag = "h2", children, className }: { id?: string; as?: "h2" | "h3" | "p" | "span" | "div"; children: ReactNode; className?: string }) {
+  return (
+    <Tag id={id} className={cn("px-1 text-xs font-semibold uppercase tracking-wide text-muted", className)}>
+      {children}
+    </Tag>
+  );
+}
+
 /** One key number: icon, value, label. */
 /**
  * One number with its label. `detail` is an optional second line under the

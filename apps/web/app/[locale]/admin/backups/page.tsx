@@ -1,8 +1,8 @@
 "use client";
 
 import { adminCan, backupIsStale, RESTORE_TEST_LATE_DAYS, type BackupRunView } from "@khmio/shared";
-import { Button, Card, cn, ConfirmDialog, EmptyState, SectionTitle, TONE_STYLES } from "@khmio/ui";
-import { AlertTriangle, ArchiveRestore, CircleCheck, DatabaseBackup, ExternalLink, Lock, ShieldCheck } from "lucide-react";
+import { Button, Card, cn, ConfirmDialog, EmptyState, IconBadge, Notice, SectionTitle, TONE_STYLES } from "@khmio/ui";
+import { ArchiveRestore, CircleCheck, DatabaseBackup, ExternalLink, Lock, ShieldCheck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
@@ -154,29 +154,23 @@ export default function BackupsPage() {
       />
 
       {problem && (
-        <p role="alert" className="rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+        <Notice tone="danger" role="alert">
           {problem}
-        </p>
+        </Notice>
       )}
 
       {stale ? (
-        <div role="alert" className="flex items-start gap-3 rounded-DEFAULT border border-danger/40 bg-danger/5 p-4 text-sm">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" aria-hidden="true" />
-          <div className="flex flex-col gap-1">
-            <p className="font-semibold text-danger">{t("bakStaleTitle")}</p>
-            <p>
-              {latest?.finishedAt ? t("bakStaleNewest", { when: dateTime(latest.finishedAt) }) : t("bakStaleNone")}{" "}
-              {lastTry?.status === "failed" && lastTry.failure && t("bakStaleReason", { reason: t(`bakFail_${lastTry.failure}`) })}
-            </p>
-            <p className="text-muted">{canRun ? t("bakStaleDo") : t("bakStaleTell")}</p>
-          </div>
-        </div>
+        <Notice tone="danger" role="alert" title={t("bakStaleTitle")} className="p-4">
+          <p>
+            {latest?.finishedAt ? t("bakStaleNewest", { when: dateTime(latest.finishedAt) }) : t("bakStaleNone")}{" "}
+            {lastTry?.status === "failed" && lastTry.failure && t("bakStaleReason", { reason: t(`bakFail_${lastTry.failure}`) })}
+          </p>
+          <p className="mt-1 text-muted">{canRun ? t("bakStaleDo") : t("bakStaleTell")}</p>
+        </Notice>
       ) : (
         latest?.finishedAt && (
           <Card className="flex items-start gap-3 p-4">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-success/10">
-              <CircleCheck className="h-5 w-5 text-success" aria-hidden="true" />
-            </span>
+            <IconBadge icon={CircleCheck} tone="success" shape="circle" />
             <div className="min-w-0">
               <p className="font-semibold">{t("bakLatest", { when: dateTime(latest.startedAt ?? latest.finishedAt) })}</p>
               <p className="text-sm text-muted">{t("bakLatestLine", { size: size(latest), duration: took(latest), kind: kind(latest) })}</p>
@@ -186,9 +180,9 @@ export default function BackupsPage() {
       )}
 
       {waitingTooLong && (
-        <p role="status" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+        <Notice tone="warning" role="status">
           {t("bakWaitingLong")}
-        </p>
+        </Notice>
       )}
 
       <div className="flex items-start gap-3 rounded-DEFAULT border border-border bg-bg p-3 text-sm">

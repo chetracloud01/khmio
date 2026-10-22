@@ -1,6 +1,6 @@
 "use client";
 
-import { Mio } from "@khmio/ui";
+import { IconBadge, Mio } from "@khmio/ui";
 import { ChevronRight, PackageSearch, Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -93,9 +93,7 @@ export default function MyOrdersPage() {
       )}
 
       <Link href={`/${locale}/track`} className="flex min-h-[52px] items-center gap-3 rounded-full border border-border bg-bg pl-1.5 pr-4 shadow-card hover:border-brand/40">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
-          <PackageSearch className="h-5 w-5" aria-hidden="true" />
-        </span>
+        <IconBadge icon={PackageSearch} shape="circle" />
         <span className="min-w-0 flex-1 text-sm font-semibold">{t("trackAnother")}</span>
         <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
       </Link>

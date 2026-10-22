@@ -17,8 +17,8 @@ import {
   type Fulfilment,
   type PaymentMethod,
 } from "@khmio/shared";
-import { Button, cn, Input, Select } from "@khmio/ui";
-import { AlertTriangle, Check, Clock, History, MapPin, Store, Truck } from "lucide-react";
+import { Button, Checkbox, cn, Input, Notice, Select } from "@khmio/ui";
+import { Check, Clock, History, MapPin, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -304,10 +304,9 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
       >
       <div ref={formRef} className="flex flex-col gap-4 p-4 lg:p-0">
         {problem && (
-          <p role="alert" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          <Notice tone="warning" role="alert">
             {problem}
-          </p>
+          </Notice>
         )}
 
         <BuyerSection number={1} title={t("sectionYou")}>
@@ -469,10 +468,7 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             </>
           )}
 
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 shrink-0 accent-brand" />
-            <span className="text-sm">{t("rememberDetails")}</span>
-          </label>
+          <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} label={t("rememberDetails")} />
         </BuyerSection>
 
         <BuyerSection number={3} title={t("sectionPay")}>
@@ -490,10 +486,9 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
           <div className="flex flex-col gap-2" data-invalid={errors.paymentMethod ? "true" : undefined}>
             <span className="text-sm font-medium">{t("paymentMethod")}</span>
             {methods.length === 0 && (
-              <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+              <Notice tone="warning" role="status">
                 {details.area === "province" && details.fulfilment === "delivery" ? t("provinceCodNote") : t("noPaymentMethods")}
-              </p>
+              </Notice>
             )}
             {methods.map((method) => (
               <button

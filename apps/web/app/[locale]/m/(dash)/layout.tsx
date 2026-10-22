@@ -11,6 +11,7 @@ import { NewOrderToast, playNewOrderChime, useServiceWorker } from "@/components
 import { api, getMe, type Me, type SellerOrder, type SellerSummary, type StoreDetails } from "@/lib/api";
 import { AppLoading, AppOffline } from "../app-frame";
 import { MerchantContext, shopStateOf } from "./merchant-context";
+import { ShareShopButton, ShareShopProvider } from "./share-shop";
 
 // The real dashboard (roadmap step 3): every signed-in page sits in this
 // frame. It reads who is signed in and their shop once, sends anyone without
@@ -59,10 +60,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   if (state === "checking" || !data) return <AppLoading />;
   return (
     <MerchantContext.Provider value={{ ...data, refreshStore, summary, refreshSummary }}>
-      <DashboardFrame me={data.me} store={data.store} waiting={summary?.waiting ?? 0}>
-        {children}
-        <NewOrderToast order={newOrder.toast} onClose={newOrder.close} />
-      </DashboardFrame>
+      <ShareShopProvider>
+        <DashboardFrame me={data.me} store={data.store} waiting={summary?.waiting ?? 0}>
+          {children}
+          <NewOrderToast order={newOrder.toast} onClose={newOrder.close} />
+        </DashboardFrame>
+      </ShareShopProvider>
     </MerchantContext.Provider>
   );
 }
@@ -75,7 +78,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
  */
 function useNewOrderAlert(summary: SellerSummary | null, base: string) {
   const { placeLabel } = useOrderText();
-  const [toast, setToast] = useState<{ number: string; total: string; place: string; href: string } | null>(null);
+  const [toast, setToast] = useState<{
+    number: string;
+    total: string;
+    place: string;
+    href: string;
+  } | null>(null);
   const lastWaiting = useRef<number | null>(null);
   const lastSeenAt = useRef<string | null>(null);
   useEffect(() => {
@@ -97,7 +105,12 @@ function useNewOrderAlert(summary: SellerSummary | null, base: string) {
       if (!newest) return;
       lastSeenAt.current = newest.createdAt;
       playNewOrderChime();
-      setToast({ number: String(newest.orderNumber), total: formatMoney(newest.totalMinor, newest.currency), place: placeLabel(newest), href: `${base}/orders/${newest.id}` });
+      setToast({
+        number: String(newest.orderNumber),
+        total: formatMoney(newest.totalMinor, newest.currency),
+        place: placeLabel(newest),
+        href: `${base}/orders/${newest.id}`,
+      });
     });
   }, [summary, base, placeLabel]);
   const close = useCallback(() => setToast(null), []);
@@ -113,6 +126,7 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
   const t = useTranslations("App");
   const tDash = useTranslations("Dashboard");
   const tPlans = useTranslations("Plans");
+  const tType = useTranslations("BusinessType");
   const locale = useLocale();
   const base = `/${locale}/m`;
   const shopPath = `/s/${store.slug}`;
@@ -121,14 +135,28 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
   const state = shopStateOf(me, store);
   const stateLabel =
     state.kind === "paused" ? tDash("statusPaused") : state.kind === "due" ? tDash("statusDue") : state.kind === "trial" ? tDash("statusTrial", { count: state.daysLeft }) : tDash("statusOpen");
+  const area = tDash(`taglineArea_${store.area}`);
+  const tagline = store.businessType === "other" ? area : `${tType(store.businessType)} · ${area}`;
+  // The dot on the logo: buyers can order (open or on trial), payment is due, or the shop is paused.
+  const statusTone = state.kind === "paused" ? "danger" : state.kind === "due" ? "warning" : "success";
   return (
     <SellerFrame
       look="teal"
       hideMobileNav={editingProduct}
+      shopHref={`/${locale}${shopPath}`}
+      showSettings={false}
       shop={{
         name: store.name,
         logoUrl: store.logoUrl,
-        belowOnTeal: <span className="block truncate text-xs text-nav-muted">{shopPath}</span>,
+        status: { tone: statusTone, label: stateLabel },
+        // What the shop is and where, under its name: "Garage / cars · Phnom Penh" ("Other" shows the area only).
+        below: <span className="block truncate text-xs text-muted">{tagline}</span>,
+        belowOnTeal: (
+          <>
+            <span className="block truncate text-xs text-nav-fg/80">{tagline}</span>
+            <span className="block truncate text-xs text-nav-muted">{shopPath}</span>
+          </>
+        ),
       }}
       homeHref={base}
       sidebarFooter={
@@ -137,18 +165,44 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           <span className="text-xs text-nav-muted">{stateLabel}</span>
         </div>
       }
+      headerExtra={<ShareShopButton variant="round" />}
       topBarExtra={
-        <Link href={`/${locale}${shopPath}`} target="_blank" className="flex min-h-touch items-center gap-2 rounded-DEFAULT px-3 text-sm font-medium text-brand hover:bg-brand/5">
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
-          {tDash("actionViewShop")}
-        </Link>
+        <>
+          <ShareShopButton variant="bar" />
+          <Link href={`/${locale}${shopPath}`} target="_blank" className="flex min-h-touch items-center gap-2 rounded-DEFAULT px-3 text-sm font-medium text-brand hover:bg-brand/5">
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            {tDash("actionViewShop")}
+          </Link>
+        </>
       }
       nav={[
-        { href: base, label: tDash("navHome"), icon: LayoutDashboard, mobile: true },
-        { href: `${base}/products`, label: tDash("navProducts"), icon: Package, mobile: true },
-        { href: `${base}/orders`, label: tDash("navOrders"), icon: ShoppingBag, mobile: true, badge: waiting },
-        // The same four on a laptop and a phone: delivery, store settings, invoices and Telegram alerts are reached from "My shop", which stays lit there.
-        { href: `${base}/settings`, label: t("navShop"), icon: Store, mobile: true, alsoActiveOn: [`${base}/delivery`, `${base}/store-settings`, `${base}/invoice-settings`, `${base}/telegram-alerts`] },
+        {
+          href: base,
+          label: tDash("navHome"),
+          icon: LayoutDashboard,
+          mobile: true,
+        },
+        {
+          href: `${base}/products`,
+          label: tDash("navProducts"),
+          icon: Package,
+          mobile: true,
+        },
+        {
+          href: `${base}/orders`,
+          label: tDash("navOrders"),
+          icon: ShoppingBag,
+          mobile: true,
+          badge: waiting,
+        },
+        // The same four on a laptop and a phone: shop details, delivery, store settings, invoices and Telegram alerts are reached from "My shop", which stays lit there.
+        {
+          href: `${base}/settings`,
+          label: t("navShop"),
+          icon: Store,
+          mobile: true,
+          alsoActiveOn: [`${base}/shop-details`, `${base}/display`, `${base}/delivery`, `${base}/store-settings`, `${base}/invoice-settings`, `${base}/telegram-alerts`],
+        },
       ]}
       banner={store.paused && <p className="bg-danger/10 px-4 py-2 text-sm font-medium text-danger">{tDash("bannerPaused")}</p>}
     >

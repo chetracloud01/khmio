@@ -1,7 +1,7 @@
 "use client";
 
 import type { TelegramLoginPayload } from "@khmio/shared";
-import { Button, Card, Input, SegmentedControl } from "@khmio/ui";
+import { Button, Card, Checkbox, Input, SegmentedControl } from "@khmio/ui";
 import { Copy, FlaskConical, KeyRound, ShieldCheck, ShieldHalf } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
@@ -243,10 +243,7 @@ function BackupCodes({ codes, onDone }: { codes: string[]; onDone: () => void })
           <Copy className="h-4 w-4" aria-hidden="true" />
           {copied ? t("copied") : t("copyCodes")}
         </Button>
-        <label className="flex min-h-touch cursor-pointer items-center gap-3 text-sm">
-          <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} className="h-5 w-5 shrink-0 accent-brand" />
-          {t("savedThem")}
-        </label>
+        <Checkbox checked={saved} onChange={(e) => setSaved(e.target.checked)} label={t("savedThem")} />
         <Button variant="primary" disabled={!saved} onClick={onDone}>
           {t("continue")}
         </Button>

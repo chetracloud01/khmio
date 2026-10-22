@@ -1,11 +1,11 @@
 "use client";
 
 import { cn, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
-import { Lock, type LucideIcon } from "lucide-react";
-import { useLocale } from "next-intl";
+import { Lock, Store, type LucideIcon } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useThemeLabels } from "@/components/use-theme-labels";
 
 export interface SellerNavItem {
@@ -30,6 +30,18 @@ export interface SellerNavItem {
  */
 export type SellerFrameLook = "light" | "teal";
 
+const STATUS_DOT = { success: "bg-success", warning: "bg-warning", danger: "bg-danger" } as const;
+
+/**
+ * The phone header's main button (Share): a teal pill with its name on a
+ * phone 400px or wider, a round teal icon on a smaller one (the shop's name
+ * keeps its room) and once the page scrolls (the header turns slim). Put the
+ * name in a span with HEADER_PILL_TEXT.
+ */
+export const HEADER_PILL =
+  "flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full bg-brand text-sm font-semibold text-on-brand shadow-card transition-all min-[400px]:group-data-[compact=false]:px-3.5 motion-reduce:transition-none";
+export const HEADER_PILL_TEXT = "sr-only min-[400px]:group-data-[compact=false]:not-sr-only";
+
 /**
  * The seller dashboard's frame (design/design-standard.md §2), the same for the
  * live dashboard (/m) and its mockup: on a phone the shop at the top and up to
@@ -49,10 +61,19 @@ export function SellerFrame({
   sidebarFooter,
   look = "light",
   hideMobileNav = false,
+  shopHref,
+  showSettings = true,
   children,
 }: {
   /** `belowOnTeal`: the line under the name in the dark sidebar ("teal" look), in nav colours; the phone header keeps `below`. */
-  shop: { name: string; logoUrl: string | null; below?: ReactNode; belowOnTeal?: ReactNode };
+  shop: {
+    name: string;
+    logoUrl: string | null;
+    below?: ReactNode;
+    belowOnTeal?: ReactNode;
+    /** The shop's state as a dot on its logo: green open, amber payment due, red paused. */
+    status?: { tone: "success" | "warning" | "danger"; label: string };
+  };
   nav: SellerNavItem[];
   homeHref: string;
   /** A notice across the top of the content (shop paused, plan ending …). */
@@ -68,12 +89,19 @@ export function SellerFrame({
   look?: SellerFrameLook;
   /** A full-screen form on a phone (e.g. the product form): no bottom tabs, so its save bar sits at the bottom. */
   hideMobileNav?: boolean;
+  /** The buyer's view of the shop: a round "View shop" button in the phone header (a laptop has it in its top bar). */
+  shopHref?: string;
+  /** Language and theme in the frame. Off when a page has them instead (the live dashboard's My shop). */
+  showSettings?: boolean;
   children: ReactNode;
 }) {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const themeLabels = useThemeLabels();
+  const tFrame = useTranslations("SellerApp");
+  const otherLocale = locale === "km" ? "en" : "km";
+  const switchLocale = (next: string) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`));
 
   const isActive = (href: string) => (href === homeHref ? pathname === href : pathname.startsWith(href));
   /** The item's own page, or one of the pages reached from it (e.g. Delivery from "My shop"). */
@@ -83,7 +111,7 @@ export function SellerFrame({
     <div className="flex shrink-0 items-center gap-1">
       <SegmentedControl
         value={locale}
-        onChange={(next) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`))}
+        onChange={switchLocale}
         options={[
           { value: "km", label: "ខ្មែរ" },
           { value: "en", label: "EN" },
@@ -95,19 +123,39 @@ export function SellerFrame({
 
   const teal = look === "teal";
 
+  // The phone header turns slim once the page scrolls a little.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setCompact(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const identity = (onTeal: boolean) => (
     <div className="flex min-w-0 items-center gap-3">
-      {shop.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- the shop's own logo (uploaded, or a local preview in the mockup)
-        <img src={shop.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-      ) : (
-        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-bold", onTeal ? "bg-nav-accent text-nav-bg" : "bg-brand text-on-brand")}>
-          {shop.name.charAt(0).toUpperCase()}
-        </span>
-      )}
+      <span className="relative shrink-0">
+        {shop.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- the shop's own logo (uploaded, or a local preview in the mockup)
+          <img src={shop.logoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+        ) : (
+          <span className={cn("flex h-10 w-10 items-center justify-center rounded-full text-base font-bold", onTeal ? "bg-nav-accent text-nav-bg" : "bg-brand text-on-brand")}>
+            {shop.name.charAt(0).toUpperCase()}
+          </span>
+        )}
+        {shop.status && (
+          <span
+            title={shop.status.label}
+            className={cn("absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2", onTeal ? "ring-nav-bg" : "ring-bg", STATUS_DOT[shop.status.tone])}
+          >
+            <span className="sr-only">{shop.status.label}</span>
+          </span>
+        )}
+      </span>
       <div className="min-w-0">
         <p className={cn("truncate text-sm font-semibold", onTeal ? "text-nav-fg" : "text-fg")}>{shop.name}</p>
-        {onTeal ? (shop.belowOnTeal ?? shop.below) : shop.below}
+        {/* On a phone the line under the name folds away once the page scrolls: the header turns slim. */}
+        {onTeal ? (shop.belowOnTeal ?? shop.below) : <div className="group-data-[compact=true]:hidden">{shop.below}</div>}
       </div>
     </div>
   );
@@ -157,25 +205,55 @@ export function SellerFrame({
           })}
         </nav>
         {sidebarFooter}
-        {!teal && settings("up")}
+        {!teal && showSettings && settings("up")}
       </aside>
 
-      {/* Phone: the shop, language and theme across the top. */}
-      <header className="flex items-center justify-between gap-3 border-b border-border bg-bg p-4 md:hidden print:hidden">
+      {/* Phone: pinned while the page scrolls, so the shop's name and the language and theme stay in reach; the
+          top padding clears the notch when Khmio runs as an installed app (full screen). */}
+      <header
+        data-compact={compact}
+        className="group sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-bg/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur transition-[padding] data-[compact=true]:pb-2 data-[compact=true]:pt-[max(0.5rem,env(safe-area-inset-top))] data-[compact=true]:shadow-card md:hidden print:hidden motion-reduce:transition-none"
+      >
         {identity(false)}
+        {/* Compact on a phone, so the shop's name keeps its room: the page's extras (Share), View shop last; language and theme when shown. */}
         <div className="flex shrink-0 items-center gap-1">
-          {settings("down")}
+          {showSettings && (
+            <>
+              <button
+                type="button"
+                onClick={() => switchLocale(otherLocale)}
+                lang={otherLocale}
+                aria-label={tFrame("switchLanguage")}
+                className="flex h-11 min-w-11 items-center justify-center rounded-full border border-border bg-bg px-3 text-sm font-semibold"
+              >
+                {otherLocale === "km" ? "ខ្មែរ" : "EN"}
+              </button>
+              <ThemeSwitcher labels={themeLabels} direction="down" />
+            </>
+          )}
           {headerExtra}
+          {shopHref && (
+            <Link
+              href={shopHref}
+              target="_blank"
+              aria-label={tFrame("viewShop")}
+              title={tFrame("viewShop")}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-bg text-brand shadow-card"
+            >
+              <Store className="h-5 w-5" aria-hidden="true" />
+            </Link>
+          )}
         </div>
       </header>
 
       {/* A plain block, not a flex column: a wide table inside a page must scroll in its own box, never push the page wider. */}
-      <main className={cn("min-w-0 flex-1 md:pb-0", hideMobileNav ? "pb-[env(safe-area-inset-bottom)]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
+      {/* --grid-sticky-top: the pinned header's height (slim phone header, laptop top bar), so a data grid's toolbar pins just under it. */}
+      <main className={cn("min-w-0 flex-1 [--grid-sticky-top:calc(3.3125rem+max(0.5rem,env(safe-area-inset-top)))] md:pb-0 md:[--grid-sticky-top:3.8125rem]", hideMobileNav ? "pb-[env(safe-area-inset-bottom)]" : "pb-[calc(5rem+env(safe-area-inset-bottom))]")}>
         {/* Teal look, tablet and up: language, theme and extras in a slim bar, as in the admin. */}
         {teal && (
           <div className="sticky top-0 z-30 hidden items-center justify-end gap-2 border-b border-border bg-bg/85 px-4 py-2 backdrop-blur md:flex print:hidden">
             {topBarExtra}
-            {settings("down")}
+            {showSettings && settings("down")}
           </div>
         )}
         {banner}

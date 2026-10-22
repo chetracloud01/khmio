@@ -65,9 +65,9 @@ function ProductsList() {
   const thumbnail = (product: MockProduct, size: string) =>
     product.photoDataUrls?.[0] ? (
       // eslint-disable-next-line @next/next/no-img-element -- local FileReader preview, not a remote image
-      <img src={product.photoDataUrls[0]} alt="" className={`${size} shrink-0 rounded-DEFAULT object-cover`} />
+      <img src={product.photoDataUrls[0]} alt="" className={`${size} shrink-0 rounded-full object-cover ring-1 ring-border`} />
     ) : (
-      <div className={`${size} shrink-0 rounded-DEFAULT ${product.photoColor}`} aria-hidden="true" />
+      <div className={`${size} shrink-0 rounded-full ring-1 ring-border ${product.photoColor}`} aria-hidden="true" />
     );
 
   // Hidden = still here to edit, not shown in the shop.
@@ -190,6 +190,7 @@ function ProductsList() {
       )}
 
       <DataGrid
+        rowNumbers
         rows={products}
         getRowId={(product) => product.id}
         columns={columns}

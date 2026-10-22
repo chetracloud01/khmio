@@ -1,5 +1,6 @@
 "use client";
 
+import { GroupTitle } from "@khmio/ui";
 import { Copy } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -11,7 +12,7 @@ export function TrackingCodeCard({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("trackingCardTitle")}</h2>
+      <GroupTitle className="px-0">{t("trackingCardTitle")}</GroupTitle>
       <div className="flex items-center justify-between gap-3">
         <span className="text-lg font-bold tracking-wider tabular-nums">{code}</span>
         <button

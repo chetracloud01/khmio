@@ -1,25 +1,36 @@
 "use client";
 
 import {
+  ActionTiles,
   Button,
   Card,
+  Checkbox,
   ConfirmDialog,
   DetailList,
   EmptyState,
   ErrorState,
+  GroupTitle,
+  IconBadge,
   Input,
   LoadingBlocks,
+  Notice,
   PageHeader,
+  PillInput,
+  PillInputButton,
   PriceTag,
+  SearchInput,
   SectionTitle,
   StatCard,
   StatusPill,
+  Switch,
   ThemeSwitcher,
   type Tone,
 } from "@khmio/ui";
-import { Inbox, ShoppingBag, Store, TriangleAlert } from "lucide-react";
+import { Copy, FileDown, Inbox, Languages, Printer, QrCode, Search, Send, ShoppingBag, Store, Truck, TriangleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
+import { MenuList } from "@/components/menu-list";
+import { MoneyInput } from "@/components/money-input";
 import { useThemeLabels } from "@/components/use-theme-labels";
 
 // The one place to see the app's standard: colours, type, and every shared
@@ -52,6 +63,11 @@ export default function StyleguidePage() {
   const themeLabels = useThemeLabels();
   const [loading, setLoading] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [switchOn, setSwitchOn] = useState(true);
+  const [ticked, setTicked] = useState(false);
+  const [usd, setUsd] = useState("8.50");
+  const [khr, setKhr] = useState("");
 
   return (
     <main className="min-h-dvh bg-canvas text-fg">
@@ -171,6 +187,55 @@ export default function StyleguidePage() {
           <Section title={t("inputs")}>
             <Input label={t("nameLabel")} placeholder={t("namePlaceholder")} />
             <Input label={t("phoneLabel")} prefix="+855" inputMode="tel" error={t("phoneError")} />
+            {/* The one rounded field: search boxes, "Find order by code" and "Track my order". */}
+            <SearchInput placeholder={t("searchPlaceholder")} value={search} onChange={(e) => setSearch(e.target.value)} onClear={() => setSearch("")} clearLabel={t("clear")} />
+            <PillInput label={t("codeLabel")} labelHidden icon={<Search />} code placeholder={t("codePlaceholder")} action={<PillInputButton type="button">{t("find")}</PillInputButton>} />
+            {/* On/off settings use Switch; choosing (rows, "remember me") uses Checkbox. */}
+            <Switch checked={switchOn} onChange={setSwitchOn} label={t("switchLabel")} description={t("switchHint")} />
+            <Checkbox checked={ticked} onChange={(e) => setTicked(e.target.checked)} label={t("checkboxLabel")} />
+          </Section>
+
+          <Section title={t("kitTitle")}>
+            {/* Messages: one look per tone. */}
+            <Notice tone="warning">{t("noticeWarning")}</Notice>
+            <Notice tone="danger" role="alert">{t("noticeDanger")}</Notice>
+            <Notice tone="info">{t("noticeInfo")}</Notice>
+            <Notice tone="success" title={t("noticeSuccessTitle")}>{t("noticeSuccess")}</Notice>
+            {/* Rows as data: My shop and any settings list. */}
+            <MenuList
+              title={t("menuTitle")}
+              rows={[
+                { key: "store", href: "#", icon: Store, tone: "brand", title: t("menuShop"), detail: t("menuShopDetail") },
+                { key: "delivery", href: "#", icon: Truck, tone: "info", title: t("menuDelivery"), detail: t("menuDeliveryDetail") },
+                { key: "language", href: "#", icon: Languages, tone: "success", title: t("menuLanguage"), value: "English" },
+              ]}
+            />
+            <div className="flex items-center gap-3">
+              <IconBadge icon={Store} />
+              <IconBadge icon={Truck} tone="info" shape="circle" />
+              <IconBadge icon={TriangleAlert} tone="warning" size="lg" />
+              <GroupTitle as="span">{t("groupTitleSample")}</GroupTitle>
+            </div>
+            {/* Round icon buttons with names: the Share sheet (plain) and the invoice (boxed). */}
+            <ActionTiles
+              items={[
+                { key: "qr", icon: QrCode, label: t("tileQr"), look: "primary" },
+                { key: "copy", icon: Copy, label: t("tileCopy") },
+                { key: "telegram", icon: Send, label: "Telegram", look: { className: "bg-[#229ED9] text-white" } },
+                { key: "share", icon: Search, label: t("tileOther") },
+              ]}
+            />
+            <ActionTiles
+              variant="boxed"
+              columns={3}
+              items={[
+                { key: "print", icon: Printer, label: t("tilePrint") },
+                { key: "pdf", icon: FileDown, label: t("tilePdf"), busy: true },
+                { key: "copy", icon: Copy, label: t("tileCopy") },
+              ]}
+            />
+            {/* One price in dollars and riel; leaving one box fills the other at the rate. */}
+            <MoneyInput usd={usd} khr={khr} onUsdChange={setUsd} onKhrChange={setKhr} usdLabel={t("priceUsd")} khrLabel={t("priceKhr")} autoFillRate={4100} />
           </Section>
 
           <Section title={t("cards")}>

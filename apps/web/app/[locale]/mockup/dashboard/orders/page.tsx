@@ -112,6 +112,7 @@ function OrdersList() {
       </div>
 
       <DataGrid
+        rowNumbers
         rows={orders}
         getRowId={(order) => order.orderNumber}
         columns={columns}

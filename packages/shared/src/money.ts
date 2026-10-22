@@ -43,3 +43,31 @@ export function convertUsdCentsToKhr(cents: number, usdToKhrRate: number): numbe
 export function convertKhrToUsdCents(riel: number, usdToKhrRate: number): number {
   return Math.round((riel / usdToKhrRate) * 100);
 }
+
+/** A saved USD price as the text of its price box: 850 → "8.50"; no price → "". */
+export function usdInputText(cents: number | null | undefined): string {
+  return cents != null ? (cents / 100).toFixed(2) : "";
+}
+
+/** A saved KHR price as the text of its price box: 34850 → "34850"; no price → "". */
+export function khrInputText(riel: number | null | undefined): string {
+  return riel != null ? riel.toString() : "";
+}
+
+/**
+ * The KHR box filled from what was typed in the USD one, at the store's rate
+ * (docs/blueprint.md "Multi-currency pricing and totals"). Only from a price
+ * that reads correctly; a typo gives undefined and is left for the save check.
+ */
+export function khrTextFromUsdText(usdText: string, usdToKhrRate: number): string | undefined {
+  const cents = parseUsdInput(usdText);
+  if (cents === undefined || Number.isNaN(cents)) return undefined;
+  return convertUsdCentsToKhr(cents, usdToKhrRate).toString();
+}
+
+/** The USD box filled from the KHR one, the same way. */
+export function usdTextFromKhrText(khrText: string, usdToKhrRate: number): string | undefined {
+  const riel = parseKhrInput(khrText);
+  if (riel === undefined || Number.isNaN(riel)) return undefined;
+  return usdInputText(convertKhrToUsdCents(riel, usdToKhrRate));
+}

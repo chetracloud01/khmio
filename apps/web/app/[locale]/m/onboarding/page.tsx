@@ -160,7 +160,7 @@ export default function OnboardingPage() {
     // The same four steps and links as the dashboard's setup checklist.
     const href: Record<ShareRequirement, string> = {
       products: `${base}/products/new`,
-      phone: `${base}/settings#details`,
+      phone: `${base}/shop-details#details`,
       delivery: `${base}/delivery`,
       payment: `${base}/store-settings`,
     };

@@ -1,6 +1,6 @@
 "use client";
 
-import { cn, SearchInput } from "@khmio/ui";
+import { cn, GroupTitle, SearchInput } from "@khmio/ui";
 import { ArrowUpDown, ChevronDown, History, LayoutGrid, List } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
@@ -62,12 +62,12 @@ export function BrowseToolbar({
           {showRecent && (
             // onMouseDown keeps the search box focused until the tap lands on a suggestion.
             <div className="absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-2xl border border-border bg-bg shadow-raised" onMouseDown={(event) => event.preventDefault()}>
-              <div className="flex items-center justify-between px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">
+              <GroupTitle as="div" className="flex items-center justify-between px-3 pt-2">
                 <span>{t("recentSearches")}</span>
                 <button type="button" onClick={browse.clearRecent} className="-mr-2 flex min-h-touch items-center px-2 font-medium normal-case tracking-normal text-brand">
                   {t("clearRecent")}
                 </button>
-              </div>
+              </GroupTitle>
               <ul>
                 {browse.recent.map((entry) => (
                   <li key={entry}>

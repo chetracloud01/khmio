@@ -1,7 +1,6 @@
 "use client";
 
-import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
-import { BackToMyShop } from "@/components/seller-frame/back-to-my-shop";
+import { SubPage } from "@/components/seller-frame/sub-page";
 import { useMerchant } from "../merchant-context";
 import { InvoiceDetailsCard } from "../settings/invoice-details";
 
@@ -9,9 +8,8 @@ import { InvoiceDetailsCard } from "../settings/invoice-details";
 export default function InvoiceSettingsPage() {
   const { store, refreshStore } = useMerchant();
   return (
-    <div className={`${SELLER_FORM} gap-4`}>
-      <BackToMyShop />
+    <SubPage>
       <InvoiceDetailsCard store={store} onSaved={refreshStore} />
-    </div>
+    </SubPage>
   );
 }

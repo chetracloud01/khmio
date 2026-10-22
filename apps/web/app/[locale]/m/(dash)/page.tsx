@@ -9,12 +9,12 @@ import { formatMoney, useOrderText } from "@/components/order-ui";
 import { FindOrderPanel, OrdersNeedingAction, type ActionRow } from "@/components/seller-cards";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { SalesOverview } from "@/components/sales-overview";
-import { HomeTopBar, InstallAppCard, InstallSheet, NeedsYouBanner, QuickActions, useInstallPrompt } from "@/components/seller-app";
+import { HomeTopBar, NeedsYouBanner, QuickActions } from "@/components/seller-app";
 import { api, type SellerOrder } from "@/lib/api";
 import { shopStateOf, useMerchant } from "./merchant-context";
 import { OrderNextStep } from "./order-next-step";
 import { SetupChecklist } from "./setup-checklist";
-import { ShareShop } from "./share-shop";
+import { useShareShop } from "./share-shop";
 
 // The seller's home (design/screens.md S3), from the shared sections in
 // components/seller-home — the same ones as its mockup. The numbers come
@@ -29,8 +29,7 @@ export default function MerchantHomePage() {
   const [problem, setProblem] = useState<string | null>(null);
   const tApp = useTranslations("SellerApp");
   const [findOpen, setFindOpen] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
-  const install = useInstallPrompt();
+  const shareShop = useShareShop();
 
   const loadOrders = useCallback(() => {
     api<SellerOrder[]>("/orders").then(setOrders, () => setOrders((previous) => previous ?? []));
@@ -45,15 +44,8 @@ export default function MerchantHomePage() {
       firstName={me.merchant.firstName}
       state={shopStateOf(me, store)}
       onSearch={() => setFindOpen(true)}
-      storefrontHref={`/${locale}/s/${store.slug}`}
       codePrefix={trackingCodePrefix(store.slug)}
     />
-  );
-  const share = (
-    // The setup checklist's "Share your shop" step jumps here.
-    <div id="share" className="scroll-mt-4">
-      <ShareShop />
-    </div>
   );
 
   if (!summary || !orders) {
@@ -95,21 +87,12 @@ export default function MerchantHomePage() {
 
   const quickActions = [
     { key: "add", href: `${base}/products/new`, icon: PackagePlus, label: tApp("quickAddProduct"), hint: tApp("addProductHint"), tone: "teal" as const },
-    { key: "share", href: `${base}#share`, icon: Share2, label: tApp("quickShareShop"), hint: tApp("shareShopHint"), tone: "amber" as const },
+    { key: "share", onClick: shareShop.open, icon: Share2, label: tApp("quickShareShop"), hint: tApp("shareShopHint"), tone: "amber" as const },
   ];
 
   return (
     <div className={`${SELLER_PAGE} gap-5`}>
       {header}
-      {install.show && (
-        <InstallAppCard
-          onInstall={() => {
-            // The browser's own prompt where there is one (Android); otherwise the steps for this phone.
-            void install.prompt().then((prompted) => prompted || setInstallOpen(true));
-          }}
-          onDismiss={install.dismiss}
-        />
-      )}
       <NeedsYouBanner count={summary.waiting} href={`${base}/orders`} />
       <QuickActions items={quickActions} />
       <SetupChecklist />
@@ -127,7 +110,6 @@ export default function MerchantHomePage() {
       ) : (
         <OrdersNeedingAction rows={rows} total={summary.waiting} allHref={`${base}/orders`} />
       )}
-      {share}
 
       <BottomSheet open={findOpen} onClose={() => setFindOpen(false)} closeLabel={tApp("close")} title={tApp("findOrder")}>
         <FindOrderPanel
@@ -139,7 +121,6 @@ export default function MerchantHomePage() {
           }}
         />
       </BottomSheet>
-      <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} />
     </div>
   );
 }

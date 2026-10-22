@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { PaymentMethod } from "./checkout";
 import type { Fulfilment } from "./delivery";
+import type { ListSpec } from "./list-query";
 import { khmerPhoneSchema } from "./phone";
 
 // The life of an order (docs/blueprint.md "Workflows from start to end", workflow 4). One fixed set
@@ -158,6 +159,19 @@ export function getOrderTab(status: OrderStatus): OrderTab {
       return "problems";
   }
 }
+
+/** The statuses under each tab, in the order work happens ("awaiting" last). */
+export function orderStatusesForTab(tab: OrderTab): OrderStatus[] {
+  return orderStatusSchema.options.filter((status) => getOrderTab(status) === tab);
+}
+
+/** The seller's order list read page by page (the data grid's server mode): what it may be searched, filtered and sorted by. */
+export const ORDER_LIST_SPEC = {
+  sorts: ["order", "buyer", "total", "status"],
+  chips: ORDER_TABS,
+  filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup"] },
+  defaultSort: { key: "order", dir: "desc" },
+} as const satisfies ListSpec;
 
 /** Whether the seller still has to act on it (the dashboard's "needs action" list). */
 export function needsSellerAction(status: OrderStatus): boolean {

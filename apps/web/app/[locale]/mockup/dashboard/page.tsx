@@ -10,7 +10,7 @@ import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { type Money, type ShopState } from "@/components/seller-home";
 import { FindOrderPanel, OrdersNeedingAction, ShareShopCard, type ActionRow } from "@/components/seller-cards";
 import { SalesOverview, type SalesHistoryDay, type TopProduct } from "@/components/sales-overview";
-import { HomeTopBar, InstallAppCard, InstallSheet, NeedsYouBanner, NewOrderToast, playNewOrderChime, QuickActions } from "@/components/seller-app";
+import { HomeTopBar, NeedsYouBanner, NewOrderToast, playNewOrderChime, QuickActions } from "@/components/seller-app";
 import { mockDailyStats, mockMerchant, mockStore, mockTrackingCode } from "@/mock/mock-data";
 import { orderLineLabel, type OrderRecord } from "@/mock/mock-orders";
 import { useMerchantProducts } from "../merchant-products-context";
@@ -64,8 +64,6 @@ function DashboardSkeleton() {
 function DashboardHome() {
   const tApp = useTranslations("SellerApp");
   const [findOpen, setFindOpen] = useState(false);
-  const [installOpen, setInstallOpen] = useState(false);
-  const [installHidden, setInstallHidden] = useState(false);
   const [toast, setToast] = useState<{ number: string; total: string; place: string; href: string } | null>(null);
   const closeToast = useCallback(() => setToast(null), []);
   const t = useTranslations("Dashboard");
@@ -158,8 +156,7 @@ function DashboardHome() {
   return (
     <div className={`${SELLER_PAGE} gap-5`}>
       {!profile.hasProfile && <div className="rounded-DEFAULT border border-dashed border-border p-3 text-sm text-muted">{t("noProfileYet")}</div>}
-      <HomeTopBar firstName={mockMerchant.firstName} state={state} onSearch={() => setFindOpen(true)} storefrontHref={storefrontHref} codePrefix={trackingCodePrefix(mockStore.slug)} />
-      {!installHidden && <InstallAppCard onInstall={() => setInstallOpen(true)} onDismiss={() => setInstallHidden(true)} />}
+      <HomeTopBar firstName={mockMerchant.firstName} state={state} onSearch={() => setFindOpen(true)} codePrefix={trackingCodePrefix(mockStore.slug)} />
       <NeedsYouBanner count={needingAction.length} href={`${base}/orders`} />
       <QuickActions items={quickActions} />
       <SetupChecklist />
@@ -190,7 +187,6 @@ function DashboardHome() {
       <BottomSheet open={findOpen} onClose={() => setFindOpen(false)} closeLabel={tApp("close")} title={tApp("findOrder")}>
         <FindOrderPanel hrefFor={findHref} prefix={trackingCodePrefix(mockStore.slug)} />
       </BottomSheet>
-      <InstallSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       <NewOrderToast order={toast} onClose={closeToast} />
     </div>
   );

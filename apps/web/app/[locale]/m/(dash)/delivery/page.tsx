@@ -3,6 +3,7 @@
 import {
   deliverySettingsSchema,
   formatKhmerPhoneLocal,
+  khrInputText,
   MAX_DELIVERY_ZONES,
   parseKhrInput,
   parseUsdInput,
@@ -10,19 +11,21 @@ import {
   placeName,
   SUGGESTED_DELIVERY_SETTINGS,
   toFieldErrors,
+  usdInputText,
   type DeliverySettings,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Card, cn, Input, PageHeader, Select } from "@khmio/ui";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Button, Card, cn, Input, Notice, Select, Switch } from "@khmio/ui";
+import { Plus, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MoneyInput } from "@/components/money-input";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
-import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
+import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, type DeliveryResponse } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
-import { BackToMyShop } from "@/components/seller-frame/back-to-my-shop";
+import { SubPage } from "@/components/seller-frame/sub-page";
 
 interface ZoneDraft {
   id: string;
@@ -46,14 +49,12 @@ interface Draft {
   drivers: DriverDraft[];
 }
 
-const usdText = (cents: number | undefined) => (cents !== undefined ? (cents / 100).toFixed(2) : "");
-const khrText = (riel: number | undefined) => (riel !== undefined ? String(riel) : "");
 
 function toDraft(settings: DeliverySettings): Draft {
   return {
-    zones: settings.zones.map((zone) => ({ id: zone.id, name: zone.name, feeUsd: usdText(zone.feeUsdCents), feeKhr: khrText(zone.feeKhr), districtIds: zone.districtIds })),
+    zones: settings.zones.map((zone) => ({ id: zone.id, name: zone.name, feeUsd: usdInputText(zone.feeUsdCents), feeKhr: khrInputText(zone.feeKhr), districtIds: zone.districtIds })),
     pickup: settings.pickup,
-    province: { enabled: settings.province.enabled, feeUsd: usdText(settings.province.feeUsdCents), feeKhr: khrText(settings.province.feeKhr), note: settings.province.note },
+    province: { enabled: settings.province.enabled, feeUsd: usdInputText(settings.province.feeUsdCents), feeKhr: khrInputText(settings.province.feeKhr), note: settings.province.note },
     drivers: settings.drivers.map((driver) => ({ ...driver, phone: formatKhmerPhoneLocal(driver.phone) })),
   };
 }
@@ -189,16 +190,22 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   const status = dirty ? t("unsavedChanges") : justSaved ? t("saved") : undefined;
 
   const feeInputs = (usd: string, khr: string, onUsd: (value: string) => void, onKhr: (value: string) => void, usdKey: string, khrKey: string) => (
-    <div className="grid grid-cols-2 gap-3">
-      <Input label={t("feeUsd")} inputMode="decimal" placeholder="1.00" value={usd} onChange={(e) => onUsd(e.target.value)} error={error(usdKey)} />
-      <Input label={t("feeKhr")} inputMode="numeric" placeholder="4000" value={khr} onChange={(e) => onKhr(e.target.value)} error={error(khrKey)} />
-    </div>
+    <MoneyInput
+      usd={usd}
+      khr={khr}
+      onUsdChange={onUsd}
+      onKhrChange={onKhr}
+      usdLabel={t("feeUsd")}
+      khrLabel={t("feeKhr")}
+      usdPlaceholder="1.00"
+      khrPlaceholder="4000"
+      usdError={error(usdKey)}
+      khrError={error(khrKey)}
+    />
   );
 
   return (
-    <div ref={formRef} className={`${SELLER_FORM} gap-5`}>
-      <BackToMyShop />
-      <PageHeader title={t("title")} description={t("description")} />
+    <SubPage ref={formRef} title={t("title")} description={t("description")}>
 
       {!configured && (
         <p role="status" className="rounded-DEFAULT border border-info/40 bg-info/5 p-3 text-sm">
@@ -209,10 +216,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
       <Card className="flex flex-col p-4">
         <FormSection stacked title={t("sectionZones")} description={t("sectionZonesHelp")}>
           {errors.zones && (
-            <p role="alert" className="flex items-start gap-2 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <Notice tone="danger" role="alert">
               {error("zones")}
-            </p>
+            </Notice>
           )}
 
           {draft.zones.map((zone, index) => (
@@ -296,15 +302,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         <FormSection stacked title={t("sectionPickup")} description={t("sectionPickupHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.pickup.enabled}
-              onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, enabled: e.target.checked } }, "pickup.address", "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("pickupEnabled")}</span>
-          </label>
+          <Switch checked={draft.pickup.enabled} onChange={(enabled) => change({ ...draft, pickup: { ...draft.pickup, enabled } }, "pickup.address", "zones")} label={t("pickupEnabled")} />
           {draft.pickup.enabled && (
             <>
               <Input
@@ -328,15 +326,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         <FormSection stacked title={t("sectionProvince")} description={t("sectionProvinceHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.province.enabled}
-              onChange={(e) => change({ ...draft, province: { ...draft.province, enabled: e.target.checked } }, "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("provinceEnabled")}</span>
-          </label>
+          <Switch checked={draft.province.enabled} onChange={(enabled) => change({ ...draft, province: { ...draft.province, enabled } }, "zones")} label={t("provinceEnabled")} />
           {draft.province.enabled && (
             <>
               {feeInputs(
@@ -408,9 +398,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         {saveError && (
-          <p role="alert" className="mb-3 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+          <Notice tone="danger" role="alert" className="mb-3">
             {saveError}
-          </p>
+          </Notice>
         )}
 
         <FormActions
@@ -428,6 +418,6 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
           className={SELLER_FORM_BAR}
         />
       </Card>
-    </div>
+    </SubPage>
   );
 }
