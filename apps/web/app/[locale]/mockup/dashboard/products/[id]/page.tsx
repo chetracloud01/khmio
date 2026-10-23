@@ -14,14 +14,13 @@ import {
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
-import { Button, Card, Input, Select, Switch, Textarea } from "@khmio/ui";
+import { Button, Card, Input, MoneyInput, Select, Switch, Textarea } from "@khmio/ui";
 import { History, Languages, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { MoneyInput } from "@/components/money-input";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { mockBusinessTypeDefaults, slugify, type MockProduct, type MockVariant } from "@/mock/mock-data";
 import { useMerchantProducts } from "../../../merchant-products-context";

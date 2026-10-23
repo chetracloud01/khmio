@@ -1,7 +1,8 @@
 "use client";
 
 import { khrTextFromUsdText, usdTextFromKhrText } from "@khmio/shared";
-import { cn, Input } from "@khmio/ui";
+import { cn } from "./cn";
+import { Input } from "./Input";
 
 export interface MoneyInputProps {
   /** The two boxes' text (what the seller typed); turn it into cents and riel with parseUsdInput / parseKhrInput. */

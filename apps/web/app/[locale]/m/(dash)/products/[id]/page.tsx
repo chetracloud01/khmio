@@ -13,14 +13,13 @@ import {
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
-import { Button, Card, Input, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
+import { Button, Card, Input, MoneyInput, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
 import { History, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
-import { MoneyInput } from "@/components/money-input";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";

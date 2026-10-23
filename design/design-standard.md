@@ -95,6 +95,24 @@ the tones `brand` `success` `warning` `danger` `info` `muted`, `EmptyState`,
 block that's missing is added to the kit, shown on `/styleguide`, then used.
 The kit holds no words — every label comes from `messages/*.json`.
 
+**Kit or app block — where a shared part lives.**
+
+| `packages/ui` (the kit) | `apps/web/components` (app blocks) |
+| --- | --- |
+| Pure look and behaviour: Button, Input, MoneyInput, Notice… | Needs Next.js (`next/link`, the router) or `next-intl`: MenuList, DataGrid, FormSection |
+| No business data, no words (labels come in as props) | Knows orders, shops or the API: OrderStatusPill, PhotoThumb |
+| Could be used by any app later | Belongs to the Khmio web app |
+
+A new look for an existing part is a new `variant` of that part, never a
+copy. `/styleguide` has four tabs — Foundations, Kit, App blocks, Website —
+and each part is shown inside a `Demo` labelled with its name, so the page
+doubles as the list of what exists. Two checks keep it honest:
+`apps/web/app/[locale]/styleguide/coverage.test.ts` fails when a kit part
+isn't on the page, and lint warns when a screen in `apps/web/app` uses a raw
+`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit (a part
+that really needs one — a whole-row tap target, a hidden file input — says
+why in an `eslint-disable-next-line` comment).
+
 **Type** — Kantumruy Pro for Khmer, system sans for Latin.
 
 | Use | Size | Tailwind |

@@ -15,11 +15,10 @@ import {
   type DeliverySettings,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Card, cn, Input, Notice, Select, Switch } from "@khmio/ui";
+import { Button, Card, cn, Input, MoneyInput, Notice, Select, Switch } from "@khmio/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { MoneyInput } from "@/components/money-input";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
 import { api, ApiError, type DeliveryResponse } from "@/lib/api";

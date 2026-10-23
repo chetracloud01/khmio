@@ -1,4 +1,18 @@
 {
   "root": true,
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["app/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "JSXOpeningElement[name.name=/^(button|input|select|textarea)$/]",
+            "message": "Screens use the kit (@khmio/ui: Button, Input, Select, Textarea, Checkbox, Switch…), see /styleguide. If a raw element is really needed, say why in an eslint-disable-next-line comment."
+          }
+        ]
+      }
+    }
+  ]
 }

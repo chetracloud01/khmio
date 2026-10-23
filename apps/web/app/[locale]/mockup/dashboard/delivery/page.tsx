@@ -14,13 +14,12 @@ import {
   type DeliverySettings,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Card, cn, Input, Select, Switch } from "@khmio/ui";
+import { Button, Card, cn, Input, MoneyInput, Select, Switch } from "@khmio/ui";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { useDeliverySettings } from "../../delivery-settings-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
-import { MoneyInput } from "@/components/money-input";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 
 interface ZoneDraft {
