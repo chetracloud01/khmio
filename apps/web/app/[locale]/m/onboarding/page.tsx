@@ -2,6 +2,7 @@
 
 import {
   BUSINESS_TYPES,
+  businessTypeSchema,
   createStoreInputSchema,
   getMissingForSharing,
   SHARE_REQUIREMENTS,
@@ -12,8 +13,8 @@ import {
   type FormErrorCode,
   type ShareRequirement,
 } from "@khmio/shared";
-import { Button, cn, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
-import { Car, Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
+import { Button, ChoiceCards, FileButton, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Car, Check, LayoutGrid, Store, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -183,11 +184,9 @@ export default function OnboardingPage() {
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold">{store.name}</p>
             <p className="truncate text-sm text-muted">/s/{store.slug}</p>
-            <label className={cn("mt-1 inline-flex min-h-touch cursor-pointer items-center gap-2 text-sm font-medium text-brand", logoBusy && "pointer-events-none opacity-60")}>
-              <Upload className="h-4 w-4" aria-hidden="true" />
+            <FileButton look="link" accept={ACCEPTED_IMAGE_TYPES} busy={logoBusy} onChange={(event) => void addLogo(event)} className="mt-1">
               {store.logoUrl ? tSignUp("changeLogo") : tSignUp("addLogo")}
-              <input type="file" accept={ACCEPTED_IMAGE_TYPES} className="hidden" disabled={logoBusy} onChange={(event) => void addLogo(event)} />
-            </label>
+            </FileButton>
             {logoFailed && (
               <p role="alert" className="text-sm text-danger">
                 {tSignUp("logoFailed")}
@@ -231,34 +230,16 @@ export default function OnboardingPage() {
             <h1 className="text-2xl font-bold leading-normal">{t("businessStepTitle")}</h1>
             <p className="text-sm text-muted">{t("businessStepHint")}</p>
           </div>
-          <div role="radiogroup" aria-label={t("businessStepTitle")} className="grid grid-cols-2 gap-3">
-            {BUSINESS_TYPES.map((type) => {
-              const Icon = ICONS[type];
-              const selected = businessType === type;
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setBusinessType(type)}
-                  className={cn(
-                    "relative flex min-h-touch flex-col items-start gap-3 rounded-2xl border-2 bg-bg p-4 text-left transition-colors",
-                    selected ? "border-brand bg-brand/5" : "border-border hover:bg-border/10",
-                  )}
-                >
-                  <span className={cn("flex h-11 w-11 items-center justify-center rounded-DEFAULT", selected ? "bg-brand text-on-brand" : "bg-brand/10 text-brand")}>
-                    <Icon className="h-6 w-6" aria-hidden="true" />
-                  </span>
-                  <span className="flex flex-col gap-0.5">
-                    <span className="font-semibold">{tType(type)}</span>
-                    <span className="text-sm text-muted">{tType(`${type}Hint`)}</span>
-                  </span>
-                  {selected && <Check className="absolute right-3 top-3 h-5 w-5 text-brand" aria-hidden="true" />}
-                </button>
-              );
-            })}
-          </div>
+          <ChoiceCards
+            variant="large"
+            label={t("businessStepTitle")}
+            value={businessType}
+            onChange={(value) => {
+              const parsed = businessTypeSchema.safeParse(value);
+              if (parsed.success) setBusinessType(parsed.data);
+            }}
+            options={BUSINESS_TYPES.map((type) => ({ value: type, icon: ICONS[type], title: tType(type), detail: tType(`${type}Hint`) }))}
+          />
         </section>
       ) : (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">

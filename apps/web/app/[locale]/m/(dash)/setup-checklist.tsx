@@ -144,6 +144,7 @@ export function SetupChecklist() {
             {content}
           </Link>
         ) : item.onClick && !inactive ? (
+          // eslint-disable-next-line no-restricted-syntax -- a checklist row: the same row look as the Link beside it, so it can't be a kit Button
           <button type="button" onClick={item.onClick} className={className}>
             {content}
           </button>

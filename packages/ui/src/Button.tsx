@@ -14,13 +14,31 @@ export const buttonVariants = cva(
         primary: "bg-brand text-on-brand hover:bg-brand/90",
         secondary: "border border-border bg-bg text-fg hover:bg-border/30",
         danger: "bg-danger text-white hover:bg-danger/90",
+        /** Text only, for the small actions beside a form or card: "Resend code", "Remove option", "Start over". */
+        ghost: "px-3 text-sm",
+      },
+      /** The ghost's text colour; the other variants ignore it. */
+      tone: {
+        brand: "",
+        muted: "",
+        danger: "",
+      },
+      size: {
+        md: "",
+        /** Smaller text and padding, same 44 px height. */
+        sm: "px-3 text-sm",
       },
       fullWidth: {
         true: "w-full",
         false: "",
       },
     },
-    defaultVariants: { variant: "primary", fullWidth: false },
+    compoundVariants: [
+      { variant: "ghost", tone: "brand", className: "text-brand hover:bg-brand/5" },
+      { variant: "ghost", tone: "muted", className: "text-muted hover:bg-border/30 hover:text-fg" },
+      { variant: "ghost", tone: "danger", className: "text-danger hover:bg-danger/10" },
+    ],
+    defaultVariants: { variant: "primary", tone: "brand", size: "md", fullWidth: false },
   },
 );
 
@@ -31,11 +49,11 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, fullWidth, loading, disabled, children, ...props }, ref) => {
+  ({ className, variant, tone, size, fullWidth, loading, disabled, children, ...props }, ref) => {
     return (
       <button
         ref={ref}
-        className={cn(buttonVariants({ variant, fullWidth }), className)}
+        className={cn(buttonVariants({ variant, tone, size, fullWidth }), className)}
         disabled={disabled || loading}
         aria-busy={loading}
         {...props}

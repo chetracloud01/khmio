@@ -13,8 +13,8 @@ import {
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
-import { Button, Card, Input, MoneyInput, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
-import { History, Loader2, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Button, Card, FileButton, IconButton, Input, MoneyInput, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
+import { History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -603,31 +603,13 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
                 {photo.status === "failed" && (
                   <span className="absolute inset-x-1 bottom-1 rounded bg-danger px-1 text-center text-xs font-medium text-bg">{tApp("photoFailedShort")}</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => removePhoto(photo.id)}
-                  aria-label={t("removePhoto")}
-                  className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-danger text-bg"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <IconButton icon={X} look="badge" label={t("removePhoto")} onClick={() => removePhoto(photo.id)} className="absolute -right-3.5 -top-3.5" />
               </div>
             ))}
             {photos.length < MAX_PRODUCT_PHOTOS && (
-              <label
-                data-invalid={photosError ? "true" : undefined}
-                tabIndex={0}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  event.currentTarget.querySelector("input")?.click();
-                }}
-                className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-DEFAULT border border-dashed text-muted ${photosError ? "border-danger" : "border-border"}`}
-              >
-                <Upload className="h-5 w-5" aria-hidden="true" />
-                <span className="sr-only">{t("photosLabel")}</span>
-                <input type="file" accept={ACCEPTED_IMAGE_TYPES} multiple className="hidden" onChange={handlePhotosChange} />
-              </label>
+              <FileButton look="tile" accept={ACCEPTED_IMAGE_TYPES} multiple invalid={Boolean(photosError)} onChange={handlePhotosChange}>
+                {t("photosLabel")}
+              </FileButton>
             )}
           </div>
           {photosError && <p className="text-sm text-danger">{photosError}</p>}
@@ -872,18 +854,19 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
                     />
                   </>
                 )}
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  tone="danger"
                   onClick={() => {
                     removeVariantRow(row.id);
                     // Messages are keyed by position, so they'd point at the wrong option now.
                     setErrors({});
                   }}
-                  className="flex min-h-touch items-center gap-1 self-start text-xs font-medium text-danger"
+                  className="-ml-3 self-start"
                 >
-                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                   {t("removeOption")}
-                </button>
+                </Button>
               </div>
             );
           })}

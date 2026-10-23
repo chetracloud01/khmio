@@ -17,8 +17,8 @@ import {
   type Fulfilment,
   type PaymentMethod,
 } from "@khmio/shared";
-import { Button, Checkbox, cn, Input, Notice, Select } from "@khmio/ui";
-import { Check, Clock, History, MapPin, Store, Truck } from "lucide-react";
+import { Button, Checkbox, ChoiceCards, Input, Notice, SegmentedControl, Select } from "@khmio/ui";
+import { Clock, History, MapPin, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BotCheck, TURNSTILE_SITE_KEY } from "@/components/bot-check";
 import { BuyerBottomBar, BuyerColumns, BuyerSection, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { formatMoney } from "@/components/order-ui";
 import { api, ApiError, type PlacedOrder, type PublicShop } from "@/lib/api";
 import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, useShopCart, type BuyerDetails } from "@/lib/cart";
@@ -234,7 +235,6 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
     },
     { value: "pickup", icon: Store, title: t("pickup"), detail: t("free"), show: canPickup },
   ];
-  const segment = (active: boolean) => cn("min-h-touch rounded-full px-4 text-sm font-medium transition-colors", active ? "bg-brand text-on-brand" : "text-muted hover:text-fg");
   const methodLabel = (method: PaymentMethod) => (method === "cod" ? (details.fulfilment === "pickup" ? t("payAtPickup") : tApp("payCashOnDelivery")) : method === "khqr" ? "KHQR" : "ABA PayWay");
 
   const summary = (
@@ -314,17 +314,17 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             <div className="flex items-center gap-3 rounded-2xl bg-brand/5 p-3 text-sm">
               <History className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
               <span className="min-w-0 flex-1">{t("prefilledNote")}</span>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setDetails({ ...details, name: "", phone: "", landmark: "", districtId: "", provinceId: "" });
                   setRemember(false);
                   setPrefilled(false);
                 }}
-                className="-my-2 flex min-h-touch shrink-0 items-center px-2 font-semibold text-brand"
+                className="-my-2 shrink-0 px-2 font-semibold"
               >
                 {t("prefilledClear")}
-              </button>
+              </Button>
             </div>
           )}
           <Input
@@ -356,33 +356,18 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
         </BuyerSection>
 
         <BuyerSection number={2} title={t("sectionHow")}>
-          <div role="radiogroup" aria-label={t("sectionHow")} className="grid grid-cols-2 gap-3" data-invalid={errors.fulfilment ? "true" : undefined}>
-            {fulfilmentCards
-              .filter((card) => card.show)
-              .map((card) => {
-                const selected = details.fulfilment === card.value;
-                return (
-                  <button
-                    key={card.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => {
-                      set("fulfilment", card.value);
-                      clearError("fulfilment");
-                    }}
-                    className={cn(
-                      "flex min-h-touch flex-col items-start gap-1 rounded-2xl border-2 p-3 text-left transition-colors",
-                      selected ? "border-brand bg-brand/5" : "border-border hover:bg-border/10",
-                    )}
-                  >
-                    <card.icon className={cn("h-5 w-5", selected ? "text-brand" : "text-muted")} aria-hidden="true" />
-                    <span className="text-sm font-semibold">{card.title}</span>
-                    <span className="text-sm text-muted">{card.detail}</span>
-                  </button>
-                );
-              })}
-          </div>
+          <ChoiceCards
+            label={t("sectionHow")}
+            value={details.fulfilment}
+            invalid={Boolean(errors.fulfilment)}
+            onChange={(value) => {
+              const card = fulfilmentCards.find((entry) => entry.value === value);
+              if (!card) return;
+              set("fulfilment", card.value);
+              clearError("fulfilment");
+            }}
+            options={fulfilmentCards.filter((card) => card.show).map(({ value, icon, title, detail }) => ({ value, icon, title, detail }))}
+          />
           {errors.fulfilment && <p className="text-sm text-danger">{errorText(errors.fulfilment)}</p>}
 
           {details.fulfilment === "pickup" && canPickup && (
@@ -408,14 +393,17 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
               {deliversInPhnomPenh && deliversToProvinces && (
                 <div className="flex flex-col gap-2">
                   <span className="text-sm font-medium">{t("area")}</span>
-                  <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
-                    <button type="button" aria-pressed={details.area === "phnom_penh"} onClick={() => set("area", "phnom_penh")} className={segment(details.area === "phnom_penh")}>
-                      {t("phnomPenh")}
-                    </button>
-                    <button type="button" aria-pressed={details.area === "province"} onClick={() => set("area", "province")} className={segment(details.area === "province")}>
-                      {t("otherProvince")}
-                    </button>
-                  </div>
+                  <SegmentedControl
+                    mode="choice"
+                    label={t("area")}
+                    value={details.area}
+                    onChange={(value) => set("area", value === "province" ? "province" : "phnom_penh")}
+                    options={[
+                      { value: "phnom_penh", label: t("phnomPenh") },
+                      { value: "province", label: t("otherProvince") },
+                    ]}
+                    className="w-fit"
+                  />
                 </div>
               )}
 
@@ -474,37 +462,32 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
         <BuyerSection number={3} title={t("sectionPay")}>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t("payIn")}</span>
-            <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
-              {(["USD", "KHR"] as const).map((option) => (
-                <button key={option} type="button" aria-pressed={currency === option} onClick={() => cart.setCurrency(option)} className={segment(currency === option)}>
-                  {option === "USD" ? "$" : "៛"} {option}
-                </button>
-              ))}
-            </div>
+            <CurrencyChoice label={t("payIn")} value={currency} onChange={cart.setCurrency} />
           </div>
 
-          <div className="flex flex-col gap-2" data-invalid={errors.paymentMethod ? "true" : undefined}>
+          {/* With no method to pick, the group itself carries the error mark; otherwise ChoiceCards does. */}
+          <div className="flex flex-col gap-2" data-invalid={errors.paymentMethod && methods.length === 0 ? "true" : undefined}>
             <span className="text-sm font-medium">{t("paymentMethod")}</span>
             {methods.length === 0 && (
               <Notice tone="warning" role="status">
                 {details.area === "province" && details.fulfilment === "delivery" ? t("provinceCodNote") : t("noPaymentMethods")}
               </Notice>
             )}
-            {methods.map((method) => (
-              <button
-                key={method}
-                type="button"
-                onClick={() => {
+            {methods.length > 0 && (
+              <ChoiceCards
+                variant="rows"
+                label={t("paymentMethod")}
+                value={paymentMethod}
+                invalid={Boolean(errors.paymentMethod)}
+                onChange={(value) => {
+                  const method = methods.find((entry) => entry === value);
+                  if (!method) return;
                   setPaymentMethod(method);
                   clearError("paymentMethod");
                 }}
-                aria-pressed={paymentMethod === method}
-                className={cn("flex min-h-touch items-center justify-between rounded-DEFAULT border-2 px-4 text-left transition-colors", paymentMethod === method ? "border-brand bg-brand/5" : "border-border")}
-              >
-                <span className="font-medium">{methodLabel(method)}</span>
-                {paymentMethod === method && <Check className="h-4 w-4 text-brand" aria-hidden="true" />}
-              </button>
-            ))}
+                options={methods.map((method) => ({ value: method, title: methodLabel(method) }))}
+              />
+            )}
             {errors.paymentMethod && <p className="text-sm text-danger">{errorText(errors.paymentMethod)}</p>}
           </div>
         </BuyerSection>

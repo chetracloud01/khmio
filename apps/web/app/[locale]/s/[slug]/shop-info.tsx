@@ -57,6 +57,7 @@ export function ShopInfo({ shop, currency }: { shop: PublicShop; currency: Curre
     <>
       <div className="flex items-center gap-2">
         {summary.length > 0 && (
+          // eslint-disable-next-line no-restricted-syntax -- the shop's one-line summary row (delivery, pickup, provinces) that opens the shop-info sheet
           <button
             type="button"
             onClick={() => setOpen(true)}

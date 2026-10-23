@@ -6,10 +6,22 @@
       "files": ["app/**/*.tsx"],
       "rules": {
         "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "JSXOpeningElement[name.name=/^(button|input|select|textarea)$/]",
+            "message": "Screens use the kit (@khmio/ui: Button, IconButton, ChoiceCards, FileButton, Input, Select…), see /styleguide. If a raw element is really needed, say why in an eslint-disable-next-line comment."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["app/*/mockup/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": [
           "warn",
           {
             "selector": "JSXOpeningElement[name.name=/^(button|input|select|textarea)$/]",
-            "message": "Screens use the kit (@khmio/ui: Button, Input, Select, Textarea, Checkbox, Switch…), see /styleguide. If a raw element is really needed, say why in an eslint-disable-next-line comment."
+            "message": "Mockups are cleaned up when their screen is next worked on: use the kit (@khmio/ui), see /styleguide."
           }
         ]
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@khmio/ui";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 
 // The buyer's add and quantity buttons, one look everywhere in the shop: the
 // list's cards and rows, and each option in a product's sheet. Every button is
@@ -36,6 +36,7 @@ export function QuantityStepper({
   onDecrease,
   onIncrease,
   increaseDisabled = false,
+  binAtOne = false,
   className,
 }: {
   quantity: number;
@@ -45,12 +46,15 @@ export function QuantityStepper({
   onIncrease: () => void;
   /** At the stock limit: the buyer can't add more than the shop has. */
   increaseDisabled?: boolean;
+  /** The cart: at 1 the − shows a bin, since one less takes the line out. */
+  binAtOne?: boolean;
   className?: string;
 }) {
+  const DecreaseIcon = binAtOne && quantity === 1 ? Trash2 : Minus;
   return (
     <div className={cn("flex items-center justify-between gap-1 rounded-full bg-brand/10 p-0.5", className)}>
       <button type="button" aria-label={decreaseLabel} onClick={onDecrease} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-bg text-brand shadow-card active:scale-90">
-        <Minus className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
+        <DecreaseIcon className="h-4 w-4" strokeWidth={2.5} aria-hidden="true" />
       </button>
       <span className="min-w-6 text-center text-sm font-bold tabular-nums" aria-live="polite">
         {quantity}

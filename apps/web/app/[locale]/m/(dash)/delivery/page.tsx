@@ -15,7 +15,7 @@ import {
   type DeliverySettings,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Card, cn, Input, MoneyInput, Notice, Select, Switch } from "@khmio/ui";
+import { Button, Card, cn, IconButton, Input, MoneyInput, Notice, Select, Switch } from "@khmio/ui";
 import { Plus, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -232,18 +232,16 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     error={error(`zones.${index}.name`)}
                   />
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  icon={Trash2}
+                  tone="danger"
+                  label={t("removeZone")}
                   onClick={() => {
                     // Messages are keyed by position, so they'd point at the wrong zone now.
                     setErrors({});
                     change({ ...draft, zones: draft.zones.filter((_, i) => i !== index) });
                   }}
-                  aria-label={t("removeZone")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-DEFAULT text-danger hover:bg-danger/10"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                />
               </div>
 
               {feeInputs(
@@ -263,6 +261,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     const mine = owner === index;
                     const elsewhere = owner !== -1 && !mine;
                     return (
+                      // eslint-disable-next-line no-restricted-syntax -- a district chip that picks several at once and greys out other zones' districts; used only here
                       <button
                         key={place.id}
                         type="button"
@@ -376,17 +375,15 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     ]}
                   />
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  icon={Trash2}
+                  tone="danger"
+                  label={t("removeDriver")}
                   onClick={() => {
                     setErrors({});
                     change({ ...draft, drivers: draft.drivers.filter((_, i) => i !== index) });
                   }}
-                  aria-label={t("removeDriver")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-DEFAULT text-danger hover:bg-danger/10"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                />
               </div>
             </div>
           ))}

@@ -209,9 +209,9 @@ function CodeEntry({ onSignedIn, onRestart }: { onSignedIn: () => void; onRestar
           {t("signIn")}
         </Button>
       </form>
-      <button type="button" onClick={onRestart} className="min-h-touch self-start text-sm text-muted underline">
+      <Button variant="ghost" tone="muted" onClick={onRestart} className="-ml-3 self-start">
         {t("startOver")}
-      </button>
+      </Button>
     </Card>
   );
 }

@@ -2,12 +2,14 @@
 
 import { approximateIn, type Currency } from "@khmio/shared";
 import { Button, Notice } from "@khmio/ui";
-import { ImageOff, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { ImageOff, Plus, ShoppingBag } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BuyerBottomBar, BuyerColumns, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { CurrencyChoice } from "@/components/buyer/currency-choice";
+import { QuantityStepper } from "@/components/buyer/quantity-control";
 import { formatMoney } from "@/components/order-ui";
 import { cartLines, cartTotal, sellableVariantIds, useShopCart } from "@/lib/cart";
 import { isTakingOrders } from "@/lib/shop-ordering";
@@ -149,27 +151,15 @@ export default function CartPage() {
                       <p className="line-clamp-2 text-sm font-medium leading-normal">{title}</p>
                       <p className="text-sm font-semibold">{priced ? formatMoney(priced.lineTotal, currency) : ""}</p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label={line.quantity === 1 ? tStore("remove") : tStore("decrease", { title })}
-                        onClick={() => cart.setQuantity(line.variant.id, line.quantity - 1)}
-                        className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted transition-transform active:scale-95"
-                      >
-                        {line.quantity === 1 ? <Trash2 className="h-4 w-4" aria-hidden="true" /> : <span className="text-lg font-bold">−</span>}
-                      </button>
-                      <span className="min-w-6 text-center text-sm font-semibold tabular-nums" aria-live="polite">
-                        {line.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label={tStore("increase", { title })}
-                        onClick={() => cart.setQuantity(line.variant.id, line.quantity + 1)}
-                        className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-lg font-bold text-on-brand transition-transform active:scale-95"
-                      >
-                        +
-                      </button>
-                    </div>
+                    <QuantityStepper
+                      quantity={line.quantity}
+                      binAtOne
+                      decreaseLabel={line.quantity === 1 ? tStore("remove") : tStore("decrease", { title })}
+                      increaseLabel={tStore("increase", { title })}
+                      onDecrease={() => cart.setQuantity(line.variant.id, line.quantity - 1)}
+                      onIncrease={() => cart.setQuantity(line.variant.id, line.quantity + 1)}
+                      className="shrink-0"
+                    />
                   </li>
                 );
               })}
@@ -181,19 +171,7 @@ export default function CartPage() {
 
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">{tCheckout("payIn")}</span>
-              <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
-                {(["USD", "KHR"] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={currency === option}
-                    onClick={() => cart.setCurrency(option)}
-                    className={`min-h-touch rounded-full px-4 text-sm font-medium transition-colors ${currency === option ? "bg-brand text-on-brand" : "text-muted hover:text-fg"}`}
-                  >
-                    {option === "USD" ? "$" : "៛"} {option}
-                  </button>
-                ))}
-              </div>
+              <CurrencyChoice label={tCheckout("payIn")} value={currency} onChange={cart.setCurrency} />
             </div>
 
             <div className="lg:hidden">{summary}</div>

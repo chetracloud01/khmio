@@ -1,7 +1,7 @@
 "use client";
 
 import { getMissingForSharing } from "@khmio/shared";
-import { BottomSheet } from "@khmio/ui";
+import { BottomSheet, Button } from "@khmio/ui";
 import { Lock, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -82,6 +82,7 @@ export function ShareShopButton({ variant }: { variant: "round" | "bar" }) {
   const { open } = useShareShop();
   if (variant === "round") {
     return (
+      // eslint-disable-next-line no-restricted-syntax -- the seller header's pill (HEADER_PILL), which shrinks to a round icon when the header turns slim
       <button type="button" onClick={open} className={HEADER_PILL}>
         <Share2 className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
         <span className={HEADER_PILL_TEXT}>{tApp("headerShare")}</span>
@@ -89,9 +90,9 @@ export function ShareShopButton({ variant }: { variant: "round" | "bar" }) {
     );
   }
   return (
-    <button type="button" onClick={open} className="flex min-h-touch items-center gap-2 rounded-DEFAULT px-3 text-sm font-medium text-brand hover:bg-brand/5">
+    <Button variant="ghost" onClick={open}>
       <Share2 className="h-4 w-4" aria-hidden="true" />
       {t("shareShop")}
-    </button>
+    </Button>
   );
 }

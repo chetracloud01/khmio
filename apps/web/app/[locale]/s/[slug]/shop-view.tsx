@@ -1,7 +1,7 @@
 "use client";
 
 import type { Currency } from "@khmio/shared";
-import { Button, PriceTag, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, IconButton, PriceTag, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -353,17 +353,11 @@ function ProductSheet({
               <ImageOff className="h-8 w-8 text-muted" aria-hidden="true" />
             </span>
           )}
-          <button type="button" onClick={onClose} aria-label={t("close")} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-bg/85 shadow-card">
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          <IconButton icon={X} look="floating" label={t("close")} onClick={onClose} className="absolute right-2 top-2" />
           {count > 1 && (
             <>
-              <button type="button" onClick={() => setPhoto((photo + count - 1) % count)} aria-label={t("previousPhoto")} className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 shadow-card">
-                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => setPhoto((photo + 1) % count)} aria-label={t("nextPhoto")} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 shadow-card">
-                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-              </button>
+              <IconButton icon={ChevronLeft} look="floating" label={t("previousPhoto")} onClick={() => setPhoto((photo + count - 1) % count)} className="absolute left-2 top-1/2 -translate-y-1/2" />
+              <IconButton icon={ChevronRight} look="floating" label={t("nextPhoto")} onClick={() => setPhoto((photo + 1) % count)} className="absolute right-2 top-1/2 -translate-y-1/2" />
               <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-fg/70 px-2 py-0.5 text-xs text-bg">{t("photoPosition", { current: photo + 1, total: count })}</span>
             </>
           )}
@@ -418,9 +412,9 @@ function ShareProduct({ title }: { title: string }) {
     if (outcome === "shared" || outcome === "copied") setDone(true);
   }
   return (
-    <button type="button" onClick={() => void share()} aria-label={t("share")} className="flex h-11 shrink-0 items-center gap-1 rounded-full border border-border px-3 text-sm font-medium hover:bg-border/10">
+    <Button variant="secondary" size="sm" onClick={() => void share()} className="shrink-0 gap-1 rounded-full">
       {done ? <Check className="h-4 w-4 text-success" aria-hidden="true" /> : <Share2 className="h-4 w-4" aria-hidden="true" />}
       {done ? t("linkCopied") : t("share")}
-    </button>
+    </Button>
   );
 }

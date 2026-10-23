@@ -108,10 +108,14 @@ copy. `/styleguide` has four tabs — Foundations, Kit, App blocks, Website —
 and each part is shown inside a `Demo` labelled with its name, so the page
 doubles as the list of what exists. Two checks keep it honest:
 `apps/web/app/[locale]/styleguide/coverage.test.ts` fails when a kit part
-isn't on the page, and lint warns when a screen in `apps/web/app` uses a raw
-`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit (a part
-that really needs one — a whole-row tap target, a hidden file input — says
-why in an `eslint-disable-next-line` comment).
+isn't on the page, and lint stops a screen in `apps/web/app` that uses a raw
+`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit — an
+error on live screens, a warning in `app/[locale]/mockup` until that mockup
+is next worked on. A part that really needs a raw element (a whole-row tap
+target, the seller header's pill) says why in an `eslint-disable-next-line`
+comment. The kit's answers to the usual cases: `Button variant="ghost"` for
+small text actions, `IconButton` for an icon alone, `ChoiceCards` and
+`SegmentedControl mode="choice"` for picking one, `FileButton` for photos.
 
 **Type** — Kantumruy Pro for Khmer, system sans for Latin.
 

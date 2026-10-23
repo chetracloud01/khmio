@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card } from "@khmio/ui";
+import { Button, Card, IconButton } from "@khmio/ui";
 import { Check, ExternalLink, Send, Trash2, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
@@ -68,9 +68,7 @@ export function TelegramAlerts({ signedInWithTelegram }: { signedInWithTelegram:
               <li key={group.id} className="flex items-center gap-3 px-3 py-2">
                 <Users className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">{group.title || t("unnamedGroup")}</span>
-                <button type="button" onClick={() => void unlink(group.id)} aria-label={t("unlink", { group: group.title || t("unnamedGroup") })} className="flex h-11 w-11 items-center justify-center rounded-DEFAULT text-danger hover:bg-danger/10">
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <IconButton icon={Trash2} tone="danger" label={t("unlink", { group: group.title || t("unnamedGroup") })} onClick={() => void unlink(group.id)} />
               </li>
             ))}
           </ul>

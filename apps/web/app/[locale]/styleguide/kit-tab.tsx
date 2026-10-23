@@ -7,13 +7,16 @@ import {
   Button,
   Card,
   Checkbox,
+  ChoiceCards,
   ConfirmDialog,
   DetailList,
   DiscountBadge,
   EmptyState,
   ErrorState,
+  FileButton,
   GroupTitle,
   IconBadge,
+  IconButton,
   Input,
   LoadingBlocks,
   MoneyInput,
@@ -35,7 +38,7 @@ import {
   ThemeSwitcher,
   type Tone,
 } from "@khmio/ui";
-import { Copy, FileDown, Inbox, Printer, QrCode, Search, Send, ShoppingBag, Store, Truck, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, FileDown, Inbox, Printer, QrCode, Scissors, Search, Send, ShoppingBag, Store, Trash2, Truck, TriangleAlert, Wrench, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { useThemeLabels } from "@/components/use-theme-labels";
@@ -56,6 +59,10 @@ export function KitTab() {
   const [switchOn, setSwitchOn] = useState(true);
   const [ticked, setTicked] = useState(false);
   const [fulfilment, setFulfilment] = useState("delivery");
+  const [area, setArea] = useState("phnom_penh");
+  const [business, setBusiness] = useState<string | null>(null);
+  const [payment, setPayment] = useState<string | null>("khqr");
+  const [picked, setPicked] = useState("");
   const [province, setProvince] = useState("");
   const [note, setNote] = useState("");
   const [usd, setUsd] = useState("8.50");
@@ -148,6 +155,30 @@ export function KitTab() {
             >
               {loading ? t("buttonLoading") : t("buttonPrimary")}
             </Button>
+            {/* Small actions beside a form or card: text only, 44 px tall. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="ghost">{t("ghostBrand")}</Button>
+              <Button variant="ghost" tone="muted">
+                {t("ghostMuted")}
+              </Button>
+              <Button variant="ghost" tone="danger">
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                {t("ghostDanger")}
+              </Button>
+              <Button variant="secondary" size="sm">
+                {t("buttonSmall")}
+              </Button>
+            </div>
+          </Demo>
+          {/* An icon alone always has a label (read out, and shown on hover) and a 44 px tap area. */}
+          <Demo name="IconButton" className="flex-row flex-wrap items-center gap-4">
+            <IconButton icon={X} label={t("close")} />
+            <IconButton icon={Trash2} label={t("ghostDanger")} tone="danger" />
+            <div className="relative flex h-24 w-40 items-center justify-between rounded-DEFAULT bg-brand/20 px-2">
+              <IconButton icon={ChevronLeft} label={t("previous")} look="floating" />
+              <IconButton icon={ChevronRight} label={t("next")} look="floating" />
+              <IconButton icon={X} label={t("removePhoto")} look="badge" className="absolute -right-3.5 -top-3.5" />
+            </div>
           </Demo>
           {/* Round icon buttons with names: the Share sheet (plain) and the invoice (boxed). */}
           <Demo name="ActionTiles">
@@ -207,6 +238,24 @@ export function KitTab() {
             <PillInput label={t("codeLabel")} labelHidden icon={<Search />} code placeholder={t("codePlaceholder")} action={<PillInputButton type="button">{t("find")}</PillInputButton>} />
           </Demo>
           {/* One price in dollars and riel; leaving one box fills the other at the rate. */}
+          {/* Pick a photo or file: a button, a link, or a dashed tile in a photo grid. */}
+          <Demo name="FileButton">
+            <div className="flex flex-wrap items-center gap-4">
+              <FileButton accept="image/*" onChange={(event) => setPicked(event.target.files?.[0]?.name ?? "")}>
+                {t("fileUpload")}
+              </FileButton>
+              <FileButton look="link" accept="image/*" onChange={(event) => setPicked(event.target.files?.[0]?.name ?? "")}>
+                {t("fileReplace")}
+              </FileButton>
+              <FileButton look="button" busy onChange={() => undefined}>
+                {t("fileUploading")}
+              </FileButton>
+              <FileButton look="tile" accept="image/*" className="w-20" onChange={(event) => setPicked(event.target.files?.[0]?.name ?? "")}>
+                {t("fileUpload")}
+              </FileButton>
+            </div>
+            {picked && <p className="text-sm text-muted">{picked}</p>}
+          </Demo>
           <Demo name="MoneyInput">
             <MoneyInput usd={usd} khr={khr} onUsdChange={setUsd} onKhrChange={setKhr} usdLabel={t("priceUsd")} khrLabel={t("priceKhr")} autoFillRate={4100} />
           </Demo>
@@ -220,6 +269,7 @@ export function KitTab() {
           <Demo name="Checkbox">
             <Checkbox checked={ticked} onChange={(e) => setTicked(e.target.checked)} label={t("checkboxLabel")} />
           </Demo>
+          {/* "tabs" switches what a page shows; "choice" is a form answer, read out as radio buttons. */}
           <Demo name="SegmentedControl">
             <SegmentedControl
               value={fulfilment}
@@ -227,6 +277,51 @@ export function KitTab() {
               options={[
                 { value: "delivery", label: t("cardDeliveryTitle") },
                 { value: "pickup", label: t("cardPickupTitle") },
+              ]}
+            />
+            <SegmentedControl
+              mode="choice"
+              label={t("areaLabel")}
+              value={area}
+              onChange={setArea}
+              options={[
+                { value: "phnom_penh", label: t("selectPhnomPenh") },
+                { value: "province", label: t("areaProvince") },
+              ]}
+            />
+          </Demo>
+          {/* Pick one of a few: cards side by side, big cards, or rows with a tick. Arrow keys move between them. */}
+          <Demo name="ChoiceCards">
+            <ChoiceCards
+              label={t("sheetTitle")}
+              value={fulfilment}
+              onChange={setFulfilment}
+              options={[
+                { value: "delivery", icon: Truck, title: t("cardDeliveryTitle"), detail: t("cardDeliveryFee") },
+                { value: "pickup", icon: Store, title: t("cardPickupTitle"), detail: t("cardPickupFee") },
+              ]}
+            />
+            <ChoiceCards
+              variant="large"
+              label={t("businessLabel")}
+              value={business}
+              onChange={setBusiness}
+              options={[
+                { value: "shop", icon: ShoppingBag, title: t("businessShop"), detail: t("businessShopHint") },
+                { value: "salon", icon: Scissors, title: t("businessSalon"), detail: t("businessSalonHint") },
+                { value: "garage", icon: Wrench, title: t("businessGarage"), detail: t("businessGarageHint") },
+              ]}
+              columns={3}
+            />
+            <ChoiceCards
+              variant="rows"
+              label={t("paymentLabel")}
+              value={payment}
+              onChange={setPayment}
+              options={[
+                { value: "khqr", title: "KHQR" },
+                { value: "aba", title: "ABA PayWay" },
+                { value: "cod", title: t("paymentCash") },
               ]}
             />
           </Demo>

@@ -1,6 +1,6 @@
 "use client";
 
-import { IconBadge, Mio } from "@khmio/ui";
+import { Button, IconBadge, Mio } from "@khmio/ui";
 import { ChevronRight, PackageSearch, Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -99,16 +99,17 @@ export default function MyOrdersPage() {
       </Link>
 
       {saved && saved.length > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          tone="muted"
           onClick={() => {
             forgetMyOrders();
             setSaved([]);
           }}
-          className="flex min-h-touch items-center justify-center text-sm font-medium text-muted hover:text-danger"
+          className="self-center"
         >
           {t("clear")}
-        </button>
+        </Button>
       )}
     </BuyerShell>
   );

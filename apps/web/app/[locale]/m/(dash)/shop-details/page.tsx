@@ -11,8 +11,8 @@ import {
   type DeliveryArea,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Card, Input, Notice, SegmentedControl, Select } from "@khmio/ui";
-import { Loader2, Upload, Wallet, X } from "lucide-react";
+import { Card, FileButton, IconButton, Input, Notice, SegmentedControl, Select } from "@khmio/ui";
+import { Wallet, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
@@ -159,31 +159,25 @@ export default function ShopDetailsPage() {
               <div className="relative shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element -- the shop's own uploaded logo */}
                 <img src={draft.logoUrl} alt="" className="h-20 w-20 rounded-full object-cover" />
-                <button
-                  type="button"
+                <IconButton
+                  icon={X}
+                  look="badge"
+                  label={t("removeLogo")}
                   onClick={() => {
                     update("logoKey", null);
                     update("logoUrl", null);
                   }}
-                  aria-label={t("removeLogo")}
-                  // A 44 px tap area around the small red circle (design-standard: no tap target under 44 px).
-                  className="absolute -right-3 -top-3 flex h-11 w-11 items-center justify-center rounded-full"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-danger text-bg">
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                </button>
+                  className="absolute -right-3 -top-3"
+                />
               </div>
             ) : (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-brand text-2xl font-bold text-on-brand">
                 {draft.shopName.trim().charAt(0).toUpperCase() || "?"}
               </div>
             )}
-            <label className="flex min-h-touch flex-1 cursor-pointer items-center justify-center gap-2 rounded-DEFAULT border border-border px-3 text-sm font-medium">
-              {logoUploading ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Upload className="h-4 w-4" aria-hidden="true" />}
+            <FileButton accept={ACCEPTED_IMAGE_TYPES} busy={logoUploading} invalid={Boolean(errors.logoKey)} onChange={(event) => void handleLogoChange(event)} className="flex-1">
               {logoUploading ? tApp("photoUploading") : t("uploadLogo")}
-              <input type="file" accept={ACCEPTED_IMAGE_TYPES} className="hidden" disabled={logoUploading} onChange={(event) => void handleLogoChange(event)} />
-            </label>
+            </FileButton>
           </div>
           {errors.logoKey && <p className="text-sm text-danger">{errorText(errors.logoKey)}</p>}
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@khmio/ui";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -46,9 +47,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-canvas p-4 text-center" role="alert">
         <p className="font-semibold">{t("offlineTitle")}</p>
-        <button type="button" onClick={load} className="min-h-touch rounded-DEFAULT bg-brand px-4 text-on-brand">
+        <Button variant="primary" onClick={load}>
           {t("retry")}
-        </button>
+        </Button>
       </div>
     );
   }
