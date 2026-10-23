@@ -16,6 +16,8 @@ This handbook does not repeat the plans; it points to them. When this page and a
 | How do several products share one login later? | `docs/platform-roadmap.md` |
 | What do Khmio's name, logo, Mio, colours and fonts look like everywhere? | `design/brand-guide.md` |
 | How must every app screen look and behave? | `design/design-standard.md` |
+| How is the code built (screens, API, database), so it stays clean? | `docs/engineering-standard.md` |
+| What did each database update change? | `docs/database-changes.md` |
 | What does each screen contain? | `design/screens.md` |
 | How do I test the screens with real sellers? | `design/seller-test.md` |
 | Which links open the app, the admin, the designs and GitHub? | This page, section 11 |

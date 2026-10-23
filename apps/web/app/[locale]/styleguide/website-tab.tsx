@@ -17,6 +17,7 @@ const PAGE_PARTS = {
   pricing: ["HeroSection", "PlansSection", "FeaturesSection", "ProductCardsSection", "ClosingSection"],
 } as const;
 type ShownPage = keyof typeof PAGE_PARTS;
+const SHOWN_PAGES: readonly ShownPage[] = ["home", "shop", "class", "pricing"];
 /** On every page: the frame around the sections. */
 const FRAME_PARTS = ["SiteHeader", "SiteSections", "SiteContainer", "SiteFooter"];
 
@@ -36,7 +37,10 @@ export function WebsiteTab() {
       <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
         <SegmentedControl
           value={page}
-          onChange={(next) => setPage(next as ShownPage)}
+          onChange={(next) => {
+            const shown = SHOWN_PAGES.find((key) => key === next);
+            if (shown) setPage(shown);
+          }}
           options={[
             { value: "home", label: t("websiteHome") },
             { value: "shop", label: t("websiteShop") },

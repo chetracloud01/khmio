@@ -54,3 +54,23 @@ pnpm admin:add-owner -- --telegram-id <id> --name "<name>" (make/reset a platfor
   Mio component in packages/ui. Brand, colours, fonts, marketing:
   design/brand-guide.md. Doc map, prompts, error playbook: docs/handbook.md.
 - Never print, log or commit secrets. Never edit an old migration.
+
+## Engineering standard (full rules + examples: docs/engineering-standard.md)
+- Search before writing; reuse or extend what exists. Second use = shared
+  piece. A new look/behaviour is a variant or prop, never a near-copy.
+- Data drives code: lists of rows/options/columns into one component or
+  function, not repeated markup or if-chains.
+- Nothing hard-coded: words in messages, colours as tokens, limits in
+  plans.ts, rules as Zod in packages/shared, settings in config.ts, numbers
+  as named constants.
+- Frontend: kit (packages/ui) vs app block (apps/web/components) per
+  design/design-standard.md; shown on /styleguide first; pages use the
+  standard frames, form-ui, DataGrid and states; client calls via lib/api.ts.
+- Backend: one folder per feature; thin controller (guard, Zod, call);
+  logic in plain tested functions; select + mapper for output; one ErrorBody
+  shape with codes; lists via ListSpec + readListPage; admin changes audited.
+- Database: every change is a new migration via pnpm db:migrate, named for
+  the feature, SQL read and commented, a line added to
+  docs/database-changes.md, explained to me in plain words before it's
+  applied. Add first, remove in a later release. Demo data via scripts.
+- No `as` to force a type; parse or narrow. No dead code left behind.
