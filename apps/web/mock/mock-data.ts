@@ -15,6 +15,7 @@ import {
   type BusinessType,
   type Currency,
   type DeliverySettings,
+  type InvoiceDetails,
   type KycIdType,
   type KycRejectReason,
   type KycStatus,
@@ -30,11 +31,6 @@ export interface MockStore {
   nameKm: string;
   nameEn: string;
   bannerColor: string;
-  ratingValue: number;
-  ratingCountLabelKm: string;
-  ratingCountLabelEn: string;
-  deliveryEtaMinMinutes: number;
-  deliveryEtaMaxMinutes: number;
   /** 855XXXXXXXX — buyers tap it to call the shop. */
   phone: string;
 }
@@ -537,11 +533,6 @@ export const mockStore: MockStore = {
   nameKm: "កាហ្វេសុខា",
   nameEn: "Sokha Coffee",
   bannerColor: "bg-gradient-to-br from-amber-300 to-orange-400",
-  ratingValue: 4.9,
-  ratingCountLabelKm: "ការវាយតម្លៃ ១k+",
-  ratingCountLabelEn: "1k+ ratings",
-  deliveryEtaMinMinutes: 15,
-  deliveryEtaMaxMinutes: 30,
   phone: "85512345678",
 };
 
@@ -549,14 +540,11 @@ export const mockStore: MockStore = {
  * What the sample seller wrote under "On your invoices" (design/screens.md
  * S10), shown on the invoice mockup (B7).
  */
-export const mockInvoiceDetails = {
-  addressKm: "ផ្ទះលេខ 12 ផ្លូវ 302 បឹងកេងកង ភ្នំពេញ",
-  addressEn: "No. 12, Street 302, Boeng Keng Kang, Phnom Penh",
+export const mockInvoiceDetails: InvoiceDetails = {
   taxNumber: "K009-901234567",
-  telegram: "t.me/sokhacoffee",
-  facebook: "fb.com/sokhacoffee",
-  noteKm: "សូមអរគុណ! អាចប្តូរទំនិញបានក្នុងរយៈពេល 3 ថ្ងៃ ដោយភ្ជាប់បង្កាន់ដៃនេះ។",
-  noteEn: "Thank you! Exchanges within 3 days with this receipt.",
+  telegramLink: "t.me/sokhacoffee",
+  facebookLink: "fb.com/sokhacoffee",
+  invoiceNote: "សូមអរគុណ! អាចប្តូរទំនិញបានក្នុងរយៈពេល 3 ថ្ងៃ ដោយភ្ជាប់បង្កាន់ដៃនេះ។",
 };
 
 /** A stand-in tracking code: 8 characters made from the order number, the same every time for one order. */

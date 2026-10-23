@@ -1,5 +1,5 @@
-import type { SystemDb } from "@khmio/db";
-import { adminAlertText, ALERT_BUTTONS, buyerCancelledAlert, buyerUpdateText, confirmButtonData, formatTrackingCode, newOrderAlert, STOP_BUTTON_LABEL, stopButtonData, type AdminAlert } from "@khmio/shared";
+import { queueAdminAlert, type SystemDb } from "@khmio/db";
+import { adminAlertSchema, adminAlertText, ALERT_BUTTONS, buyerCancelledAlert, buyerUpdateText, confirmButtonData, formatTrackingCode, newOrderAlert, STOP_BUTTON_LABEL, stopButtonData, type AdminAlert } from "@khmio/shared";
 import type { Logger } from "pino";
 import { TelegramError, type InlineButton, type TelegramClient } from "../telegram/client";
 
@@ -88,7 +88,7 @@ export async function deliverOutboxOnce(deps: OutboxDeps): Promise<number> {
         const orderId = typeof event.payload.orderId === "string" ? event.payload.orderId : null;
         const order = orderId ? await db.order.findUnique({ where: { id: orderId }, select: { orderNumber: true } }) : null;
         const alert: AdminAlert = { reason: "message_gave_up", kind: event.kind, orderNumber: order?.orderNumber ?? null, attempts };
-        await db.outboxEvent.create({ data: { kind: "admin_alert", payload: alert } });
+        await queueAdminAlert(db, alert);
       }
     }
   }
@@ -138,7 +138,7 @@ export async function alertChats(db: SystemDb): Promise<string[]> {
 
 /** The message for an outbox event, or null when there's nothing worth sending (a status buyers don't hear about). */
 async function buildMessage(deps: OutboxDeps, kind: string, payload: Record<string, unknown>): Promise<Message | null> {
-  if (kind === "admin_alert") return { text: adminAlertText(payload as unknown as AdminAlert) };
+  if (kind === "admin_alert") return { text: adminAlertText(adminAlertSchema.parse(payload)) };
   if (kind === "order_status_changed") return buyerUpdate(deps, payload);
   const order = typeof payload.orderId === "string"
     ? await deps.db.order.findUnique({

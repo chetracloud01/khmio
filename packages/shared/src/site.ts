@@ -275,12 +275,11 @@ export function picturesUsedIn(page: Pick<SitePage, "sections" | "seo">): Set<st
   const visit = (value: unknown): void => {
     if (Array.isArray(value)) return value.forEach(visit);
     if (!value || typeof value !== "object") return;
-    const record = value as Record<string, unknown>;
-    if (typeof record.src === "string") {
-      const id = libraryPictureId(record.src);
+    if ("src" in value && typeof value.src === "string") {
+      const id = libraryPictureId(value.src);
       if (id) used.add(id);
     }
-    Object.values(record).forEach(visit);
+    Object.values(value).forEach(visit);
   };
   visit(page.sections);
   visit(page.seo);

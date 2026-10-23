@@ -6,9 +6,8 @@ import type { ReactNode } from "react";
 /**
  * The top of a shop page (design/screens.md B1): a brand-colour banner, the
  * shop's logo over its edge, its name, whether it's open, a short line of
- * facts (rating, delivery time, Verified) and the delivery-and-call line
- * (`info`). The shop leads; Khmio stays in the background. One block for the
- * live shop and its mockup — words come in as props.
+ * facts, and `info` under them — the "Shop info & contact" row that opens
+ * the Shop info sheet. The shop leads; Khmio stays in the background. One block for the live shop and its mockup — words come in as props.
  */
 export function ShopHero({
   name,
@@ -18,20 +17,23 @@ export function ShopHero({
   info,
   controls,
   highlight,
+  nameBadge,
 }: {
   name: string;
   /** The logo picture, or the shop's first letter. */
   logo: ReactNode;
   /** "Open now"; the page shows a closed notice instead of the shop when it isn't. */
   openLabel: string;
-  /** Rating, delivery time, Verified badge … */
+  /** A short line under the name (rating, delivery time …). */
   facts?: ReactNode;
-  /** "Delivery from $1 · Pickup · Provinces" with the call button (opens Shop info). */
+  /** Under the name: the "Shop info & contact" row (ShopInfoButton), and any notice. */
   info?: ReactNode;
   /** Language and theme, top right of the banner. */
   controls?: ReactNode;
   /** A short line on the banner, e.g. "Up to 20% off". */
   highlight?: string;
+  /** Beside the name, before "Open now": the Verified badge. */
+  nameBadge?: ReactNode;
 }) {
   return (
     <section className="relative">
@@ -48,6 +50,7 @@ export function ShopHero({
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold leading-normal sm:text-2xl">{name}</h1>
+            {nameBadge}
             <StatusPill tone="success">
               <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-success" aria-hidden="true" />
               {openLabel}

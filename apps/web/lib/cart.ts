@@ -1,8 +1,10 @@
 "use client";
 
-import { computeOrderTotal, MAX_LINE_QUANTITY, type Currency, type DeliveryArea, type Fulfilment, type OrderTotal } from "@khmio/shared";
+import { computeOrderTotal, currencySchema, deliveryAreaSchema, fulfilmentSchema, MAX_LINE_QUANTITY, type Currency, type OrderTotal } from "@khmio/shared";
 import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 import type { Product, ProductVariant, PublicShop } from "./api";
+import { readStored, writeStored } from "./device-storage";
 
 // The buyer's cart and details, kept on their phone (no buyer login). One
 // cart per shop; the buyer's name, phone and address are kept only when they
@@ -12,29 +14,12 @@ import type { Product, ProductVariant, PublicShop } from "./api";
 const cartKey = (slug: string) => `khmio:cart:${slug}`;
 const BUYER_KEY = "khmio:buyer";
 
-export interface StoredCart {
+const storedCartSchema = z.object({
   /** variant id → how many. */
-  quantities: Record<string, number>;
-  currency: Currency | null;
-}
-
-function readJson<T>(key: string): T | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeJson(key: string, value: unknown) {
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage full or unavailable (private browsing): the cart just lives for this page.
-  }
-}
+  quantities: z.record(z.number()),
+  currency: currencySchema.nullable().catch(null),
+});
+export type StoredCart = z.infer<typeof storedCartSchema>;
 
 /** The cart for one shop. `ready` is false until it has been read from the phone. */
 export function useShopCart(slug: string) {
@@ -42,8 +27,8 @@ export function useShopCart(slug: string) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = readJson<StoredCart>(cartKey(slug));
-    if (stored && typeof stored.quantities === "object") setCart({ quantities: stored.quantities, currency: stored.currency ?? null });
+    const stored = readStored(cartKey(slug), storedCartSchema);
+    if (stored) setCart(stored);
     setReady(true);
   }, [slug]);
 
@@ -51,7 +36,7 @@ export function useShopCart(slug: string) {
     (change: (previous: StoredCart) => StoredCart) => {
       setCart((previous) => {
         const next = change(previous);
-        writeJson(cartKey(slug), next);
+        writeStored(cartKey(slug), next);
         return next;
       });
     },
@@ -89,10 +74,10 @@ export function useShopCart(slug: string) {
  * sells and works out today's prices.
  */
 export function addToShopCart(slug: string, lines: { variantId: string; quantity: number }[]) {
-  const stored = readJson<StoredCart>(cartKey(slug));
-  const quantities = { ...(stored && typeof stored.quantities === "object" ? stored.quantities : {}) };
+  const stored = readStored(cartKey(slug), storedCartSchema);
+  const quantities = { ...stored?.quantities };
   for (const line of lines) quantities[line.variantId] = Math.min(MAX_LINE_QUANTITY, (quantities[line.variantId] ?? 0) + line.quantity);
-  writeJson(cartKey(slug), { quantities, currency: stored?.currency ?? null });
+  writeStored(cartKey(slug), { quantities, currency: stored?.currency ?? null });
 }
 
 export interface CartLine {
@@ -133,38 +118,28 @@ export function cartTotal(shop: PublicShop, lines: CartLine[], currency: Currenc
   });
 }
 
-export interface BuyerDetails {
-  name: string;
-  phone: string;
-  fulfilment: Fulfilment;
-  area: DeliveryArea;
-  districtId: string;
-  provinceId: string;
-  landmark: string;
-}
+/** Each field falls back on its own, so details kept by an older version still fill in what they can. */
+const text = z.string().catch("");
+const buyerDetailsSchema = z.object({
+  name: text,
+  phone: text,
+  fulfilment: fulfilmentSchema.catch("delivery"),
+  area: deliveryAreaSchema.catch("phnom_penh"),
+  districtId: text,
+  provinceId: text,
+  landmark: text,
+});
+export type BuyerDetails = z.infer<typeof buyerDetailsSchema>;
 
 const EMPTY_BUYER: BuyerDetails = { name: "", phone: "", fulfilment: "delivery", area: "phnom_penh", districtId: "", provinceId: "", landmark: "" };
 
 /** The buyer's details from their last order on this phone, if they asked us to remember them. */
 export function readBuyerDetails(): { details: BuyerDetails; remembered: boolean } {
-  const stored = readJson<Partial<BuyerDetails>>(BUYER_KEY);
-  if (!stored) return { details: EMPTY_BUYER, remembered: false };
-  const text = (value: unknown) => (typeof value === "string" ? value : "");
-  return {
-    details: {
-      name: text(stored.name),
-      phone: text(stored.phone),
-      fulfilment: stored.fulfilment === "pickup" ? "pickup" : "delivery",
-      area: stored.area === "province" ? "province" : "phnom_penh",
-      districtId: text(stored.districtId),
-      provinceId: text(stored.provinceId),
-      landmark: text(stored.landmark),
-    },
-    remembered: true,
-  };
+  const stored = readStored(BUYER_KEY, buyerDetailsSchema);
+  return stored ? { details: stored, remembered: true } : { details: EMPTY_BUYER, remembered: false };
 }
 
 /** Keeps the details for next time, or forgets them when the buyer unticked "Remember". */
 export function saveBuyerDetails(details: BuyerDetails, remember: boolean) {
-  writeJson(BUYER_KEY, remember ? details : null);
+  writeStored(BUYER_KEY, remember ? details : null);
 }

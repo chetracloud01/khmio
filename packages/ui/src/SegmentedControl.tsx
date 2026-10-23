@@ -4,15 +4,16 @@ import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { radioKeyDown, radioTabIndex } from "./radio-keys";
 
-export interface SegmentedControlOption {
-  value: string;
+/** `V` is the values' own type ("today" | "week"), so onChange hands back that type, never a plain string. */
+export interface SegmentedControlOption<V extends string = string> {
+  value: V;
   label: ReactNode;
 }
 
-export interface SegmentedControlProps {
-  options: SegmentedControlOption[];
-  value: string;
-  onChange: (value: string) => void;
+export interface SegmentedControlProps<V extends string = string> {
+  options: SegmentedControlOption<V>[];
+  value: V;
+  onChange: (value: V) => void;
   /**
    * "tabs" (default) switches what the page shows; "choice" is a form answer
    * (Phnom Penh or province, USD or KHR) and is read out as radio buttons.
@@ -23,7 +24,7 @@ export interface SegmentedControlProps {
   className?: string;
 }
 
-export function SegmentedControl({ options, value, onChange, mode = "tabs", label, className }: SegmentedControlProps) {
+export function SegmentedControl<V extends string>({ options, value, onChange, mode = "tabs", label, className }: SegmentedControlProps<V>) {
   const choice = mode === "choice";
   const values = options.map((option) => option.value);
   return (

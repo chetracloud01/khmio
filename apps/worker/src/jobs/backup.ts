@@ -1,4 +1,4 @@
-import { Prisma, type SystemDb } from "@khmio/db";
+import { Prisma, queueAdminAlert, type SystemDb } from "@khmio/db";
 import type { AdminAlert, BackupFailure, WorkerEnv } from "@khmio/shared";
 import type PgBoss from "pg-boss";
 import type { Logger } from "pino";
@@ -49,7 +49,7 @@ export async function recordBackup(db: SystemDb, logger: Logger, runId: string, 
     logger.error({ detail }, "database backup failed");
     await db.backupRun.update({ where: { id: runId }, data: { status: "failed", failure: failureOf(error), finishedAt: new Date() } });
     const alert: AdminAlert = { reason: "backup_failed", detail };
-    await db.outboxEvent.create({ data: { kind: "admin_alert", payload: alert } }).catch(() => undefined);
+    await queueAdminAlert(db, alert).catch(() => undefined);
     return;
   }
   await db.backupRun.update({

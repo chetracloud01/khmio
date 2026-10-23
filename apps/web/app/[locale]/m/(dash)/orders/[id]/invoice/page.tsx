@@ -7,7 +7,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { InvoiceScreen } from "@/components/invoice/invoice-screen";
 import { useInvoiceData } from "@/components/invoice/use-invoice-data";
-import { api, ApiError, type OrderInvoice } from "@/lib/api";
+import { api, ApiError, type OrderInvoice, orderInvoiceSchema } from "@/lib/api";
 import { PageLoading, PageOffline } from "../../../page-states";
 
 // The seller's copy of an order's invoice / receipt (design/screens.md B7):
@@ -21,7 +21,7 @@ export default function SellerInvoicePage() {
 
   const load = useCallback(() => {
     setState("loading");
-    api<OrderInvoice>(`/orders/${id}/invoice`)
+    api(`/orders/${id}/invoice`, orderInvoiceSchema)
       .then((loaded) => {
         setInvoice(loaded);
         setState("ready");

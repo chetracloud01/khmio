@@ -1,6 +1,5 @@
-import { applyAdminOverride, BILLING_PERIOD_DAYS, type AdminOverride, type PlanId, type SubscriptionStatus } from "@khmio/shared";
+import { type AdminOverride, applyAdminOverride, BILLING_PERIOD_DAYS, DAY_MS, type PlanId, type SubscriptionStatus } from "@khmio/shared";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface SubscriptionDates {
   plan: PlanId;

@@ -18,6 +18,7 @@ export default function AccountSubscriptionsPage() {
   const t = useTranslations("Account");
   const tPlans = useTranslations("Plans");
   const tBilling = useTranslations("Billing");
+  const tDates = useTranslations("Dates");
   const locale = useLocale() === "en" ? "en" : "km";
   const { subscription } = useMerchantSubscription();
   const billingHref = `/${locale}/mockup/dashboard/billing`;
@@ -90,7 +91,7 @@ export default function AccountSubscriptionsPage() {
                     <span className="min-w-0 flex-1">
                       {tBilling(`reason_${invoice.reason}`)} · {tPlans(invoice.plan)}
                       <span className="block text-xs text-muted">
-                        {invoice.createdDaysAgo === 0 ? tBilling("today") : tBilling("daysAgo", { count: invoice.createdDaysAgo })}
+                        {invoice.createdDaysAgo === 0 ? tBilling("today") : tDates("daysAgo", { count: invoice.createdDaysAgo })}
                       </span>
                     </span>
                     <span className="font-semibold tabular-nums">{money(invoice.amountMinor, invoice.currency)}</span>

@@ -1,10 +1,11 @@
 "use client";
 
-import { cn, KhmioLogo, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { cn, KhmioLogo, ThemeSwitcher } from "@khmio/ui";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
 import { AppSwitcher } from "../app-switcher";
 import { useThemeLabels } from "@/components/use-theme-labels";
 
@@ -15,7 +16,6 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
   const t = useTranslations("Account");
   const locale = useLocale();
   const pathname = usePathname();
-  const router = useRouter();
   const themeLabels = useThemeLabels();
   const base = `/${locale}/mockup/account`;
   const tabs = [
@@ -33,14 +33,7 @@ export default function AccountLayout({ children }: { children: ReactNode }) {
             <span className="hidden text-sm font-medium text-muted sm:inline">{t("title")}</span>
           </Link>
           <div className="hidden sm:block">
-            <SegmentedControl
-              value={locale}
-              onChange={(next) => router.push(pathname.replace(/^\/(km|en)/, `/${next}`))}
-              options={[
-                { value: "km", label: "ខ្មែរ" },
-                { value: "en", label: "EN" },
-              ]}
-            />
+            <LanguageSwitch />
           </div>
           <ThemeSwitcher labels={themeLabels} direction="down" />
           <AppSwitcher current="hub" align="right" />

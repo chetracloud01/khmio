@@ -1,10 +1,11 @@
 "use client";
 
-import { buttonVariants, Card, SegmentedControl } from "@khmio/ui";
+import { buttonVariants, Card } from "@khmio/ui";
 import { Phone, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { LanguageSwitch } from "@/components/language-switch";
+import { useDateText } from "@/components/use-date-text";
 import { mockMerchant } from "@/mock/mock-data";
 import { useMerchantAccount } from "../../merchant-account-context";
 
@@ -13,10 +14,8 @@ import { useMerchantAccount } from "../../merchant-account-context";
 export default function AccountProfilePage() {
   const t = useTranslations("Account");
   const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
   const { logins } = useMerchantAccount();
-  const dateFormat = new Intl.DateTimeFormat(locale === "km" ? "km-KH" : "en-GB", { dateStyle: "medium" });
+  const { date } = useDateText();
 
   return (
     <>
@@ -47,7 +46,7 @@ export default function AccountProfilePage() {
                   <span className="text-sm font-semibold">{login.method === "telegram" ? t("loginTelegram") : t("loginPhone")}</span>
                   <span className="truncate text-sm text-muted">{login.account}</span>
                 </span>
-                <span className="text-xs text-muted">{t("linkedOn", { date: dateFormat.format(new Date(login.linkedAtIso)) })}</span>
+                <span className="text-xs text-muted">{t("linkedOn", { date: date(login.linkedAtIso) })}</span>
               </li>
             ))}
           </ul>
@@ -58,15 +57,7 @@ export default function AccountProfilePage() {
       <Card className="flex flex-col gap-3 p-5">
         <h2 className="font-semibold">{t("language")}</h2>
         <p className="text-sm text-muted">{t("languageHint")}</p>
-        <SegmentedControl
-          value={locale}
-          onChange={(next) => router.push(pathname.replace(/^\/(km|en)/, `/${next}`))}
-          options={[
-            { value: "km", label: "ខ្មែរ" },
-            { value: "en", label: "English" },
-          ]}
-          className="self-start"
-        />
+        <LanguageSwitch size="long" className="self-start" />
       </Card>
 
       <Link href={`/${locale}/mockup/merchant-login`} className={buttonVariants({ variant: "secondary" })}>

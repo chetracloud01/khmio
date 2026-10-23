@@ -1,4 +1,4 @@
-import type { Prisma, Tx } from "@khmio/db";
+import { merchantActor, type Prisma, type Tx, writeAudit } from "@khmio/db";
 import { decideOrderAction, formatTrackingCode, getDispatchRoute, getSellerActions, type OrderActionRequest } from "@khmio/shared";
 import { NotFoundException } from "@nestjs/common";
 import { AppException } from "../errors";
@@ -104,17 +104,6 @@ export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: s
     if (dispatch) await tx.deliveryDispatch.update({ where: { id: dispatch.id }, data: { [field]: now } });
   }
 
-  await tx.auditLog.create({
-    data: {
-      actorType: "merchant",
-      actorId: context.merchantId,
-      storeId: context.storeId,
-      action: `order.${request.action}`,
-      entity: "order",
-      entityId: order.id,
-      before: { status: order.status },
-      after: { status: decision.status },
-    },
-  });
+  await writeAudit(tx, merchantActor(context), { action: `order.${request.action}`, entity: "order", entityId: order.id, before: { status: order.status }, after: { status: decision.status } });
   return readOrderDetail(tx, order.id);
 }

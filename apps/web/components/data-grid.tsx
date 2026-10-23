@@ -5,6 +5,8 @@ import { BottomSheet, Button, Card, Checkbox, cn, GroupTitle, Notice, SearchInpu
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronLeft, ChevronRight, Download, ListFilter, Settings2, SquareCheckBig, X, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { createContext, Fragment, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { z } from "zod";
+import { readStored, writeStored } from "@/lib/device-storage";
 
 // The standard data grid for every list in the app (admin and merchant):
 // search, quick-filter chips, a filter panel, sortable columns, row selection
@@ -117,11 +119,10 @@ export interface DataGridBulkAction<T> {
 type SortState = { key: string; direction: "asc" | "desc" } | null;
 type Density = "comfortable" | "compact";
 
-interface StoredPrefs {
-  hidden: string[];
-  density: Density;
-  pageSize: number;
-}
+const storedPrefsSchema = z
+  .object({ hidden: z.array(z.string()), density: z.enum(["comfortable", "compact"]) satisfies z.ZodType<Density>, pageSize: z.number() })
+  .partial();
+type StoredPrefs = Required<z.infer<typeof storedPrefsSchema>>;
 
 const PAGE_SIZES = [10, 20, 50, 100];
 
@@ -254,28 +255,17 @@ export function DataGrid<T>({
   // Per-viewer display preferences (a convenience only — safe to lose).
   useEffect(() => {
     if (!storageKey) return;
-    try {
-      const raw = window.localStorage.getItem(`khmio:grid:${storageKey}`);
-      if (raw) {
-        const prefs = JSON.parse(raw) as Partial<StoredPrefs>;
-        if (prefs.hidden) setHidden(new Set(prefs.hidden));
-        if (prefs.density === "compact" || prefs.density === "comfortable") setDensity(prefs.density);
-        if (prefs.pageSize && PAGE_SIZES.includes(prefs.pageSize)) setPageSize(prefs.pageSize);
-      }
-    } catch {
-      // Storage unavailable — keep defaults.
-    }
+    const prefs = readStored(`khmio:grid:${storageKey}`, storedPrefsSchema);
+    if (prefs?.hidden) setHidden(new Set(prefs.hidden));
+    if (prefs?.density) setDensity(prefs.density);
+    if (prefs?.pageSize && PAGE_SIZES.includes(prefs.pageSize)) setPageSize(prefs.pageSize);
     setPrefsLoaded(true);
   }, [storageKey]);
 
   useEffect(() => {
     if (!storageKey || !prefsLoaded) return;
-    try {
-      const prefs: StoredPrefs = { hidden: [...hidden], density, pageSize };
-      window.localStorage.setItem(`khmio:grid:${storageKey}`, JSON.stringify(prefs));
-    } catch {
-      // Storage unavailable — preferences just won't be remembered.
-    }
+    const prefs: StoredPrefs = { hidden: [...hidden], density, pageSize };
+    writeStored(`khmio:grid:${storageKey}`, prefs); // not remembered when storage refuses
   }, [storageKey, prefsLoaded, hidden, density, pageSize]);
 
   // syncUrl: read the address once (tab, search, sort, filters, page)…
@@ -358,14 +348,18 @@ export function DataGrid<T>({
     pageSize: size,
     filters: Object.fromEntries(Object.entries(filterValues).filter(([, value]) => value)),
   });
-  const serverQueryKey = JSON.stringify(serverQuery(page, pageSize));
+  const shownQuery = serverQuery(page, pageSize);
+  const serverQueryKey = JSON.stringify(shownQuery);
+  // The load below runs when the key changes; the ref hands it the query the key was made from.
+  const shownQueryRef = useRef(shownQuery);
+  shownQueryRef.current = shownQuery;
   const serverLoad = server?.load;
   const serverOnPage = server?.onPage;
   useEffect(() => {
     if (!serverLoad || (storageKey && !prefsLoaded) || !urlReady) return;
     const request = ++latestRequest.current;
     setServerState("loading");
-    serverLoad(JSON.parse(serverQueryKey) as ListQuery).then(
+    serverLoad(shownQueryRef.current).then(
       (result) => {
         if (request !== latestRequest.current) return; // a newer request is on its way
         if (firstServerPage.current) {
@@ -1154,7 +1148,7 @@ export function DataGrid<T>({
                   }}
                   className={cn(
                     "min-h-touch rounded-full px-4 text-sm font-semibold disabled:opacity-40",
-                    action.variant === "danger" ? "bg-danger text-white" : action.variant === "primary" ? "bg-nav-accent text-nav-bg" : "bg-nav-fg/10 hover:bg-nav-fg/20",
+                    action.variant === "danger" ? "bg-danger text-on-danger" : action.variant === "primary" ? "bg-nav-accent text-nav-bg" : "bg-nav-fg/10 hover:bg-nav-fg/20",
                   )}
                 >
                   {action.label}

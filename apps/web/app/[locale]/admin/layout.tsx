@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AdminFrame } from "@/components/admin-frame/admin-frame";
 import type { AdminBadge } from "@/components/admin-frame/admin-nav";
-import type { AdminBadges, AdminMe } from "@/lib/admin-api";
-import { api, ApiError } from "@/lib/api";
+import { adminBadgesSchema, adminMeSchema, type AdminMe } from "@/lib/admin-api";
+import { api, ApiError, apiSend } from "@/lib/api";
 import { AdminContext, type ActiveAdmin } from "./admin-context";
 import { AdminLogin } from "./admin-login";
 
@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   const load = useCallback(() => {
     setState("checking");
-    api<AdminMe>("/admin/auth/me")
+    api("/admin/auth/me", adminMeSchema)
       .then((result) => {
         setMe(result);
         setState("ready");
@@ -68,11 +68,11 @@ function AdminShell({ me, children }: { me: ActiveAdmin; children: ReactNode }) 
 
   // Asked again on every page change, so a fixed problem clears from the menu.
   useEffect(() => {
-    api<AdminBadges>("/admin/badges").then(setBadges, () => undefined);
+    api("/admin/badges", adminBadgesSchema).then(setBadges, () => undefined);
   }, [pathname]);
 
   async function signOut() {
-    await api("/admin/auth/logout", { method: "POST" }).catch(() => undefined);
+    await apiSend("/admin/auth/logout", { method: "POST" }).catch(() => undefined);
     window.location.reload();
   }
 

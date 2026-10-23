@@ -186,7 +186,7 @@ export function KitTab() {
               items={[
                 { key: "qr", icon: QrCode, label: t("tileQr"), look: "primary" },
                 { key: "copy", icon: Copy, label: t("tileCopy") },
-                { key: "telegram", icon: Send, label: "Telegram", look: { className: "bg-[#229ED9] text-white" } },
+                { key: "telegram", icon: Send, label: "Telegram", look: "telegram" },
                 { key: "share", icon: Search, label: t("tileOther") },
               ]}
             />

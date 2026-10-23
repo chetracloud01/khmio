@@ -1,10 +1,10 @@
 import type { SystemDb } from "@khmio/db";
-import { createStoreInputSchema, isReservedSlug, shopSlugSchema } from "@khmio/shared";
+import { createStoreInputSchema } from "@khmio/shared";
 import { Body, ConflictException, Controller, Get, Inject, Post, Query, UseGuards } from "@nestjs/common";
 import { SYSTEM_DB } from "../db";
 import { InvalidInputException } from "../errors";
 import { CurrentMerchant, SessionGuard } from "../auth/session.guard";
-import { createStore, isSlugTaken } from "./create-store";
+import { createStore, slugAvailability } from "./create-store";
 
 @Controller("stores")
 @UseGuards(SessionGuard)
@@ -14,9 +14,7 @@ export class StoresController {
   /** Onboarding's live check while the seller types a link. Answers only yes or no — it never shows whose shop it is. */
   @Get("slug-available")
   async slugAvailable(@Query("slug") slug: unknown) {
-    const parsed = shopSlugSchema.safeParse(slug);
-    if (!parsed.success || isReservedSlug(parsed.data)) return { available: false, reason: "invalid" as const };
-    return (await isSlugTaken(this.system, parsed.data)) ? { available: false, reason: "taken" as const } : { available: true };
+    return slugAvailability(this.system, slug);
   }
 
   /** Onboarding's "Finish": the two answers become a shop. */

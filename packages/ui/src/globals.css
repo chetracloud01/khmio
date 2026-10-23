@@ -20,6 +20,7 @@
   --color-warning: 163 75 8; /* #A34B08: 5.9:1 on white, 5.1:1 on its 10% tint */
   --color-info: 29 90 224; /* #1D5AE0: 5.9:1 on white, 5.1:1 on its 10% tint */
   --color-danger: 200 30 30; /* #C81E1E: 5.7:1 on white, 4.9:1 on its 10% tint */
+  --color-on-danger: 255 255 255; /* text on a danger button or badge: 5.7:1 */
   --color-bg: 255 255 255; /* cards, inputs, sheets */
   --color-canvas: 244 246 250; /* page background behind cards */
   --color-fg: 15 23 42;
@@ -42,6 +43,11 @@
   --color-paper-unpaid: 163 75 8;
   --color-paper-void: 200 30 30;
   --color-paper-brand: 14 116 144; /* Khmio Teal, kept in dark mode: white letters on it stay 5.4:1 */
+
+  /* Telegram's own blue, the same in both themes (the Share sheet's Telegram tile).
+     Only icons sit on it: white is 3.0:1, enough for a shape, not for text. */
+  --color-telegram: 34 158 217;
+  --color-on-telegram: 255 255 255;
 
   /* The home's two quick-action icons (Add product, Share shop): bright, the same in both themes, white icons on them. */
   --color-action-teal: 20 184 166;
@@ -70,6 +76,7 @@
     --color-warning: 251 191 36;
     --color-info: 96 165 250;
     --color-danger: 241 90 90; /* 5.0:1 on bg, 4.5:1 on its badge (was #EF4444, 4.4) */
+    --color-on-danger: 69 10 10; /* 4.9:1 on the light danger red (white would be 3.3) */
     --color-bg: 22 30 46;
     --color-canvas: 11 17 30;
     --color-fg: 241 245 249;
@@ -87,6 +94,7 @@
   --color-warning: 251 191 36;
   --color-info: 96 165 250;
   --color-danger: 241 90 90;
+  --color-on-danger: 69 10 10;
   --color-bg: 22 30 46;
   --color-canvas: 11 17 30;
   --color-fg: 241 245 249;

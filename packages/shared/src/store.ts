@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { businessTypeSchema } from "./business";
+import { requirePickupAddress, shopLocationFields } from "./delivery";
+import { invoiceDetailsSchema } from "./invoice";
 import { normalizeKhmerPhone } from "./phone";
 
 // The shop's own details, as the merchant enters them in onboarding and the
@@ -89,6 +91,23 @@ export const storeDetailsSaveSchema = storeProfileSchema.extend({
   logoKey: z.string().min(1).max(200).nullable(),
 });
 export type StoreDetailsSave = z.infer<typeof storeDetailsSaveSchema>;
+
+/**
+ * Shop details as one save, in its groups (design/screens.md S10): the shop,
+ * its location and pickup, getting paid (with cash on delivery), prices and
+ * tax, and what goes on invoices — what PUT /store runs. The exchange rate
+ * must sit in today's band (admin Settings). Whether pickup may be switched
+ * off also depends on the delivery settings (offersAnyFulfilment), which the
+ * API checks.
+ */
+export function shopDetailsSaveSchema(band: ExchangeRateBand) {
+  return storeDetailsSaveSchema
+    .merge(shopLocationFields)
+    .merge(storeSettingsSchema(band).omit({ onlineStockLocation: true }))
+    .merge(invoiceDetailsSchema)
+    .superRefine(requirePickupAddress);
+}
+export type ShopDetailsSave = z.infer<ReturnType<typeof shopDetailsSaveSchema>>;
 export type StoreProfile = z.output<typeof storeProfileSchema>;
 
 /** The band the super admin allows a store's USD→KHR rate in (admin Settings). */

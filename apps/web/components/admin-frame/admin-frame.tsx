@@ -1,11 +1,12 @@
 "use client";
 
-import { cn, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { cn, ThemeSwitcher } from "@khmio/ui";
 import { ChevronRight, LogOut, Menu, PanelLeftClose, PanelLeftOpen, ShieldHalf, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
 import { useThemeLabels } from "@/components/use-theme-labels";
 import { adminBase, findActiveNav, type AdminArea, type AdminBadge } from "./admin-nav";
 import { AdminNavMenu } from "./admin-nav-menu";
@@ -41,7 +42,6 @@ export function AdminFrame({
 }) {
   const t = useTranslations("AdminNav");
   const locale = useLocale();
-  const router = useRouter();
   const pathname = usePathname();
   const themeLabels = useThemeLabels();
   const base = adminBase(locale, area);
@@ -201,15 +201,7 @@ export function AdminFrame({
             )}
           </nav>
 
-          <SegmentedControl
-            value={locale}
-            onChange={(next) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`))}
-            className="shrink-0"
-            options={[
-              { value: "km", label: "ខ្មែរ" },
-              { value: "en", label: "EN" },
-            ]}
-          />
+          <LanguageSwitch className="shrink-0" />
 
           <ThemeSwitcher labels={themeLabels} className="shrink-0" />
 

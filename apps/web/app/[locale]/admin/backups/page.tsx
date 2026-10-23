@@ -6,10 +6,11 @@ import { ArchiveRestore, CircleCheck, DatabaseBackup, ExternalLink, Lock, Shield
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
-import type { AdminBackups } from "@/lib/admin-api";
-import { api, ApiError } from "@/lib/api";
+import { adminBackupsSchema, restoreTestSchema, type AdminBackups } from "@/lib/admin-api";
+import { api, ApiError, apiSend } from "@/lib/api";
+import { useDateText } from "@/components/use-date-text";
 import { useAdminMe } from "../admin-context";
-import { LoadState, PageHeader, Pill, useDateText } from "../admin-ui";
+import { LoadState, PageHeader, Pill } from "../admin-ui";
 
 const STATUS_STYLES: Record<BackupRunView["status"], string> = {
   queued: TONE_STYLES.muted,
@@ -48,7 +49,7 @@ export default function BackupsPage() {
 
   const load = useCallback((before?: string) => {
     setFailed(false);
-    return api<AdminBackups>(`/admin/backups${before ? `?before=${encodeURIComponent(before)}` : ""}`).then(
+    return api(`/admin/backups${before ? `?before=${encodeURIComponent(before)}` : ""}`, adminBackupsSchema).then(
       (page) => setData((previous) => (before && previous ? { ...page, runs: [...previous.runs, ...page.runs] } : page)),
       () => setFailed(true),
     );
@@ -70,7 +71,7 @@ export default function BackupsPage() {
     setStarting(true);
     setProblem(null);
     try {
-      await api("/admin/backups", { method: "POST" });
+      await apiSend("/admin/backups", { method: "POST" });
     } catch (error) {
       setProblem(error instanceof ApiError && error.status === 409 ? t("bakAlreadyRunning") : tApp("saveFailed"));
     }
@@ -82,7 +83,7 @@ export default function BackupsPage() {
     setConfirm(null);
     setProblem(null);
     try {
-      const { restoreTestPassedAt } = await api<{ restoreTestPassedAt: string }>("/admin/backups/restore-test", { method: "POST" });
+      const { restoreTestPassedAt } = await api("/admin/backups/restore-test", restoreTestSchema, { method: "POST" });
       setData((previous) => (previous ? { ...previous, restoreTestPassedAt } : previous));
     } catch {
       setProblem(tApp("saveFailed"));

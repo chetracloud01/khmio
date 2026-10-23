@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { forwardRef, useEffect, useState } from "react";
 import { formatMoney } from "@/components/order-ui";
+import { useDateText } from "../use-date-text";
 
 // The invoice / receipt (design/screens.md B7): one document for the buyer
 // and the seller, on white paper in both themes because it's printed, saved
@@ -63,8 +64,6 @@ export interface InvoiceData {
   trackUrl: string;
 }
 
-const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
-
 const STAMP: Record<InvoiceState, string> = {
   unpaid: "border-paper-unpaid text-paper-unpaid",
   paid: "border-paper-paid text-paper-paid",
@@ -74,6 +73,7 @@ const STAMP: Record<InvoiceState, string> = {
 export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; size: InvoiceSize; fixedWidth?: boolean; className?: string }>(
   function InvoiceDocument({ data, size, fixedWidth = false, className }, ref) {
     const t = useTranslations("Invoice");
+    const { dateTime } = useDateText();
     const [qr, setQr] = useState<string | null>(null);
     useEffect(() => {
       let live = true;
@@ -87,15 +87,8 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
     // The saved copy is always at paper width, so it takes the wide A4 layout whatever screen it's made on.
     const wide = fixedWidth && !receipt;
     const title = data.state === "paid" ? t("titleReceipt") : data.state === "cancelled" ? t("titleCancelled") : t("titleInvoice");
-    // Built from our own month names in Phnom Penh time (UTC+7, no daylight saving), not the browser's date data:
-    // a printed or shared document reads the same on every phone, and the server and browser agree.
-    const local = new Date(new Date(data.placedAtIso).getTime() + PHNOM_PENH_OFFSET_MS);
-    const date = t("dateTime", {
-      day: local.getUTCDate(),
-      month: t(`month_${local.getUTCMonth() + 1}`),
-      year: local.getUTCFullYear(),
-      time: `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`,
-    });
+    // Phnom Penh time and our own month names: a printed or shared document reads the same on every phone.
+    const date = dateTime(data.placedAtIso);
     const otherCurrency: Currency = data.currency === "USD" ? "KHR" : "USD";
     const money = (amount: number) => formatMoney(amount, data.currency);
     const contacts = [data.shop.phone && formatKhmerPhoneLocal(data.shop.phone), data.shop.telegram, data.shop.facebook].filter(Boolean);

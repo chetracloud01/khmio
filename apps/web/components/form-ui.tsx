@@ -13,6 +13,26 @@ import type { ReactNode } from "react";
 //   FormErrorCode per field, shown under the field, and the first one is focused;
 // - a sticky FormActions bar, active only once something changed.
 
+/**
+ * A long form's groups as a row of chips under the title, each jumping to its
+ * FormSection (by id) — so a seller on a phone goes straight to "Invoices".
+ */
+export function SectionJumpLinks({ label, links }: { label: string; links: { id: string; label: string }[] }) {
+  return (
+    <nav aria-label={label} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+      {links.map((link) => (
+        <a
+          key={link.id}
+          href={`#${link.id}`}
+          className="flex min-h-touch shrink-0 items-center rounded-full border border-border bg-bg px-4 text-sm font-medium hover:border-brand/40 hover:bg-brand/5"
+        >
+          {link.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 /** Standard form row: what this group of fields is for, then the fields. Side by side on laptop. */
 export function FormSection({
   id,
@@ -41,7 +61,8 @@ export function FormSection({
         <h2 className="font-semibold text-fg">{title}</h2>
         {description && <p className="mt-1 text-sm text-muted">{description}</p>}
       </div>
-      <div className="flex flex-col gap-4">{children}</div>
+      {/* min-w-0: a long one-line value (an address in a row) shortens with "…" instead of widening the form. */}
+      <div className="flex min-w-0 flex-col gap-4">{children}</div>
     </section>
   );
 }

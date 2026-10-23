@@ -2,6 +2,7 @@ import type { Prisma, Tx } from "@khmio/db";
 import { canAddProduct, planHasFeature, productSaveSchema, slugify, toFieldErrors, type FormErrorCode, type PlanId, type ProductSave } from "@khmio/shared";
 import { AppException, InvalidInputException } from "../errors";
 import { isStorePhotoKey, thumbKeyOf } from "../files/photos";
+import { storePlan } from "../merchant/plan";
 
 // Saving and reading products. Every function here runs inside the store's
 // own context (withContext), so row-level security already limits it to
@@ -11,7 +12,7 @@ export const productInclude = {
   variants: { where: { deletedAt: null }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
   photos: { orderBy: { sortOrder: "asc" } },
 } satisfies Prisma.ProductInclude;
-type ProductRow = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
+export type ProductRow = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
 /** A product as the dashboard and the shop page see it. Wholesale prices are left out unless the plan has them. */
 export function toProductDto(product: ProductRow, photoUrl: (key: string) => string, showWholesale = false) {
@@ -84,7 +85,7 @@ interface VariantPlan {
  */
 export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: ProductSave, existingId?: string): Promise<string> {
   const { product, photoKeys } = input;
-  const errors: Partial<Record<string, FormErrorCode>> = {};
+  const errors: Record<string, FormErrorCode> = {};
 
   // The category, brand and unit must be this store's own (row-level security hides any other store's).
   const [category, brand, unit] = await Promise.all([
@@ -173,7 +174,7 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
     ];
   }
 
-  if (Object.keys(errors).length > 0) throw new InvalidInputException(errors as Record<string, FormErrorCode>);
+  if (Object.keys(errors).length > 0) throw new InvalidInputException(errors);
 
   const fields = {
     categoryId: product.categoryId,
@@ -205,4 +206,36 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
     await tx.productPhoto.createMany({ data: photoKeys.map((fileKey, sortOrder) => ({ storeId, productId, fileKey, sortOrder })) });
   }
   return productId;
+}
+
+/** The seller's products; wholesale prices only on plans that have them. */
+export async function readProducts(tx: Tx, storeId: string, photoUrl: (key: string) => string) {
+  const { plan } = await storePlan(tx, storeId);
+  const products = await tx.product.findMany({ where: { deletedAt: null }, include: productInclude, orderBy: { createdAt: "desc" } });
+  return products.map((product) => toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice")));
+}
+
+/** One of the seller's products, or null when there's no such product. */
+export async function readProduct(tx: Tx, storeId: string, id: string, photoUrl: (key: string) => string) {
+  const { plan } = await storePlan(tx, storeId);
+  const product = await tx.product.findFirst({ where: { id, deletedAt: null }, include: productInclude });
+  return product ? toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice")) : null;
+}
+
+export async function productExists(tx: Tx, id: string): Promise<boolean> {
+  return (await tx.product.findFirst({ where: { id, deletedAt: null }, select: { id: true } })) !== null;
+}
+
+/** The "Show in shop" switch; false when there's no such product. */
+export async function setProductVisibility(tx: Tx, id: string, isVisible: boolean): Promise<boolean> {
+  const { count } = await tx.product.updateMany({ where: { id, deletedAt: null }, data: { isVisible } });
+  return count > 0;
+}
+
+/** Soft delete: the product and its options leave the dashboard and the shop; old orders keep pointing at them. False when there's no such product. */
+export async function deleteProduct(tx: Tx, id: string, now = new Date()): Promise<boolean> {
+  const { count } = await tx.product.updateMany({ where: { id, deletedAt: null }, data: { deletedAt: now } });
+  if (count === 0) return false;
+  await tx.productVariant.updateMany({ where: { productId: id, deletedAt: null }, data: { deletedAt: now } });
+  return true;
 }

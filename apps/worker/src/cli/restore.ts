@@ -67,7 +67,8 @@ async function main() {
     const file = join(dir, "backup.dump");
     try {
       const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-      await pipeline(object.Body as Readable, createWriteStream(file));
+      if (!(object.Body instanceof Readable)) throw new Error(`backup ${key} came back without a file body`);
+      await pipeline(object.Body, createWriteStream(file));
       console.log(`Downloaded ${key}. Restoring...`);
       const pg = pgEnvironment(target);
       const { code, stderr } = await run(env.PG_RESTORE_PATH, ["--no-owner", "--exit-on-error", `--dbname=${pg.PGDATABASE}`, file], pg);

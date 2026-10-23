@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { apiBaseUrl, type PublicOrder } from "@/lib/api";
+import { apiBaseUrl, type PublicOrder, publicOrderSchema } from "@/lib/api";
 import { OrderView } from "./order-view";
 
 // The buyer's order page (design/screens.md B6). The link's random token is
@@ -11,7 +11,7 @@ async function loadOrder(token: string): Promise<PublicOrder | null> {
   const response = await fetch(`${apiBaseUrl()}/public/orders/${encodeURIComponent(token)}`, { cache: "no-store" });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`order page: API answered ${response.status}`);
-  return (await response.json()) as PublicOrder;
+  return publicOrderSchema.parse(await response.json());
 }
 
 export default async function OrderPage({ params }: { params: Promise<{ token: string }> }) {

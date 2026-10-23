@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { apiBaseUrl, type OrderInvoice } from "@/lib/api";
+import { apiBaseUrl, type OrderInvoice, orderInvoiceSchema } from "@/lib/api";
 import { BuyerInvoice } from "./buyer-invoice";
 
 // The buyer's invoice / receipt (design/screens.md B7), from their order link.
@@ -10,7 +10,7 @@ async function loadInvoice(token: string): Promise<OrderInvoice | null> {
   const response = await fetch(`${apiBaseUrl()}/public/orders/${encodeURIComponent(token)}/invoice`, { cache: "no-store" });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`invoice: API answered ${response.status}`);
-  return (await response.json()) as OrderInvoice;
+  return orderInvoiceSchema.parse(await response.json());
 }
 
 export default async function InvoicePage({ params }: { params: Promise<{ token: string }> }) {

@@ -2,16 +2,17 @@
 
 import {
   dispatchInputSchema,
-  formatKhmerPhoneLocal,
-  isCashOrder,
-  orderCancellationSchema,
-  SELLER_CANCEL_REASONS,
-  toFieldErrors,
   type Driver,
+  formatKhmerPhoneLocal,
   type FormErrorCode,
+  isCashOrder,
+  isPlainOrderAction,
   type OrderActionRequest,
+  orderCancellationSchema,
   type OrderCancelReason,
+  SELLER_CANCEL_REASONS,
   type SellerOrderAction,
+  toFieldErrors,
 } from "@khmio/shared";
 import { BottomSheet, Button, Card, Input, Notice, Select } from "@khmio/ui";
 import { ArrowLeft, Bus, MapPin, Phone, Store, Truck, User } from "lucide-react";
@@ -23,7 +24,7 @@ import { useFormErrorText } from "@/components/form-ui";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
 import { OrderContactBar } from "@/components/seller-app";
 import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, type DeliveryResponse, type SellerOrderDetail } from "@/lib/api";
+import { api, ApiError, deliveryResponseSchema, type SellerOrderDetail, sellerOrderDetailSchema } from "@/lib/api";
 import { PageLoading, PageOffline } from "../../page-states";
 
 const OTHER_DRIVER = "__other__";
@@ -38,7 +39,7 @@ export default function OrderDetailPage() {
 
   const load = useCallback(() => {
     setState("loading");
-    Promise.all([api<SellerOrderDetail>(`/orders/${id}`), api<DeliveryResponse>("/delivery")])
+    Promise.all([api(`/orders/${id}`, sellerOrderDetailSchema), api("/delivery", deliveryResponseSchema)])
       .then(([detail, delivery]) => {
         setOrder(detail);
         setDrivers(delivery.settings.drivers);
@@ -111,7 +112,7 @@ function OrderDetail({
     setBusy(true);
     setProblem(null);
     try {
-      onChanged(await api<SellerOrderDetail>(`/orders/${order.id}/actions`, { method: "POST", body: request }));
+      onChanged(await api(`/orders/${order.id}/actions`, sellerOrderDetailSchema, { method: "POST", body: request }));
       return true;
     } catch (failure) {
       if (failure instanceof ApiError && failure.code === "action_not_allowed") {
@@ -281,7 +282,7 @@ function OrderDetail({
         )}
 
         {primary && (
-          <Button variant="primary" className="w-full" loading={busy} onClick={() => (primary === "dispatch" ? handleSend() : void run({ action: primary } as OrderActionRequest))}>
+          <Button variant="primary" className="w-full" loading={busy} onClick={() => (primary === "dispatch" ? handleSend() : isPlainOrderAction(primary) && void run({ action: primary }))}>
             {actionLabel(order, primary, route)}
           </Button>
         )}

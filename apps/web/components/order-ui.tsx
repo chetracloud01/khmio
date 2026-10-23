@@ -32,6 +32,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useDateText } from "./use-date-text";
 
 // One wording and one colour per order status, for the buyer's order page,
 // the seller's dashboard and (later) Telegram — design/design-standard.md §7.
@@ -118,12 +119,10 @@ export function formatMoney(amount: number, currency: Currency): string {
 }
 
 /** Translated texts that depend on an order. */
-const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
-
 export function useOrderText() {
   const t = useTranslations("Orders");
   const tCheckout = useTranslations("Checkout");
-  const tInvoice = useTranslations("Invoice");
+  const { timeAgo, clockTime } = useDateText();
   const locale = useLocale();
 
   /** A pickup order is never "out for delivery": at that point it's waiting at the shop. */
@@ -156,25 +155,6 @@ export function useOrderText() {
     const province = PROVINCES.find((place) => place.id === order.provinceId);
     if (province) return placeName(province, locale);
     return order.area === "phnom_penh" ? tCheckout("phnomPenh") : tCheckout("otherProvince");
-  }
-
-  function timeAgo(iso: string): string {
-    const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-    if (minutes < 1) return t("justNow");
-    if (minutes < 60) return t("minutesAgo", { count: minutes });
-    if (minutes < 1440) return t("hoursAgo", { count: Math.round(minutes / 60) });
-    return t("daysAgo", { count: Math.round(minutes / 1440) });
-  }
-
-  /** "14:05" today, "29 Sep, 14:05" otherwise — for the status history. */
-  function clockTime(iso: string): string {
-    // Phnom Penh time (UTC+7) and our own month names, not the browser's date data: the server's page and
-    // the phone's agree (some phones have no Khmer dates), and every buyer reads the same time.
-    const local = new Date(new Date(iso).getTime() + PHNOM_PENH_OFFSET_MS);
-    const today = new Date(Date.now() + PHNOM_PENH_OFFSET_MS);
-    const time = `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
-    if (local.toISOString().slice(0, 10) === today.toISOString().slice(0, 10)) return time;
-    return `${local.getUTCDate()} ${tInvoice(`month_${local.getUTCMonth() + 1}`)}, ${time}`;
   }
 
   return { statusLabel, actionLabel, paymentLabel, placeLabel, timeAgo, clockTime };

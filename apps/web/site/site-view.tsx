@@ -1,9 +1,9 @@
 "use client";
 
 import { visibleSections, type PlatformProductId, type SitePage, type SiteSection } from "@khmio/shared";
-import { AnnouncementBar, SegmentedControl, SiteFooter, SiteHeader, SiteSections, type SiteKitContext, type SiteWaitlistContext } from "@khmio/ui";
+import { AnnouncementBar, SiteFooter, SiteHeader, SiteSections, type SiteKitContext, type SiteWaitlistContext } from "@khmio/ui";
 import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { LanguageSwitch } from "@/components/language-switch";
 import { useFormErrorText } from "@/components/form-ui";
 import { SITE_PRODUCTS } from "./content";
 import { siteHasPath } from "./pages";
@@ -46,8 +46,6 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
   const tPlans = useTranslations("Plans");
   const tBilling = useTranslations("Billing");
   const locale = useLocale() === "en" ? "en" : "km";
-  const router = useRouter();
-  const pathname = usePathname();
   const shown = (path: string) => !live || siteHasPath(path);
 
   const sections = visibleSections(page, new Date()).filter((section) => !live || showsOnLiveSite(section));
@@ -107,14 +105,7 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
   };
 
   const languageSwitch = (
-    <SegmentedControl
-      value={locale}
-      onChange={(next) => router.push(pathname.replace(/^\/(km|en)/, `/${next}`))}
-      options={[
-        { value: "km", label: "ខ្មែរ" },
-        { value: "en", label: "EN" },
-      ]}
-    />
+    <LanguageSwitch />
   );
   const link = (label: string, path: string) => ({ label, href: href(path), path });
   const onlyShown = <T extends { path: string }>(links: T[]) => links.filter((entry) => shown(entry.path)).map(({ path: _path, ...rest }) => rest);

@@ -40,6 +40,7 @@ const config: Config = {
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         info: "rgb(var(--color-info) / <alpha-value>)",
         danger: "rgb(var(--color-danger) / <alpha-value>)",
+        "on-danger": "rgb(var(--color-on-danger) / <alpha-value>)",
         bg: "rgb(var(--color-bg) / <alpha-value>)",
         canvas: "rgb(var(--color-canvas) / <alpha-value>)",
         fg: "rgb(var(--color-fg) / <alpha-value>)",
@@ -54,6 +55,10 @@ const config: Config = {
           unpaid: "rgb(var(--color-paper-unpaid) / <alpha-value>)",
           void: "rgb(var(--color-paper-void) / <alpha-value>)",
           brand: "rgb(var(--color-paper-brand) / <alpha-value>)",
+        },
+        telegram: {
+          DEFAULT: "rgb(var(--color-telegram) / <alpha-value>)",
+          on: "rgb(var(--color-on-telegram) / <alpha-value>)",
         },
         khqr: {
           DEFAULT: "rgb(var(--color-khqr) / <alpha-value>)",

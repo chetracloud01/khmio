@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { formatKhr, formatUsd, type Currency } from "./money";
 import { PHNOM_PENH_DISTRICTS, PROVINCES } from "./locations";
 
@@ -80,11 +81,13 @@ export function parseButtonData(data: string): { action: "confirm"; orderId: str
 }
 
 /** Something only a person can fix, for the platform's alert chat (admin Settings). */
-export type AdminAlert =
-  | { reason: "message_gave_up"; kind: string; orderNumber: number | null; attempts: number }
-  | { reason: "worker_failing"; detail: string }
-  | { reason: "admin_locked"; adminName: string }
-  | { reason: "backup_failed"; detail: string };
+export const adminAlertSchema = z.discriminatedUnion("reason", [
+  z.object({ reason: z.literal("message_gave_up"), kind: z.string(), orderNumber: z.number().nullable(), attempts: z.number() }),
+  z.object({ reason: z.literal("worker_failing"), detail: z.string() }),
+  z.object({ reason: z.literal("admin_locked"), adminName: z.string() }),
+  z.object({ reason: z.literal("backup_failed"), detail: z.string() }),
+]);
+export type AdminAlert = z.infer<typeof adminAlertSchema>;
 
 export function adminAlertText(alert: AdminAlert): string {
   switch (alert.reason) {

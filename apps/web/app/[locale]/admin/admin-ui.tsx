@@ -2,7 +2,7 @@
 
 import type { SubscriptionStatus } from "@khmio/shared";
 import { ErrorState, LoadingBlocks, TONE_STYLES } from "@khmio/ui";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 // The live admin's blocks come from the shared kit (packages/ui blocks.tsx),
 // the same ones its mockup uses; only admin-specific pieces live here.
@@ -19,14 +19,4 @@ export const STATUS_STYLES: Record<SubscriptionStatus, string> = {
 export function LoadState({ failed, onRetry }: { failed: boolean; onRetry: () => void }) {
   const t = useTranslations("App");
   return failed ? <ErrorState title={t("offlineTitle")} retryLabel={t("retry")} onRetry={onRetry} /> : <LoadingBlocks label={t("loading")} />;
-}
-
-/** "2 Oct 2026" / "2 តុលា 2026". */
-export function useDateText() {
-  const locale = useLocale();
-  return {
-    date: (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale === "km" ? "km-KH" : "en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"),
-    dateTime: (iso: string) =>
-      new Date(iso).toLocaleString(locale === "km" ? "km-KH" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }),
-  };
 }

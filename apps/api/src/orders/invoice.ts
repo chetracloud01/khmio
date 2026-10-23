@@ -1,4 +1,4 @@
-import type { Prisma } from "@khmio/db";
+import type { Prisma, Tx } from "@khmio/db";
 import { formatTrackingCode, getInvoiceState, maskKhmerPhone } from "@khmio/shared";
 
 // The invoice / receipt (design/screens.md B7), for the seller (GET
@@ -71,3 +71,11 @@ export function toInvoice(order: InvoiceOrderRow, store: InvoiceStoreRow, public
 }
 
 export type InvoiceDto = ReturnType<typeof toInvoice>;
+
+/** The seller's invoice for one of their orders (the buyer's phone in full), or null when there's no such order. */
+export async function readSellerInvoice(tx: Tx, storeId: string, orderId: string, publicUrl: (key: string) => string) {
+  const order = await tx.order.findFirst({ where: { id: orderId, storeId }, select: invoiceOrderSelect });
+  if (!order) return null;
+  const store = await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: invoiceStoreSelect });
+  return toInvoice(order, store, publicUrl, "seller");
+}

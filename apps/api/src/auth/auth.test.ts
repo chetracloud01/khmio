@@ -1,6 +1,7 @@
 import { TELEGRAM_LOGIN_MAX_AGE_SECONDS, type TelegramLoginPayload } from "@khmio/shared";
 import { createHash, createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { toMeMerchant } from "./accounts";
 import { hashToken, readCookie, sessionCookie } from "./sessions";
 import { checkTelegramLogin } from "./telegram";
 
@@ -60,5 +61,20 @@ describe("session cookie", () => {
   it("is stored only as a hash", () => {
     expect(hashToken("abc")).toMatch(/^[a-f0-9]{64}$/);
     expect(hashToken("abc")).not.toContain("abc");
+  });
+});
+
+describe("who is signed in", () => {
+  it("names their Telegram username when they signed in with Telegram", () => {
+    expect(toMeMerchant({ firstName: "Sokha", lastName: "", identities: [{ method: "telegram", telegramUsername: "sokha_shop" }] })).toEqual({
+      firstName: "Sokha",
+      lastName: "",
+      telegramUsername: "sokha_shop",
+      signedInWithTelegram: true,
+    });
+  });
+
+  it("says so when they didn't, so the dashboard can ask them to connect Telegram for alerts", () => {
+    expect(toMeMerchant({ firstName: "Sokha", lastName: "", identities: [{ method: "phone", telegramUsername: null }] })).toMatchObject({ telegramUsername: null, signedInWithTelegram: false });
   });
 });

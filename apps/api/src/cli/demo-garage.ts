@@ -3,12 +3,13 @@ import {
   applyOrderAction,
   BUSINESS_TYPE_DEFAULTS,
   computeOrderTotal,
+  type Currency,
+  DAY_MS,
+  type DeliverySettings,
+  type Fulfilment,
   getDeliveryQuote,
   getDispatchRoute,
   getInitialOrderStatus,
-  type Currency,
-  type DeliverySettings,
-  type Fulfilment,
   type OrderAction,
   type OrderStatus,
 } from "@khmio/shared";
@@ -39,7 +40,6 @@ import { createStore } from "../stores/create-store";
 // Products without one show none.
 
 const SLUG = "mekong-auto-garage";
-const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
 const MAX_PHOTOS = 6;
 const PHOTO_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;

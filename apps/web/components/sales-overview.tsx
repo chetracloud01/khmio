@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatMoney } from "@/components/order-ui";
+import { useDateText } from "./use-date-text";
 
 // The seller's sales at a glance (2026-10-22 seller review), the way strong
 // seller apps lead: one big number for the period with its change against the
@@ -42,9 +43,9 @@ export interface TopProduct {
 const otherOf = (currency: Currency): Currency => (currency === "USD" ? "KHR" : "USD");
 
 function sumDays(days: SalesHistoryDay[]) {
-  return days.reduce(
+  return days.reduce<{ money: Money; orders: Money }>(
     (sum, day) => ({ money: { USD: sum.money.USD + day.USD, KHR: sum.money.KHR + day.KHR }, orders: { USD: sum.orders.USD + day.ordersUSD, KHR: sum.orders.KHR + day.ordersKHR } }),
-    { money: { USD: 0, KHR: 0 } as Money, orders: { USD: 0, KHR: 0 } as Money },
+    { money: { USD: 0, KHR: 0 }, orders: { USD: 0, KHR: 0 } },
   );
 }
 
@@ -97,10 +98,10 @@ export function SalesOverview({
   }, [days, length, mainCurrency]);
 
   // "Today" alone is one bar: show the week with today picked out.
+  const { day: dayText } = useDateText();
   const chartDays = days.slice(-(period === "today" ? 7 : length));
-  const dayLabel = useMemo(() => new Intl.DateTimeFormat(locale === "km" ? "km-KH" : "en-GB", { day: "numeric", month: "short", timeZone: "UTC" }), [locale]);
   const chartData = chartDays.map((day, index) => ({
-    label: dayLabel.format(new Date(`${day.date}T00:00:00Z`)),
+    label: dayText(day.date),
     amount: day[mainCurrency],
     highlight: period !== "today" || index === chartDays.length - 1,
   }));
@@ -118,7 +119,7 @@ export function SalesOverview({
         </h2>
         <SegmentedControl
           value={period}
-          onChange={(next) => setPeriod(next as SalesPeriod)}
+          onChange={setPeriod}
           options={[
             { value: "today", label: t("periodToday") },
             { value: "week", label: t("periodWeek") },

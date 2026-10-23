@@ -1,6 +1,6 @@
 "use client";
 
-import { formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, type ListPage, type ListQuery } from "@khmio/shared";
+import { DAY_MS, formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, phnomPenhDay, type ListQuery } from "@khmio/shared";
 import { cn, Mio, Notice, PageHeader } from "@khmio/ui";
 import { AlertTriangle, Phone, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -10,15 +10,12 @@ import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } 
 import { formatMoney, ORDER_STATUS_TONE, ORDER_TAB_ICON, ORDER_TAB_TONE, orderStatusIcon, TONE_TEXT, useOrderText } from "@/components/order-ui";
 import { OrderStatusCircle } from "@/components/seller-cards";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
-import { api, type SellerOrder } from "@/lib/api";
+import { api, listPageSchema, type SellerOrder, sellerOrderSchema } from "@/lib/api";
+import { useDateText } from "@/components/use-date-text";
 import { OrderNextStep } from "../order-next-step";
 
 /** An order still to confirm this long gets a "Waiting 25 min" warning. */
 const LATE_AFTER_MINUTES = 15;
-const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
-
-/** "2026-10-22": the Phnom Penh day an order was placed. */
-const phnomPenhDay = (iso: string) => new Date(new Date(iso).getTime() + PHNOM_PENH_OFFSET_MS).toISOString().slice(0, 10);
 
 // The seller's orders (design/screens.md S4), in the shared data grid: a table
 // on a laptop, compact rows on a phone (2026-10-22 review), grouped by day
@@ -29,7 +26,7 @@ const phnomPenhDay = (iso: string) => new Date(new Date(iso).getTime() + PHNOM_P
 // finds any of them.
 export default function OrdersPage() {
   const t = useTranslations("Orders");
-  const tInvoice = useTranslations("Invoice");
+  const { day: dayText } = useDateText();
   const locale = useLocale();
   const router = useRouter();
   const { paymentLabel, placeLabel, timeAgo, statusLabel } = useOrderText();
@@ -37,7 +34,7 @@ export default function OrdersPage() {
   /** Bumped after an order moves on, so the list reads its page again. */
   const [reloadKey, setReloadKey] = useState(0);
   const load = useCallback(() => setReloadKey((key) => key + 1), []);
-  const loadPage = useCallback((query: ListQuery) => api<ListPage<SellerOrder>>(`/orders/page?${listQueryToSearchParams(query)}`), []);
+  const loadPage = useCallback((query: ListQuery) => api(`/orders/page?${listQueryToSearchParams(query)}`, listPageSchema(sellerOrderSchema)), []);
 
   const href = (order: SellerOrder) => `/${locale}/m/orders/${order.id}`;
   /** The one next step as a compact pill: a button when it's one tap, otherwise a link into the order (shared with the home page). */
@@ -72,14 +69,14 @@ export default function OrdersPage() {
       </span>
     );
   };
-  const today = phnomPenhDay(new Date().toISOString());
-  const yesterday = phnomPenhDay(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  const today = phnomPenhDay(new Date());
+  const yesterday = phnomPenhDay(new Date(Date.now() - DAY_MS));
   /** "Today", "Yesterday" or "20 Oct" (our own month names, the same on every phone). */
   const dayLabel = (order: SellerOrder) => {
     const day = phnomPenhDay(order.createdAt);
     if (day === today) return t("groupToday");
     if (day === yesterday) return t("groupYesterday");
-    return `${Number(day.slice(8, 10))} ${tInvoice(`month_${Number(day.slice(5, 7))}`)}`;
+    return dayText(day);
   };
 
   const stepRank = (order: SellerOrder) => {

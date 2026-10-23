@@ -7,7 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { SharedPill, ShareShopPanel } from "@/components/seller-cards";
 import { HEADER_PILL, HEADER_PILL_TEXT } from "@/components/seller-frame/seller-frame";
-import { api } from "@/lib/api";
+import { apiSend } from "@/lib/api";
 import { useMerchant } from "./merchant-context";
 
 /**
@@ -46,7 +46,7 @@ export function ShareShopProvider({ children }: { children: ReactNode }) {
 
   async function markShared() {
     if (store.linkShared) return;
-    await api("/store/link-shared", { method: "POST" }).catch(() => undefined);
+    await apiSend("/store/link-shared", { method: "POST" }).catch(() => undefined);
     await refreshStore().catch(() => undefined);
   }
 

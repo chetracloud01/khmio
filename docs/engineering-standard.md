@@ -35,6 +35,8 @@ each migration changed).
 | Error messages | Codes in `packages/shared/src/form-errors.ts`, shown via `FormErrors` messages | English text sent by the API |
 | Settings and secrets | `apps/api/src/config.ts` reading `.env` | A URL, key or token in code |
 | Numbers that mean something | A named constant beside the code that uses it | A bare `5` or `200` |
+| Dates and times | `packages/shared/src/time.ts` (`DAY_MS`, `phnomPenhTime`), `useDateText()` on screen | `7 * 60 * 60 * 1000`, `toLocaleDateString("km-KH")` |
+| Audit actions | `AUDIT_ACTIONS` in `packages/shared/src/audit.ts`, written with `writeAudit` (`packages/db`) | `tx.auditLog.create(...)` with a name typed by hand |
 
 A named constant says what the number is and why:
 
@@ -81,6 +83,8 @@ block"):
 | A risky action | `ConfirmDialog` |
 | Pick one of a few | `ChoiceCards`, `SegmentedControl mode="choice"`, `Select` |
 | Small text action, icon action | `Button variant="ghost"`, `IconButton` |
+| Language switch | `LanguageSwitch` (`useLocaleSwitch` for a one-tap button) |
+| A date or time | `useDateText()`: `timeAgo`, `clockTime`, `date`, `dateTime`, `day` |
 | Photo or file | `FileButton` |
 
 Lint stops a raw `<button>`, `<input>`, `<select>` or `<textarea>` in a live
@@ -91,10 +95,20 @@ screen. If one is truly needed, the line above it says why:
 ```
 
 **Talking to the server:** client screens call the API only through
-`apps/web/lib/api.ts` (`api<T>(path, options)`), which handles the address,
-cookies and `ApiError`. Server pages that need data for the page title use
-`apiBaseUrl()` with `fetch`. A screen never builds its own `fetch` with
-headers.
+`apps/web/lib/api.ts`, which handles the address, cookies and `ApiError`.
+`api(path, schema, options)` reads the answer with its schema from
+`lib/api-answers.ts` (admin: `lib/admin-api.ts`), so a screen never works on a
+shape it only assumed; an answer of another shape becomes `ApiError`
+"bad_answer" and the screen shows its error state. `apiSend(path, options)` is
+for calls whose answer isn't used. Answer schemas check the shape, not the
+input rules. Server pages that need data for the page title use
+`apiBaseUrl()` with `fetch` and read the answer with the same schema. A screen
+never builds its own `fetch` with headers.
+
+**Kept on the device:** cart, drafts, list settings and recent searches go
+through `apps/web/lib/device-storage.ts` (`readStored(key, schema)`,
+`writeStored(key, value)`): what comes back is checked, and a blocked or full
+storage never breaks the page.
 
 **Live and mockup:** a live screen and its mockup use the same parts, so they
 can't drift apart. When a mockup is next worked on, its lint warnings get
@@ -110,7 +124,7 @@ Every feature is one folder in `apps/api/src/<feature>/`, built like
 | `<feature>.controller.ts` | Thin: route, guard, read input with the shared Zod schema, call a function, return its result |
 | `<feature>.ts` or `<action>.ts` | The real work as plain functions taking `tx` and plain values, so tests can call them directly |
 | `<feature>-list.ts` | `select` objects and mappers (`orderListSelect`, `toListedOrder`) that shape what leaves the API |
-| `<name>.test.ts` | Tests beside the code, one for every rule and every fixed bug |
+| `<name>.test.ts` | Tests beside the code, one for every rule and every fixed bug. Rules and mappers are pure functions tested without a database; rows for them come from `apps/api/src/testing/rows.ts`. Queries are checked end to end by `pnpm test:e2e` |
 
 ```ts
 @Controller("orders")
@@ -145,7 +159,11 @@ export class OrdersController {
   plan limits), not only hidden in the screen. Downgrade or pause locks data,
   never deletes it.
 - **Admin:** every route has `AdminGuard` + `@AdminPermissionNeeded(...)`,
-  and every change writes an `auditLog` row with `before` and `after`.
+  and every change writes an audit row with `before` and `after`. Every audit
+  row (admin, merchant or system, API or worker) is written with `writeAudit`
+  from `packages/db`, inside the change's own transaction; its action is one
+  of `AUDIT_ACTIONS`, and `messages.test.ts` checks the admin screen has a
+  sentence for each.
 - **Payments:** only through `packages/payments`, and a callback is always
   confirmed with the provider's status API.
 - **Slow or outside work** (Telegram, payment checks, backups) goes to the

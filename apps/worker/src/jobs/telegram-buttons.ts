@@ -1,4 +1,4 @@
-import type { SystemDb } from "@khmio/db";
+import { merchantActor, type SystemDb, writeAudit } from "@khmio/db";
 import { ALERT_BUTTONS, CONFIRMED_BUTTON_DATA, decideOrderAction, LINK_REPLIES, parseButtonData, parseStopButton } from "@khmio/shared";
 import type { Logger } from "pino";
 import type { CallbackQuery, TelegramClient } from "../telegram/client";
@@ -39,17 +39,12 @@ export async function handleButton(db: SystemDb, query: Pick<CallbackQuery, "fro
     if (count === 0) return "already_moved";
     await tx.orderStatusEvent.create({ data: { storeId: order.storeId, orderId: order.id, status: decision.status, actor: "merchant", actorMerchantId: identity.merchantId } });
     await tx.outboxEvent.create({ data: { storeId: order.storeId, kind: "order_status_changed", payload: { orderId: order.id, status: decision.status } } });
-    await tx.auditLog.create({
-      data: {
-        actorType: "merchant",
-        actorId: identity.merchantId,
-        storeId: order.storeId,
-        action: "order.confirm",
-        entity: "order",
-        entityId: order.id,
-        before: { status: order.status },
-        after: { status: decision.status, via: "telegram" },
-      },
+    await writeAudit(tx, merchantActor({ merchantId: identity.merchantId, storeId: order.storeId }), {
+      action: "order.confirm",
+      entity: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: decision.status, via: "telegram" },
     });
     return "confirmed" as const;
   });

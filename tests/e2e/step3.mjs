@@ -64,7 +64,8 @@ const photos = [up.json.key, (await upload(a, JPG)).json.key, (await upload(a, J
 
 // ---------------------------------------------------------------- catalog
 const catA = (await call("/catalog", { cookie: a })).json;
-check("A's catalog lists their categories and units, with a default unit", catA.categories.length > 0 && catA.units.length === 7 && !!catA.defaultUnitId);
+// The units grow with the business types (packages/shared DEFAULT_UNITS): check the rule, not a count.
+check("A's catalog lists their categories and units, with a default unit", catA.categories.length > 0 && catA.units.length > 0 && catA.units.some((unit) => unit.id === catA.defaultUnitId));
 const newCat = await call("/catalog/categories", { method: "POST", cookie: a, body: { nameKm: "អាវ", nameEn: "Shirts" } });
 check("A adds a category", newCat.status === 201 && newCat.json?.nameEn === "Shirts");
 check("an empty category name is refused", (await call("/catalog/brands", { method: "POST", cookie: a, body: { nameKm: "", nameEn: "x" } })).json?.fields?.nameKm === "required");

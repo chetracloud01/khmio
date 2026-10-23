@@ -11,6 +11,8 @@ interface DeliverySettingsContextValue {
   settings: DeliverySettings;
   /** Callers validate with deliverySettingsSchema first; saved values are always valid. */
   saveSettings: (settings: DeliverySettings) => void;
+  /** Pickup is set on Shop details; saving it there doesn't count as setting up delivery. */
+  savePickup: (pickup: DeliverySettings["pickup"]) => void;
   /** True once the seller has saved delivery settings themselves (the setup checklist's "Set delivery"). */
   configured: boolean;
   /**
@@ -63,6 +65,10 @@ export function DeliverySettingsProvider({ children }: { children: ReactNode }) 
     setConfigured(true);
   }
 
+  function savePickup(pickup: DeliverySettings["pickup"]) {
+    setSettings((current) => ({ ...current, pickup }));
+  }
+
   function startNewShop() {
     setSettings({ ...mockDeliverySettings, pickup: { enabled: false, address: "", hours: "" }, drivers: [] });
     setConfigured(false);
@@ -74,7 +80,7 @@ export function DeliverySettingsProvider({ children }: { children: ReactNode }) 
   }
 
   return (
-    <DeliverySettingsContext.Provider value={{ hydrated, settings, saveSettings, configured, startNewShop }}>
+    <DeliverySettingsContext.Provider value={{ hydrated, settings, saveSettings, savePickup, configured, startNewShop }}>
       {children}
     </DeliverySettingsContext.Provider>
   );

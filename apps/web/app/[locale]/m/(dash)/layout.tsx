@@ -8,10 +8,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { SellerFrame } from "@/components/seller-frame/seller-frame";
 import { formatMoney, useOrderText } from "@/components/order-ui";
 import { NewOrderToast, playNewOrderChime, useServiceWorker } from "@/components/seller-app";
-import { api, getMe, type Me, type SellerOrder, type SellerSummary, type StoreDetails } from "@/lib/api";
+import { api, getMe, type Me, type SellerOrder, sellerOrderSchema, type SellerSummary, sellerSummarySchema, type StoreDetails, storeDetailsSchema } from "@/lib/api";
 import { AppLoading, AppOffline } from "../app-frame";
 import { MerchantContext, shopStateOf } from "./merchant-context";
 import { ShareShopButton, ShareShopProvider } from "./share-shop";
+import { z } from "zod";
 
 // The real dashboard (roadmap step 3): every signed-in page sits in this
 // frame. It reads who is signed in and their shop once, sends anyone without
@@ -29,7 +30,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       .then(async (me) => {
         if (!me) return router.replace(`/${locale}/m/login`);
         if (!me.store) return router.replace(`/${locale}/m/onboarding`);
-        setData({ me, store: await api<StoreDetails>("/store") });
+        setData({ me, store: await api("/store", storeDetailsSchema) });
         setState("ready");
       })
       .catch(() => setState("offline"));
@@ -37,14 +38,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   useEffect(load, [load]);
 
   const refreshStore = useCallback(async () => {
-    const store = await api<StoreDetails>("/store");
+    const store = await api("/store", storeDetailsSchema);
     setData((previous) => (previous ? { ...previous, store } : previous));
   }, []);
 
   // The home page's numbers and the Orders badge: once ready, then every 30 seconds (a missed refresh keeps the last numbers).
   const [summary, setSummary] = useState<SellerSummary | null>(null);
   const refreshSummary = useCallback(async () => {
-    await api<SellerSummary>("/orders/summary").then(setSummary, () => undefined);
+    await api("/orders/summary", sellerSummarySchema).then(setSummary, () => undefined);
   }, []);
   useEffect(() => {
     if (state !== "ready") return;
@@ -90,7 +91,7 @@ function useNewOrderAlert(summary: SellerSummary | null, base: string) {
     if (!summary) return;
     const before = lastWaiting.current;
     lastWaiting.current = summary.waiting;
-    const readOrders = () => api<SellerOrder[]>("/orders").catch(() => [] as SellerOrder[]);
+    const readOrders = (): Promise<SellerOrder[]> => api("/orders", z.array(sellerOrderSchema)).catch(() => []);
     // First numbers: remember the newest order, so only later ones pop up.
     if (before === null) {
       void readOrders().then((orders) => {
@@ -201,7 +202,7 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           label: t("navShop"),
           icon: Store,
           mobile: true,
-          alsoActiveOn: [`${base}/shop-details`, `${base}/display`, `${base}/delivery`, `${base}/store-settings`, `${base}/invoice-settings`, `${base}/telegram-alerts`],
+          alsoActiveOn: [`${base}/shop-details`, `${base}/display`, `${base}/delivery`, `${base}/telegram-alerts`],
         },
       ]}
       banner={store.paused && <p className="bg-danger/10 px-4 py-2 text-sm font-medium text-danger">{tDash("bannerPaused")}</p>}

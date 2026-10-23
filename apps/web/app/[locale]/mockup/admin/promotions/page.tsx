@@ -14,6 +14,7 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState } from "react";
 import { focusFirstInvalidField } from "@/components/form-ui";
+import { useDateText } from "@/components/use-date-text";
 import { useAdmin } from "../../admin-context";
 import { SITE_PAGE_KEYS, useWebsite, type SitePageKey } from "../../website-context";
 import { EmptyState, PageHeader, Pill } from "../admin-ui";
@@ -66,8 +67,8 @@ export default function AdminPromotionsPage() {
   const [notice, setNotice] = useState("");
 
   const now = new Date();
-  const dateFormat = new Intl.DateTimeFormat(locale === "km" ? "km-KH" : "en-GB", { timeZone: "Asia/Phnom_Penh", dateStyle: "medium", timeStyle: "short" });
-  const when = (iso: string) => (Number.isNaN(Date.parse(iso)) ? "—" : dateFormat.format(new Date(iso)));
+  const { dateTime } = useDateText();
+  const when = (iso: string) => (Number.isNaN(Date.parse(iso)) ? "—" : dateTime(iso));
 
   const rows: Row[] = SITE_PAGE_KEYS.flatMap((pageKey) => {
     const { draft, published } = website.pages[pageKey];

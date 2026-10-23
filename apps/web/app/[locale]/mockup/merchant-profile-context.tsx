@@ -3,8 +3,11 @@
 import {
   businessTypeSchema,
   deliveryAreaSchema,
+  invoiceDetailsSchema,
+  shopMapUrlSchema,
   type BusinessType,
   type DeliveryArea,
+  type InvoiceDetails,
 } from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
@@ -32,6 +35,12 @@ interface MerchantProfileContextValue {
   setArea: Dispatch<SetStateAction<ShopArea>>;
   description: string;
   setDescription: Dispatch<SetStateAction<string>>;
+  /** Copied from Google Maps; the buyer's Map button opens it (design/screens.md S10). */
+  mapUrl: string;
+  setMapUrl: Dispatch<SetStateAction<string>>;
+  /** "On your invoices": VAT TIN, Telegram, Facebook, note. */
+  invoiceDetails: InvoiceDetails;
+  setInvoiceDetails: Dispatch<SetStateAction<InvoiceDetails>>;
   /** True once the seller has copied or shared the shop link (the setup checklist's last step). */
   linkShared: boolean;
   setLinkShared: Dispatch<SetStateAction<boolean>>;
@@ -55,8 +64,12 @@ interface PersistedProfile {
   phone: string;
   area: ShopArea;
   description: string;
+  mapUrl: string;
+  invoiceDetails: InvoiceDetails;
   linkShared: boolean;
 }
+
+const EMPTY_INVOICE_DETAILS: InvoiceDetails = { taxNumber: "", invoiceNote: "", telegramLink: "", facebookLink: "" };
 
 export function MerchantProfileProvider({ children }: { children: ReactNode }) {
   const [businessType, setBusinessType] = useState<BusinessType>("other");
@@ -68,6 +81,8 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
   const [phone, setPhone] = useState("");
   const [area, setArea] = useState<ShopArea>("phnom_penh");
   const [description, setDescription] = useState("");
+  const [mapUrl, setMapUrl] = useState("");
+  const [invoiceDetails, setInvoiceDetails] = useState<InvoiceDetails>(EMPTY_INVOICE_DETAILS);
   const [linkShared, setLinkShared] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -90,6 +105,10 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         const storedArea = deliveryAreaSchema.safeParse(parsed.area);
         if (storedArea.success) setArea(storedArea.data);
         if (parsed.description) setDescription(parsed.description);
+        const storedMapUrl = shopMapUrlSchema.safeParse(parsed.mapUrl);
+        if (storedMapUrl.success) setMapUrl(storedMapUrl.data);
+        const storedInvoice = invoiceDetailsSchema.safeParse(parsed.invoiceDetails);
+        if (storedInvoice.success) setInvoiceDetails(storedInvoice.data);
         if (parsed.linkShared) setLinkShared(true);
         if (parsed.shopName) setHasProfile(true);
       }
@@ -115,13 +134,15 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         phone,
         area,
         description,
+        mapUrl,
+        invoiceDetails,
         linkShared,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Storage full or unavailable — profile just won't persist this time.
     }
-  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, linkShared, hydrated]);
+  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, mapUrl, invoiceDetails, linkShared, hydrated]);
 
   return (
     <MerchantProfileContext.Provider
@@ -148,6 +169,10 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         setArea,
         description,
         setDescription,
+        mapUrl,
+        setMapUrl,
+        invoiceDetails,
+        setInvoiceDetails,
         linkShared,
         setLinkShared,
         hasProfile,

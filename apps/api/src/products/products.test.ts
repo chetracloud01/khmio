@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectPhotoType, isStorePhotoKey, newPhotoKey } from "../files/photos";
-import { firstFreeSku, suggestSku } from "./products";
+import { photoUrl, productRow } from "../testing/rows";
+import { firstFreeSku, suggestSku, toProductDto } from "./products";
 
 const STORE = "11111111-2222-3333-4444-555555555555";
 const OTHER = "99999999-8888-7777-6666-555555555555";
@@ -42,5 +43,19 @@ describe("SKUs", () => {
   it("never repeat one already used in the store", () => {
     expect(firstFreeSku("ITEM", new Set())).toBe("ITEM");
     expect(firstFreeSku("ITEM", new Set(["ITEM", "ITEM-2"]))).toBe("ITEM-3");
+  });
+});
+
+describe("a product as the seller sees it", () => {
+  it("shows wholesale prices only on plans that have them", () => {
+    expect(toProductDto(productRow(), photoUrl, true).variants[0]).toMatchObject({ wholesalePriceUsdCents: 180 });
+    expect(toProductDto(productRow(), photoUrl, false).variants[0]).not.toHaveProperty("wholesalePriceUsdCents");
+  });
+
+  it("gives each photo its address and its small copy's, and says whether it has options", () => {
+    const dto = toProductDto(productRow(), photoUrl);
+    expect(dto.photos[0]).toMatchObject({ key: "stores/store-1/photo.jpg", url: "https://files.test/stores/store-1/photo.jpg" });
+    expect(dto.photos[0]?.thumbUrl).not.toBe(dto.photos[0]?.url);
+    expect(dto.hasOptions).toBe(false);
   });
 });

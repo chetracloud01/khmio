@@ -7,7 +7,6 @@ import {
   ExternalLink,
   LayoutDashboard,
   Package,
-  Settings,
   ShieldCheck,
   ShoppingBag,
   Store,
@@ -41,12 +40,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const billingHref = `/${locale}/mockup/dashboard/billing`;
   const profileHref = `/${locale}/mockup/dashboard/profile`;
-  const settingsHref = `/${locale}/mockup/dashboard/settings`;
   const verificationHref = `/${locale}/mockup/dashboard/verification`;
   const deliveryHref = `/${locale}/mockup/dashboard/delivery`;
   const { demoKycStatus } = useAdmin();
 
-  // Delivery, Store settings, Verification and Billing are sidebar-only: five tabs is
+  // Delivery, Verification and Billing are sidebar-only: five tabs is
   // the most a 360px bottom bar holds. On phones they're reached from the
   // Profile page, and the Profile tab stays highlighted while you're there.
   const navItems = [
@@ -56,13 +54,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { href: `/${locale}/mockup/dashboard/orders`, label: t("navOrders"), icon: ShoppingBag, mobile: true },
     { href: profileHref, label: t("navProfile"), icon: Store, mobile: true },
     { href: deliveryHref, label: t("navDelivery"), icon: Truck, mobile: false },
-    { href: settingsHref, label: t("navSettings"), icon: Settings, mobile: false },
     { href: verificationHref, label: t("navVerification"), icon: ShieldCheck, mobile: false },
     { href: billingHref, label: t("navBilling"), icon: CreditCard, mobile: false },
   ];
 
   const homeHref = `/${locale}/mockup/dashboard`;
-  const reachedFromProfile = [billingHref, settingsHref, verificationHref, deliveryHref];
+  const reachedFromProfile = [billingHref, verificationHref, deliveryHref];
 
   const { hydrated: subscriptionReady, subscription } = useMerchantSubscription();
   const stockHref = `/${locale}/mockup/dashboard/stock`;

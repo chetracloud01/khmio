@@ -13,17 +13,19 @@ import {
   type FormErrorCode,
   type ShareRequirement,
 } from "@khmio/shared";
-import { Button, ChoiceCards, FileButton, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, ChoiceCards, FileButton, Input, Mio, ThemeSwitcher } from "@khmio/ui";
 import { Car, Check, LayoutGrid, Store, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
+import { LanguageSwitch } from "@/components/language-switch";
 import { ShopLinkCard } from "@/components/shop-link-card";
 import { NextSteps, OnboardingSteps, ShopPreview, SignUpFrame } from "@/components/sign-up-frame";
 import { useThemeLabels } from "@/components/use-theme-labels";
-import { api, ApiError, getMe, uploadPhoto, type Me, type StoreDetails } from "@/lib/api";
+import { api, ApiError, apiSend, getMe, type Me, slugAvailabilitySchema, type StoreDetails, storeDetailsSchema, uploadPhoto } from "@/lib/api";
+import { savedShopDetails } from "@/lib/shop-details-save";
 import { AppLoading, AppOffline } from "../app-frame";
 
 const ICONS: Record<BusinessType, LucideIcon> = { shop: Store, restaurant: UtensilsCrossed, service: Wrench, garage: Car, other: LayoutGrid };
@@ -45,7 +47,6 @@ export default function OnboardingPage() {
   const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
-  const pathname = usePathname();
 
   const [me, setMe] = useState<Me | null>(null);
   const [state, setState] = useState<"checking" | "ready" | "offline">("checking");
@@ -88,7 +89,7 @@ export default function OnboardingPage() {
     if (!slug || store) return setSlugState("idle");
     setSlugState("checking");
     const timer = setTimeout(() => {
-      api<{ available: boolean; reason?: "taken" | "invalid" }>(`/stores/slug-available?slug=${encodeURIComponent(slug)}`)
+      api(`/stores/slug-available?slug=${encodeURIComponent(slug)}`, slugAvailabilitySchema)
         .then((result) => setSlugState(result.available ? "available" : (result.reason ?? "invalid")))
         .catch(() => setSlugState("idle"));
     }, 400);
@@ -106,8 +107,8 @@ export default function OnboardingPage() {
     if (slugState === "taken") return setErrors({ slug: "slug_taken" });
     setBusy(true);
     try {
-      await api("/stores", { method: "POST", body: parsed.data });
-      setStore(await api<StoreDetails>("/store"));
+      await apiSend("/stores", { method: "POST", body: parsed.data });
+      setStore(await api("/store", storeDetailsSchema));
     } catch (caught) {
       setBusy(false);
       if (caught instanceof ApiError && caught.code === "invalid_input") return setErrors(caught.fields);
@@ -125,9 +126,9 @@ export default function OnboardingPage() {
     setLogoFailed(false);
     try {
       const uploaded = await uploadPhoto(await compressImageToBlob(file, 512));
-      const saved = await api<StoreDetails>("/store", {
+      const saved = await api("/store", storeDetailsSchema, {
         method: "PUT",
-        body: { shopName: store.name, businessType: store.businessType, phone: store.phone, area: store.area, description: store.description, bakongId: store.bakongId, logoKey: uploaded.key },
+        body: { ...savedShopDetails(store), logoKey: uploaded.key },
       });
       setStore(saved);
     } catch {
@@ -142,14 +143,7 @@ export default function OnboardingPage() {
 
   const controls = (
     <>
-      <SegmentedControl
-        value={locale}
-        onChange={(next) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`))}
-        options={[
-          { value: "km", label: "ខ្មែរ" },
-          { value: "en", label: "EN" },
-        ]}
-      />
+      <LanguageSwitch />
       <ThemeSwitcher labels={themeLabels} />
     </>
   );
@@ -163,7 +157,7 @@ export default function OnboardingPage() {
       products: `${base}/products/new`,
       phone: `${base}/shop-details#details`,
       delivery: `${base}/delivery`,
-      payment: `${base}/store-settings`,
+      payment: `${base}/shop-details#payments`,
     };
     return (
       <SignUpFrame controls={controls}>

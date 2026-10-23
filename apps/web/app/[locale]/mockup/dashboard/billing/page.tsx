@@ -46,6 +46,7 @@ export default function DashboardBillingMockupPage() {
 
 function Billing() {
   const t = useTranslations("Billing");
+  const tDates = useTranslations("Dates");
   const tPlan = useTranslations("Plans");
   const { subscription, setBillingCurrency, changePlan, cancelPendingDowngrade, payInvoice, preview } =
     useMerchantSubscription();
@@ -223,7 +224,7 @@ function Billing() {
                     {tPlan(invoice.plan)} · {t(`reason_${invoice.reason}`)}
                   </p>
                   <p className="text-xs text-muted">
-                    {invoice.createdDaysAgo === 0 ? t("today") : t("daysAgo", { count: invoice.createdDaysAgo })}
+                    {invoice.createdDaysAgo === 0 ? t("today") : tDates("daysAgo", { count: invoice.createdDaysAgo })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
+import { readStored, writeStored } from "@/lib/device-storage";
 import type { ProductView } from "./product-tile";
 
 export type ProductSort = "newest" | "price_asc" | "price_desc" | "discount";
@@ -20,27 +22,7 @@ const MAX_RECENT = 5;
 const VIEW_KEY = "khmio.shopView";
 const recentKey = (shop: string) => `khmio.recentSearches.${shop}`;
 
-// Browser storage is a convenience here: it can be missing or refuse (private
-// window), and the shop works the same without it.
-function readStorage<T>(key: string, fallback: T, valid: (value: unknown) => value is T): T {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return fallback;
-    const value: unknown = JSON.parse(raw);
-    return valid(value) ? value : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function writeStorage(key: string, value: unknown) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Storage full or blocked: nothing to keep, nothing breaks.
-  }
-}
-const isView = (value: unknown): value is ProductView => value === "grid" || value === "list";
-const isStringList = (value: unknown): value is string[] => Array.isArray(value) && value.every((entry) => typeof entry === "string");
+const productViewSchema = z.enum(["grid", "list"]) satisfies z.ZodType<ProductView>;
 
 /**
  * The shop list's search, category, sort, grid-or-list and recent searches
@@ -56,13 +38,13 @@ export function useProductBrowse<T>(items: readonly T[], get: BrowseAccessors<T>
 
   // After the first paint, so the server's page and the browser's agree.
   useEffect(() => {
-    setViewState(readStorage(VIEW_KEY, "grid", isView));
-    setRecent(readStorage(recentKey(shopKey), [], isStringList).slice(0, MAX_RECENT));
+    setViewState(readStored(VIEW_KEY, productViewSchema) ?? "grid");
+    setRecent((readStored(recentKey(shopKey), z.array(z.string())) ?? []).slice(0, MAX_RECENT));
   }, [shopKey]);
 
   const setView = useCallback((next: ProductView) => {
     setViewState(next);
-    writeStorage(VIEW_KEY, next);
+    writeStored(VIEW_KEY, next);
   }, []);
 
   /** Keeps a search worth repeating (2+ characters), newest first. */
@@ -72,7 +54,7 @@ export function useProductBrowse<T>(items: readonly T[], get: BrowseAccessors<T>
       if (trimmed.length < 2) return;
       setRecent((current) => {
         const next = [trimmed, ...current.filter((entry) => entry.toLowerCase() !== trimmed.toLowerCase())].slice(0, MAX_RECENT);
-        writeStorage(recentKey(shopKey), next);
+        writeStored(recentKey(shopKey), next);
         return next;
       });
     },
@@ -80,7 +62,7 @@ export function useProductBrowse<T>(items: readonly T[], get: BrowseAccessors<T>
   );
   const clearRecent = useCallback(() => {
     setRecent([]);
-    writeStorage(recentKey(shopKey), []);
+    writeStored(recentKey(shopKey), []);
   }, [shopKey]);
 
   const { text, category: categoryOf, price, discount } = get;

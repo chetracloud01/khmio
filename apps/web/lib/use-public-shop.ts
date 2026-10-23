@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type PublicShop } from "./api";
+import { publicShopSchema } from "@/lib/api";
 
 /** The shop's public data for the cart and checkout pages: loading, the shop, "no such shop", or offline. */
 export function usePublicShop(slug: string) {
@@ -9,7 +10,7 @@ export function usePublicShop(slug: string) {
   const [state, setState] = useState<"loading" | "ready" | "not_found" | "offline">("loading");
   const load = useCallback(() => {
     setState("loading");
-    api<PublicShop>(`/public/stores/${encodeURIComponent(slug)}`)
+    api(`/public/stores/${encodeURIComponent(slug)}`, publicShopSchema)
       .then((result) => {
         setShop(result);
         setState("ready");

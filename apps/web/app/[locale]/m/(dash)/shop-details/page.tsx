@@ -5,58 +5,57 @@ import {
   businessTypeSchema,
   deliveryAreaSchema,
   formatKhmerPhoneLocal,
-  storeDetailsSaveSchema,
+  shopDetailsSaveSchema,
   toFieldErrors,
-  type BusinessType,
-  type DeliveryArea,
   type FormErrorCode,
+  type ShopDetailsSave,
 } from "@khmio/shared";
-import { Card, FileButton, IconButton, Input, Notice, SegmentedControl, Select } from "@khmio/ui";
+import { Card, FileButton, IconButton, Input, Notice, SegmentedControl, Select, Switch } from "@khmio/ui";
 import { Wallet, X } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
-import { FormActions, FormSection, ReadOnlyField, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SubPage } from "@/components/seller-frame/sub-page";
 import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, uploadPhoto, type StoreDetails } from "@/lib/api";
+import { InvoiceFields } from "@/components/shop-details/invoice-fields";
+import { LocationFields } from "@/components/shop-details/location-fields";
+import { PricingFields, toPricingDraft, toPricingInput, type PricingDraft } from "@/components/shop-details/pricing-fields";
+import { api, ApiError, type StoreDetails, storeDetailsSchema, uploadPhoto } from "@/lib/api";
+import { savedShopDetails } from "@/lib/shop-details-save";
 import { useMerchant } from "../merchant-context";
 
-interface Draft {
-  shopName: string;
-  businessType: BusinessType;
-  phone: string;
-  area: DeliveryArea;
-  description: string;
-  bakongId: string;
-  logoKey: string | null;
+/** What PUT /store takes — with the rate and VAT as typed — plus the logo's picture while it's on screen. */
+interface Draft extends Omit<ShopDetailsSave, keyof PricingDraft>, PricingDraft {
   logoUrl: string | null;
 }
 
+/** The form's groups, in order: each a FormSection other screens can link to (shop-details#invoices). */
+const SECTION_IDS = ["details", "location", "payments", "prices", "invoices"] as const;
+
 function toDraft(store: StoreDetails): Draft {
-  return {
-    shopName: store.name,
-    businessType: store.businessType,
-    phone: formatKhmerPhoneLocal(store.phone),
-    area: store.area,
-    description: store.description,
-    bakongId: store.bakongId,
-    logoKey: store.logoKey,
-    logoUrl: store.logoUrl,
-  };
+  const saved = savedShopDetails(store);
+  return { ...saved, ...toPricingDraft(saved), phone: formatKhmerPhoneLocal(store.phone), logoUrl: store.logoUrl };
 }
 
-// Shop details (the mockup's Profile → shop section), reached from the My
-// shop menu: the standard form over storeDetailsSaveSchema, the same check
-// PUT /store runs.
+function toInput({ logoUrl: _shown, ...draft }: Draft) {
+  return { ...draft, ...toPricingInput(draft) };
+}
+
+// Shop details (design/screens.md S10), reached from the My shop menu: one
+// form in groups — the shop, its location and pickup, getting paid, prices
+// and tax, what goes on invoices — over shopDetailsSaveSchema with today's
+// rate band, the same check PUT /store runs. The API also refuses to switch pickup off when it's the shop's only
+// way to get an order to buyers.
 export default function ShopDetailsPage() {
   const t = useTranslations("DashboardProfile");
   const tType = useTranslations("BusinessType");
   const tApp = useTranslations("App");
-  const locale = useLocale();
   const { store, refreshStore } = useMerchant();
+  const tStore = useTranslations("StoreSettings");
   const errorText = useFormErrorText();
+  const schema = shopDetailsSaveSchema(store.rateBand);
   const formRef = useRef<HTMLDivElement>(null);
 
   const [saved, setSaved] = useState<Draft>(() => toDraft(store));
@@ -68,26 +67,20 @@ export default function ShopDetailsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
-  const input = (from: Draft) => ({
-    shopName: from.shopName,
-    businessType: from.businessType,
-    phone: from.phone,
-    area: from.area,
-    description: from.description,
-    bakongId: from.bakongId,
-    logoKey: from.logoKey,
-  });
-
-  function update<K extends keyof Draft>(field: K, value: Draft[K]) {
-    setDraft((previous) => ({ ...previous, [field]: value }));
-    setErrors((previous) => ({ ...previous, [field]: undefined }));
+  function updateFields(patch: Partial<Draft>) {
+    setDraft((previous) => ({ ...previous, ...patch }));
+    setErrors((previous) => Object.fromEntries(Object.entries(previous).filter(([field]) => !(field in patch))));
     setJustSaved(false);
     setSaveError(null);
   }
 
+  function update<K extends keyof Draft>(field: K, value: Draft[K]) {
+    updateFields({ [field]: value });
+  }
+
   /** On leaving a field: show its problem now rather than waiting for Save. */
   function checkField(field: keyof Draft) {
-    const result = storeDetailsSaveSchema.safeParse(input(draft));
+    const result = schema.safeParse(toInput(draft));
     const code = result.success ? undefined : toFieldErrors(result.error)[field];
     setErrors((previous) => ({ ...previous, [field]: code }));
   }
@@ -100,11 +93,7 @@ export default function ShopDetailsPage() {
     setSaveError(null);
     try {
       const uploaded = await uploadPhoto(await compressImageToBlob(file, 512));
-      setDraft((previous) => ({
-        ...previous,
-        logoKey: uploaded.key,
-        logoUrl: uploaded.url,
-      }));
+      setDraft((previous) => ({ ...previous, logoKey: uploaded.key, logoUrl: uploaded.url }));
       setJustSaved(false);
     } catch {
       setSaveError(tApp("photoUploadFailed"));
@@ -114,7 +103,7 @@ export default function ShopDetailsPage() {
   }
 
   async function handleSave() {
-    const result = storeDetailsSaveSchema.safeParse(input(draft));
+    const result = schema.safeParse(toInput(draft));
     if (!result.success) {
       setErrors(toFieldErrors(result.error));
       focusFirstInvalidField(formRef.current);
@@ -123,12 +112,7 @@ export default function ShopDetailsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const next = toDraft(
-        await api<StoreDetails>("/store", {
-          method: "PUT",
-          body: input(draft),
-        }),
-      );
+      const next = toDraft(await api("/store", storeDetailsSchema, { method: "PUT", body: result.data }));
       // Show the cleaned-up values (trimmed, phone in local format) so the form matches what was saved.
       setSaved(next);
       setDraft(next);
@@ -151,6 +135,7 @@ export default function ShopDetailsPage() {
 
   return (
     <SubPage ref={formRef} title={tApp("shopDetailsTitle")}>
+      <SectionJumpLinks label={t("jumpTo")} links={SECTION_IDS.map((id) => ({ id, label: t(`jump_${id}`) }))} />
 
       <Card className="flex flex-col p-4">
         <FormSection id="details" stacked title={t("sectionShop")} description={t("sectionShopHelp")}>
@@ -159,16 +144,7 @@ export default function ShopDetailsPage() {
               <div className="relative shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element -- the shop's own uploaded logo */}
                 <img src={draft.logoUrl} alt="" className="h-20 w-20 rounded-full object-cover" />
-                <IconButton
-                  icon={X}
-                  look="badge"
-                  label={t("removeLogo")}
-                  onClick={() => {
-                    update("logoKey", null);
-                    update("logoUrl", null);
-                  }}
-                  className="absolute -right-3 -top-3"
-                />
+                <IconButton icon={X} look="badge" label={t("removeLogo")} onClick={() => updateFields({ logoKey: null, logoUrl: null })} className="absolute -right-3 -top-3" />
               </div>
             ) : (
               <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-brand text-2xl font-bold text-on-brand">
@@ -197,10 +173,7 @@ export default function ShopDetailsPage() {
                 const parsed = businessTypeSchema.safeParse(e.target.value);
                 if (parsed.success) update("businessType", parsed.data);
               }}
-              options={BUSINESS_TYPES.map((type) => ({
-                value: type,
-                label: tType(type),
-              }))}
+              options={BUSINESS_TYPES.map((type) => ({ value: type, label: tType(type) }))}
             />
             <p className="text-xs text-muted">{t("businessTypeHint")}</p>
           </div>
@@ -245,6 +218,8 @@ export default function ShopDetailsPage() {
           />
         </FormSection>
 
+        <LocationFields values={draft} errors={errors} onChange={updateFields} onCheck={checkField} />
+
         <FormSection id="payments" stacked title={t("sectionPayments")} description={t("sectionPaymentsHelp")}>
           {!saved.bakongId && (
             <Notice tone="warning" icon={Wallet}>
@@ -260,7 +235,18 @@ export default function ShopDetailsPage() {
             onBlur={() => checkField("bakongId")}
             error={errorText(errors.bakongId)}
           />
+          <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod)} label={tStore("codLabel")} description={tStore("codHint")} />
+          {!draft.allowCod && <Notice tone="warning">{tApp("codOffWarning")}</Notice>}
         </FormSection>
+
+        <PricingFields values={draft} band={store.rateBand} errors={errors} onChange={updateFields} onCheck={checkField} />
+
+        <InvoiceFields
+          values={draft}
+          errors={errors}
+          onChange={update}
+          shop={{ name: draft.shopName, logoUrl: draft.logoUrl, phone: store.phone, address: draft.address }}
+        />
 
         {saveError && (
           <Notice tone="danger" role="alert" className="mb-3">

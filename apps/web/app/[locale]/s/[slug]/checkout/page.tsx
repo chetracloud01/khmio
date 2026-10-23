@@ -28,7 +28,7 @@ import { BuyerBottomBar, BuyerColumns, BuyerSection, BuyerShell, BuyerSteps, Buy
 import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { formatMoney } from "@/components/order-ui";
-import { api, ApiError, type PlacedOrder, type PublicShop } from "@/lib/api";
+import { api, ApiError, placedOrderSchema, type PublicShop } from "@/lib/api";
 import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, useShopCart, type BuyerDetails } from "@/lib/cart";
 import { newId } from "@/lib/new-id";
 import { isTakingOrders, paymentMethodsFor } from "@/lib/shop-ordering";
@@ -161,7 +161,7 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
     }
     setPlacing(true);
     try {
-      const order = await api<PlacedOrder>(`/public/stores/${encodeURIComponent(slug)}/orders`, {
+      const order = await api(`/public/stores/${encodeURIComponent(slug)}/orders`, placedOrderSchema, {
         method: "POST",
         body: {
           idempotencyKey,

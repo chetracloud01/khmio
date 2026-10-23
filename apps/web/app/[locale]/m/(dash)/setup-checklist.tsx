@@ -53,7 +53,7 @@ export function SetupChecklist() {
     products: `${base}/products/new`,
     phone: `${base}/shop-details#details`,
     delivery: `${base}/delivery`,
-    payment: `${base}/store-settings`,
+    payment: `${base}/shop-details#payments`,
   };
   const requirementHint: Record<ShareRequirement, string | undefined> = {
     products: tReady("hint_products"),

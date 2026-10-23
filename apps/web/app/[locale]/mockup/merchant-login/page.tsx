@@ -10,7 +10,7 @@ import {
   toFieldErrors,
   type FormErrorCode,
 } from "@khmio/shared";
-import { Button, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, Input, Mio, ThemeSwitcher } from "@khmio/ui";
 import { ArrowLeft, Phone, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { mockMerchant } from "@/mock/mock-data";
 import { useFormErrorText } from "@/components/form-ui";
+import { LanguageSwitch } from "@/components/language-switch";
 import { SignUpFrame } from "@/components/sign-up-frame";
 import { useThemeLabels } from "@/components/use-theme-labels";
 import { useMerchantAccount } from "../merchant-account-context";
@@ -123,14 +124,7 @@ export default function MerchantLoginMockupPage() {
   }
 
   const languageSwitch = (
-    <SegmentedControl
-      value={locale}
-      onChange={(next) => router.push(`/${next}/mockup/merchant-login`)}
-      options={[
-        { value: "km", label: "ខ្មែរ" },
-        { value: "en", label: "EN" },
-      ]}
-    />
+    <LanguageSwitch />
   );
 
   return (

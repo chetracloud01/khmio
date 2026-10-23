@@ -6,9 +6,10 @@ import { AlertTriangle, CalendarClock, ChevronRight, MessageSquareWarning, Pause
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import type { AdminAuditEntry, AdminOverview } from "@/lib/admin-api";
+import { adminAuditPageSchema, adminOverviewSchema, type AdminAuditEntry, type AdminOverview } from "@/lib/admin-api";
 import { api } from "@/lib/api";
-import { LoadState, PageHeader, Pill, StatCard, useDateText } from "./admin-ui";
+import { useDateText } from "@/components/use-date-text";
+import { LoadState, PageHeader, Pill, StatCard } from "./admin-ui";
 import { useAuditText } from "./audit-text";
 
 const HEALTH_DOT: Record<HealthState, string> = { ok: "bg-success", warning: "bg-danger", off: "bg-muted" };
@@ -23,26 +24,19 @@ export default function AdminOverviewPage() {
   const tAdmin = useTranslations("Admin");
   const tNav = useTranslations("AdminNav");
   const locale = useLocale();
-  const { dateTime } = useDateText();
+  const { dateTime, timeAgo: ago } = useDateText();
   const { describe } = useAuditText();
   const [data, setData] = useState<{ overview: AdminOverview; recent: AdminAuditEntry[] } | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(() => {
     setFailed(false);
-    Promise.all([api<AdminOverview>("/admin/overview"), api<{ entries: AdminAuditEntry[] }>(`/admin/audit-log?limit=${RECENT}`)])
+    Promise.all([api("/admin/overview", adminOverviewSchema), api(`/admin/audit-log?limit=${RECENT}`, adminAuditPageSchema)])
       .then(([overview, audit]) => setData({ overview, recent: audit.entries }))
       .catch(() => setFailed(true));
   }, []);
   useEffect(load, [load]);
 
-  /** "4 min ago", "3 hr ago", "2 days ago". */
-  const ago = (iso: string) => {
-    const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000));
-    if (minutes < 60) return tAdmin("minutesAgo", { count: minutes });
-    if (minutes < 1440) return tAdmin("hoursAgo", { count: Math.round(minutes / 60) });
-    return tAdmin("daysAgo", { count: Math.round(minutes / 1440) });
-  };
 
   if (!data) {
     return (

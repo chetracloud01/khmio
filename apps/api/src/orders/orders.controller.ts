@@ -5,13 +5,10 @@ import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { assertStoreWritable } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
-import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "./invoice";
+import { readSellerInvoice } from "./invoice";
 import { readOrderDetail, runSellerAction } from "./order-actions";
-import { orderListSelect, parseOrderListQuery, readOrderListPage, toListedOrder } from "./order-list";
+import { parseOrderListQuery, readOrderList, readOrderListPage, readStoreSlug } from "./order-list";
 import { sellerSummary } from "./summary";
-
-/** Most orders the list returns; older ones stay in the database. */
-const ORDER_LIST_LIMIT = 200;
 
 /** The seller's orders (roadmap steps 4 and 6): the list, one order in full, and moving it on. */
 @Controller("orders")
@@ -24,12 +21,7 @@ export class OrdersController {
 
   @Get()
   async list(@CurrentStore() context: MerchantStore) {
-    return withContext(this.app, context, async (tx) => {
-      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: { slug: true } });
-      const orders = await tx.order.findMany({ where: { storeId: context.storeId }, orderBy: { createdAt: "desc" }, take: ORDER_LIST_LIMIT, select: orderListSelect });
-      // The tracking code as printed, so the list's search finds an order by it.
-      return orders.map((order) => toListedOrder(order, store.slug));
-    });
+    return withContext(this.app, context, (tx) => readOrderList(tx, context.storeId));
   }
 
   /**
@@ -40,10 +32,7 @@ export class OrdersController {
   @Get("page")
   async page(@CurrentStore() context: MerchantStore, @Query() params: unknown) {
     const query = parseOrderListQuery(params);
-    return withContext(this.app, context, async (tx) => {
-      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: { slug: true } });
-      return readOrderListPage(tx, context.storeId, store.slug, query);
-    });
+    return withContext(this.app, context, async (tx) => readOrderListPage(tx, context.storeId, await readStoreSlug(tx, context.storeId), query));
   }
 
   /** The home page's numbers: waiting orders, today's sales, cash to collect, 30 days of totals, best sellers. Before ":id", so "summary" isn't read as an order id. */
@@ -60,12 +49,9 @@ export class OrdersController {
   /** The invoice / receipt for this order (design/screens.md B7), with the buyer's phone in full. */
   @Get(":id/invoice")
   async invoice(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string) {
-    return withContext(this.app, context, async (tx) => {
-      const order = await tx.order.findFirst({ where: { id, storeId: context.storeId }, select: invoiceOrderSelect });
-      if (!order) throw new NotFoundException();
-      const store = await tx.store.findUniqueOrThrow({ where: { id: context.storeId }, select: invoiceStoreSelect });
-      return toInvoice(order, store, (key) => this.storage.publicUrl(key), "seller");
-    });
+    const invoice = await withContext(this.app, context, (tx) => readSellerInvoice(tx, context.storeId, id, (key) => this.storage.publicUrl(key)));
+    if (!invoice) throw new NotFoundException();
+    return invoice;
   }
 
   /** Confirm, pack, send, delivered, cash collected, failed, rebook or cancel — only the step that follows the order's status. */

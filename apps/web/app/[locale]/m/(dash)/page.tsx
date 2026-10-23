@@ -10,11 +10,12 @@ import { FindOrderPanel, OrdersNeedingAction, type ActionRow } from "@/component
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { SalesOverview } from "@/components/sales-overview";
 import { HomeTopBar, NeedsYouBanner, QuickActions } from "@/components/seller-app";
-import { api, type SellerOrder } from "@/lib/api";
+import { api, type SellerOrder, sellerOrderSchema } from "@/lib/api";
 import { shopStateOf, useMerchant } from "./merchant-context";
 import { OrderNextStep } from "./order-next-step";
 import { SetupChecklist } from "./setup-checklist";
 import { useShareShop } from "./share-shop";
+import { z } from "zod";
 
 // The seller's home (design/screens.md S3), from the shared sections in
 // components/seller-home — the same ones as its mockup. The numbers come
@@ -32,7 +33,7 @@ export default function MerchantHomePage() {
   const shareShop = useShareShop();
 
   const loadOrders = useCallback(() => {
-    api<SellerOrder[]>("/orders").then(setOrders, () => setOrders((previous) => previous ?? []));
+    api("/orders", z.array(sellerOrderSchema)).then(setOrders, () => setOrders((previous) => previous ?? []));
   }, []);
   // Again whenever the layout's minute refresh sees the waiting count change, so the rows follow the numbers.
   const waiting = summary?.waiting ?? 0;

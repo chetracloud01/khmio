@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export type Currency = "USD" | "KHR";
+export const currencySchema = z.enum(["USD", "KHR"]);
+export type Currency = z.infer<typeof currencySchema>;
 
 /** USD stored as integer cents, e.g. $8.50 -> 850. */
 export const usdCentsSchema = z.number().int().nonnegative();

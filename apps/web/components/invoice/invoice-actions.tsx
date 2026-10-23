@@ -182,7 +182,7 @@ export function InvoiceActions({
         <span className="text-sm font-medium">{t("sizeLabel")}</span>
         <SegmentedControl
           value={size}
-          onChange={(next) => onSizeChange(next as InvoiceSize)}
+          onChange={onSizeChange}
           options={[
             { value: "a4", label: t("sizeA4") },
             { value: "receipt", label: t("sizeReceipt") },

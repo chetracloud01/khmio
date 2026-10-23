@@ -40,6 +40,18 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
   address and hours, provinces, how to pay).
 - Grey placeholder blocks while loading.
 - Later (needs the backend): real rating and delivery time.
+- **Change (shop profile, built):** the top reads like a profile in a phone
+  app — logo, name, Open now, then one row of round buttons: Call (phone),
+  Map (Google Maps), Telegram, Facebook, Shop info. A button shows only when
+  the seller filled that in. No description, numbers bar or VAT TIN; the
+  "Delivery from …" button and call icon are gone. "Shop info" opens the
+  delivery and payment sheet, which ends with the shop's number.
+- **Change (Shop info sheet, built):** the header keeps only logo, name,
+  Open now and one "Shop info & contact" row. The sheet holds the round
+  buttons (Call, Map, Telegram, Facebook — each opens the phone's own app),
+  then Contact (phone → call, address → map, opening hours), Delivery (each
+  Phnom Penh zone with its fee, provinces, pickup) and How to pay. One sheet
+  component for the live shop and the mockup.
 
 ### B2. Product detail — Built · L
 - Photo carousel (swipe, dots), title, description.
@@ -125,6 +137,10 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
 - Wrong code or phone: one message for both ("We couldn't find that
   order"), never which one was wrong; too many tries are slowed down.
 - Linked from the shop page footer, the "Order placed" screen and B7's QR.
+- **Change (back to the shop, built):** Track my order and My orders
+  (`/orders`) have the top bar with a back arrow. The shop page's links add
+  `?shop=<link>`, so back returns to that shop; opened directly, back goes to
+  the shop of this phone's latest order, else Khmio's home page.
 
 ## Seller
 
@@ -192,16 +208,34 @@ Phone first; sidebar from tablet width; tables on desktop.
 - Provinces: on/off, bus fee, note for buyers.
 - Drivers: own and partner drivers (name, phone) for "Send the order".
 - Later: free delivery above an order amount.
+- **Change (shop details, built):** pickup is set on S10 with the shop
+  address; here it is one row ("Pickup is on · address · hours — Change")
+  linking to S10. Delivery still refuses to switch off the last way to get
+  an order.
 
 ### S9. Store settings — Built · L
 - Default currency, exchange rate, VAT, cash on delivery, online stock location.
 - Delivery fees are on S8; this page links to it.
+- **Change (into S10, built):** no longer its own page. Cash on delivery
+  joins "Getting paid" on S10; currency, exchange rate, VAT (and the
+  Advance-plan online stock location) are S10's "Prices & tax" group, saved
+  with the rest. The old address opens that group.
 
 ### S10. Shop profile — Built · L
 - Shop details, getting paid (Bakong ID), order alerts, login methods.
 - **Change (invoice):** an "On your invoices" section — tax number (VAT TIN),
   invoice note (up to 300 characters), Telegram and Facebook page; with a
   small preview of the invoice header.
+- **Change (grouped, built):** one form in groups, with jump links at the
+  top — Your shop · Location and pickup (shop address, Google Maps link with
+  a "Check your map link" test, pickup on/off and hours) · Getting paid
+  (Bakong ID, cash on delivery) · Prices & tax (currency, exchange rate in
+  the allowed band, VAT; Advance: online stock location; once S9) ·
+  On your invoices (VAT TIN, Telegram, Facebook, note, header preview) ·
+  Alerts. One Save. The map link is what the buyer's Map button opens; without
+  it the button searches for the address. Pickup can't be switched off when
+  it's the shop's only way to get an order (once delivery is set up). The
+  separate "On your invoices" page is gone; its old link opens this group.
 
 ### S11. Verification (KYC) — Built · L
 ### S12. Plan and billing — Built · L

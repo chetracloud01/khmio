@@ -8,8 +8,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { z } from "zod";
 import { ORDER_STATUS_TONE, orderStatusIcon } from "@/components/order-ui";
 import { copyText, shareOrCopyLink } from "@/components/share-link";
+import { readStored, writeStored } from "@/lib/device-storage";
 
 // The seller home's working blocks in the sales card's style (2026-10-22
 // review): one rounded card each, a title row with a pill on the right, soft
@@ -240,7 +242,7 @@ export function ShareShopPanel({ url, shopName, qrFileName = "shop-qr.png", onSh
         items={[
           { key: "qr", icon: QrCode, label: tApp("qrCode"), look: "primary", onClick: () => setShowQr(true) },
           { key: "copy", icon: Copy, label: t("copy"), onClick: () => void copy() },
-          { key: "telegram", icon: Send, label: "Telegram", look: { className: "bg-[#229ED9] text-white" }, href: telegramHref, external: true, onClick: () => onShared?.() },
+          { key: "telegram", icon: Send, label: "Telegram", look: "telegram", href: telegramHref, external: true, onClick: () => onShared?.() },
           { key: "other", icon: Share2, label: t("otherApps"), onClick: () => void share() },
         ]}
       />
@@ -268,12 +270,7 @@ export function FindOrderPanel({ hrefFor, prefix }: { hrefFor: (code: string) =>
   const [problem, setProblem] = useState<string | null>(null);
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => {
-    try {
-      const saved: unknown = JSON.parse(window.localStorage.getItem(RECENT_CODES_KEY) ?? "[]");
-      if (Array.isArray(saved)) setRecent(saved.filter((entry): entry is string => typeof entry === "string").slice(0, 3));
-    } catch {
-      // No saved codes on this phone: nothing to show.
-    }
+    setRecent((readStored(RECENT_CODES_KEY, z.array(z.string())) ?? []).slice(0, 3));
   }, []);
 
   function find(input: string) {
@@ -283,11 +280,7 @@ export function FindOrderPanel({ hrefFor, prefix }: { hrefFor: (code: string) =>
     if (!href) return setProblem(t("notFound"));
     const shown = `${prefix}-${code.slice(0, 4)}-${code.slice(4)}`;
     const next = [shown, ...recent.filter((entry) => entry !== shown)].slice(0, 3);
-    try {
-      window.localStorage.setItem(RECENT_CODES_KEY, JSON.stringify(next));
-    } catch {
-      // Not kept: the search still works.
-    }
+    writeStored(RECENT_CODES_KEY, next); // not kept when storage refuses: the search still works
     router.push(href);
   }
   function submit(event: FormEvent) {

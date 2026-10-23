@@ -42,6 +42,7 @@ export const FORM_ERROR_CODES = [
   "delivery_unavailable",
   "payment_unavailable",
   "link_invalid",
+  "map_link_invalid",
   "ends_before_start",
 ] as const;
 

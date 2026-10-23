@@ -112,6 +112,8 @@ describe("colour contrast in every theme and accent", () => {
           need(`brand text on ${surface}`, c("brand"), c(surface), 4.5);
         }
         need("text on a brand button", c("on-brand"), c("brand"), 4.5);
+        need("text on a danger button", c("on-danger"), c("danger"), 4.5);
+        need("icon on the Telegram tile", c("on-telegram"), c("telegram"), 3);
         for (const status of ["success", "warning", "danger", "info"]) {
           need(`${status} on bg`, c(status), c("bg"), 4.5);
           need(`${status} on its badge`, c(status), tint(c(status), c("bg")), 4.5);

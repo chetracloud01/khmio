@@ -1,6 +1,8 @@
 // Platform health on the admin overview (design/screens.md A1): what the
 // worker, backups, Telegram and payments are doing, as states a person can act on.
 
+import { z } from "zod";
+
 /** The worker checks in every 5 minutes; after this long without a word it counts as down. */
 export const WORKER_DOWN_AFTER_MINUTES = 15;
 
@@ -12,14 +14,15 @@ export function workerState(seenAt: Date | null, now = new Date()): HealthState 
 }
 
 /** GET /admin/overview's health part. */
-export interface PlatformHealth {
-  workerSeenAt: string | null;
-  latestBackupAt: string | null;
-  backupsStale: boolean;
+export const platformHealthSchema = z.object({
+  workerSeenAt: z.string().nullable(),
+  latestBackupAt: z.string().nullable(),
+  backupsStale: z.boolean(),
   /** "dry_run" = no bot token yet: messages are only written to the log. */
-  telegram: "on" | "dry_run";
+  telegram: z.enum(["on", "dry_run"]),
   /** KHQR (roadmap step 5) isn't connected until the Bakong token arrives. */
-  khqr: "not_connected";
+  khqr: z.literal("not_connected"),
   /** Release 1: every shop is free; billing starts at Release 2. */
-  betaAllBasic: boolean;
-}
+  betaAllBasic: z.boolean(),
+});
+export type PlatformHealth = z.infer<typeof platformHealthSchema>;

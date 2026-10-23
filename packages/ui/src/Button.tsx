@@ -13,7 +13,7 @@ export const buttonVariants = cva(
       variant: {
         primary: "bg-brand text-on-brand hover:bg-brand/90",
         secondary: "border border-border bg-bg text-fg hover:bg-border/30",
-        danger: "bg-danger text-white hover:bg-danger/90",
+        danger: "bg-danger text-on-danger hover:bg-danger/90",
         /** Text only, for the small actions beside a form or card: "Resend code", "Remove option", "Start over". */
         ghost: "px-3 text-sm",
       },

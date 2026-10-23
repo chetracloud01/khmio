@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toFieldErrors } from "./form-errors";
 import { buyerCancelledAlert, confirmButtonData, newOrderAlert, parseButtonData } from "./notifications";
-import { decideOrderAction, orderActionRequestSchema, type OrderFacts } from "./orders";
+import { decideOrderAction, isPlainOrderAction, isSellerOrderAction, orderActionRequestSchema, type OrderFacts } from "./orders";
 
 const cashInPhnomPenh: OrderFacts = { status: "packing", paymentMethod: "cod", fulfilment: "delivery", area: "phnom_penh" };
 
@@ -67,5 +67,21 @@ describe("Telegram alerts", () => {
     expect(parseButtonData(data)).toEqual({ action: "confirm", orderId });
     expect(parseButtonData("confirm:../../x")).toBeNull();
     expect(parseButtonData("delete:" + orderId)).toBeNull();
+  });
+});
+
+describe("which steps a seller sends, and with what", () => {
+  it("knows the system's own step isn't the seller's", () => {
+    expect(isSellerOrderAction("confirm")).toBe(true);
+    expect(isSellerOrderAction("cancel")).toBe(true);
+    expect(isSellerOrderAction("pay")).toBe(false);
+  });
+
+  it("sends the plain steps alone, and dispatch or cancel only with their details", () => {
+    expect(isPlainOrderAction("confirm")).toBe(true);
+    expect(isPlainOrderAction("fail_delivery")).toBe(true);
+    expect(isPlainOrderAction("dispatch")).toBe(false);
+    expect(isPlainOrderAction("cancel")).toBe(false);
+    expect(isPlainOrderAction("pay")).toBe(false);
   });
 });

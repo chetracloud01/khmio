@@ -8,8 +8,8 @@ export interface ActionTile {
   key: string;
   icon: LucideIcon;
   label: ReactNode;
-  /** "primary" teal, "soft" light teal (default), or a colour of the caller's (e.g. Telegram blue) as classes. */
-  look?: "primary" | "soft" | { className: string };
+  /** "primary" teal, "soft" light teal (default), or "telegram" blue for sending to Telegram. */
+  look?: keyof typeof LOOKS;
   onClick?: () => void;
   /** A link instead of a button (opens in a new tab when `external`). */
   href?: string;
@@ -24,6 +24,7 @@ export interface ActionTile {
 const LOOKS = {
   primary: "bg-brand text-on-brand",
   soft: "bg-brand/10 text-brand group-hover:bg-brand/15",
+  telegram: "bg-telegram text-telegram-on",
 };
 
 const VARIANTS = {
@@ -51,7 +52,7 @@ export function ActionTiles({ items, columns = 4, variant = "plain", className }
         const Icon = item.busy ? Loader2 : item.icon;
         const content = (
           <>
-            <span className={cn("flex items-center justify-center rounded-full transition-colors", style.circle, typeof look === "string" ? LOOKS[look] : look.className)}>
+            <span className={cn("flex items-center justify-center rounded-full transition-colors", style.circle, LOOKS[look])}>
               <Icon className={cn("h-5 w-5", item.busy && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
             </span>
             <span className="leading-normal">{item.label}</span>

@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { TrackingCodeCard } from "@/components/invoice/tracking-code-card";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
-import { api, ApiError, type PublicOrder, type TelegramLink } from "@/lib/api";
+import { api, ApiError, apiSend, type PublicOrder, telegramLinkSchema } from "@/lib/api";
 import { addToShopCart } from "@/lib/cart";
 import { rememberOrder } from "@/lib/my-orders";
 
@@ -56,7 +56,7 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
     setCancelling(true);
     setCancelProblem(null);
     try {
-      await api(`/public/orders/${encodeURIComponent(token)}/cancel`, { method: "POST" });
+      await apiSend(`/public/orders/${encodeURIComponent(token)}/cancel`, { method: "POST" });
     } catch (failure) {
       // Already moved on (the shop confirmed it meanwhile): the page shows why after the refresh.
       setCancelProblem(failure instanceof ApiError && failure.code === "action_not_allowed" ? tApp("orderMovedOn") : failure instanceof ApiError && failure.code === "too_many_requests" ? tApp("tooManyTries") : tApp("saveFailed"));
@@ -356,7 +356,7 @@ function TelegramUpdates({ token, following }: { token: string; following: boole
     setBusy(true);
     setFailed(null);
     try {
-      const result = await api<TelegramLink>(`/public/orders/${encodeURIComponent(token)}/telegram-link`, { method: "POST" });
+      const result = await api(`/public/orders/${encodeURIComponent(token)}/telegram-link`, telegramLinkSchema, { method: "POST" });
       setLink(result.link);
       window.open(result.link, "_blank", "noopener");
     } catch (failure) {

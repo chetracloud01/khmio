@@ -1,85 +1,149 @@
-import type { AdminRole, BackupRunView, PlatformHealth, BusinessType, PlanId, PlatformProductId, PlatformSettingsSave, SubscriptionStatus, WaitlistBusinessType } from "@khmio/shared";
+import {
+  adminRoleSchema,
+  backupRunViewSchema,
+  businessTypeSchema,
+  deliveryAreaSchema,
+  planIdSchema,
+  platformHealthSchema,
+  platformProductIdSchema,
+  subscriptionStatusSchema,
+  WAITLIST_BUSINESS_TYPES,
+} from "@khmio/shared";
+import { z } from "zod";
 
-// What the admin API (apps/api admin/*) answers. Calls go through lib/api.ts
-// api(); the admin cookie is set by the API for its /admin routes only.
+// What the admin API (apps/api admin/*) answers, read by lib/api.ts api()
+// with these schemas (shape only, like lib/api-answers.ts). The admin cookie
+// is set by the API for its /admin routes only.
 
 /** GET /admin/auth/me. */
-export type AdminMe = { stage: "active"; name: string; role: AdminRole } | { stage: "pending_2fa"; name: string; enrolled: boolean };
+export const adminMeSchema = z.discriminatedUnion("stage", [
+  z.object({ stage: z.literal("active"), name: z.string(), role: adminRoleSchema }),
+  z.object({ stage: z.literal("pending_2fa"), name: z.string(), enrolled: z.boolean() }),
+]);
+export type AdminMe = z.infer<typeof adminMeSchema>;
 
-export interface AdminOverview {
-  shops: number;
-  newThisWeek: number;
-  paused: number;
-  trialsEndingSoon: number;
-  ordersToday: number;
-  waitingOrders: number;
-  messagesGaveUp: number;
-  health: PlatformHealth;
-}
+/** POST /admin/auth/start and /admin/auth/telegram: what the login asks for next. */
+export const adminLoginNextSchema = z.object({ next: z.enum(["enrol", "code"]) });
 
-export interface AdminMerchantRow {
-  id: string;
-  slug: string;
-  name: string;
-  businessType: BusinessType;
-  createdAt: string;
-  owner: { name: string; telegramUsername: string | null } | null;
-  plan: PlanId | null;
-  status: SubscriptionStatus | null;
-  endsAt: string | null;
-  products: number;
-  orders: number;
-}
+/** POST /admin/auth/enrol: the authenticator app's QR link and its typed-in secret. */
+export const adminEnrolSchema = z.object({ otpauthUri: z.string(), secret: z.string() });
 
-export interface AdminAuditEntry {
-  id: string;
-  at: string;
-  actorType: "admin" | "merchant" | "system";
-  actorName: string | null;
-  storeId: string | null;
-  storeName: string | null;
-  action: string;
-  entity: string;
-  before: Record<string, unknown> | null;
-  after: Record<string, unknown> | null;
-}
+/** POST /admin/auth/verify: signed in; the one-time backup codes come once, on enrolment. */
+export const adminVerifiedSchema = z.object({ ok: z.literal(true), backupCodes: z.array(z.string()).optional() });
 
-export interface AdminMerchantDetail {
-  id: string;
-  slug: string;
-  name: string;
-  businessType: BusinessType;
-  phone: string;
-  area: "phnom_penh" | "province";
-  createdAt: string;
-  deliveryConfiguredAt: string | null;
-  subscription: { plan: PlanId; status: SubscriptionStatus; trialEndsAt: string | null; currentPeriodStart: string; currentPeriodEnd: string | null; endsAt: string | null } | null;
-  members: { role: "owner" | "staff"; name: string; telegramUsername: string | null }[];
-  products: number;
-  orders: number;
-  lastOrderAt: string | null;
-  audit: Pick<AdminAuditEntry, "id" | "at" | "actorType" | "action" | "after">[];
-}
+export const adminOverviewSchema = z.object({
+  shops: z.number(),
+  newThisWeek: z.number(),
+  paused: z.number(),
+  trialsEndingSoon: z.number(),
+  ordersToday: z.number(),
+  waitingOrders: z.number(),
+  messagesGaveUp: z.number(),
+  health: platformHealthSchema,
+});
+export type AdminOverview = z.infer<typeof adminOverviewSchema>;
 
-export type AdminSettings = PlatformSettingsSave;
+export const adminMerchantRowSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  businessType: businessTypeSchema,
+  createdAt: z.string(),
+  owner: z.object({ name: z.string(), telegramUsername: z.string().nullable() }).nullable(),
+  plan: planIdSchema.nullable(),
+  status: subscriptionStatusSchema.nullable(),
+  endsAt: z.string().nullable(),
+  products: z.number(),
+  orders: z.number(),
+});
+export type AdminMerchantRow = z.infer<typeof adminMerchantRowSchema>;
+
+const auditChangeSchema = z.record(z.unknown()).nullable();
+
+export const adminAuditEntrySchema = z.object({
+  id: z.string(),
+  at: z.string(),
+  actorType: z.enum(["admin", "merchant", "system"]),
+  actorName: z.string().nullable(),
+  storeId: z.string().nullable(),
+  storeName: z.string().nullable(),
+  action: z.string(),
+  entity: z.string(),
+  before: auditChangeSchema,
+  after: auditChangeSchema,
+});
+export type AdminAuditEntry = z.infer<typeof adminAuditEntrySchema>;
+
+/** GET /admin/audit-log: one page, newest first. */
+export const adminAuditPageSchema = z.object({ entries: z.array(adminAuditEntrySchema), more: z.boolean() });
+
+export const adminMerchantDetailSchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  businessType: businessTypeSchema,
+  phone: z.string(),
+  area: deliveryAreaSchema,
+  createdAt: z.string(),
+  deliveryConfiguredAt: z.string().nullable(),
+  subscription: z
+    .object({
+      plan: planIdSchema,
+      status: subscriptionStatusSchema,
+      trialEndsAt: z.string().nullable(),
+      currentPeriodStart: z.string(),
+      currentPeriodEnd: z.string().nullable(),
+      endsAt: z.string().nullable(),
+    })
+    .nullable(),
+  members: z.array(z.object({ role: z.enum(["owner", "staff"]), name: z.string(), telegramUsername: z.string().nullable() })),
+  products: z.number(),
+  orders: z.number(),
+  lastOrderAt: z.string().nullable(),
+  audit: z.array(adminAuditEntrySchema.pick({ id: true, at: true, actorType: true, action: true, after: true })),
+});
+export type AdminMerchantDetail = z.infer<typeof adminMerchantDetailSchema>;
+
+/** GET/PUT /admin/settings (the save is checked with platformSettingsSaveSchema). */
+export const adminSettingsSchema = z.object({
+  platformName: z.string(),
+  supportTelegram: z.string(),
+  usdToKhrMin: z.number(),
+  usdToKhrMax: z.number(),
+  alertChatId: z.string(),
+  betaAllBasic: z.boolean(),
+});
+export type AdminSettings = z.infer<typeof adminSettingsSchema>;
 
 /** GET /admin/badges: the menu's red counts. */
-export interface AdminBadges {
-  trialsEnding: number;
-  backupsStale: number;
-}
+export const adminBadgesSchema = z.object({ trialsEnding: z.number(), backupsStale: z.number() });
+export type AdminBadges = z.infer<typeof adminBadgesSchema>;
 
 /** GET /admin/backups (A13): one page of runs, newest first, the newest good one, and the last restore test. */
-export interface AdminBackups {
-  runs: BackupRunView[];
-  latestDone: BackupRunView | null;
-  restoreTestPassedAt: string | null;
-  more: boolean;
-}
+export const adminBackupsSchema = z.object({
+  runs: z.array(backupRunViewSchema),
+  latestDone: backupRunViewSchema.nullable(),
+  restoreTestPassedAt: z.string().nullable(),
+  more: z.boolean(),
+});
+export type AdminBackups = z.infer<typeof adminBackupsSchema>;
+
+/** POST /admin/backups/restore-test. */
+export const restoreTestSchema = z.object({ restoreTestPassedAt: z.string() });
 
 /** GET /admin/waitlist: sign-ups per product, and one page of sign-ups, newest first. */
-export interface AdminWaitlist {
-  counts: Partial<Record<PlatformProductId, number>>;
-  signups: { id: string; product: PlatformProductId; name: string; phone: string; businessType: WaitlistBusinessType; createdAt: string }[];
-  more: boolean;
-}
+export const adminWaitlistSchema = z.object({
+  counts: z.record(platformProductIdSchema, z.number()),
+  signups: z.array(
+    z.object({
+      id: z.string(),
+      product: platformProductIdSchema,
+      name: z.string(),
+      phone: z.string(),
+      businessType: z.enum(WAITLIST_BUSINESS_TYPES),
+      createdAt: z.string(),
+    }),
+  ),
+  more: z.boolean(),
+});
+export type AdminWaitlist = z.infer<typeof adminWaitlistSchema>;

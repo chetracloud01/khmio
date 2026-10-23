@@ -1,14 +1,14 @@
 "use client";
 
 import type { TelegramLoginPayload } from "@khmio/shared";
-import { Button, Card, Checkbox, Input, SegmentedControl } from "@khmio/ui";
+import { Button, Card, Checkbox, Input } from "@khmio/ui";
 import { Copy, FlaskConical, KeyRound, ShieldCheck, ShieldHalf } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
 import { BOT_USERNAME, SHOW_DEV_LOGIN, TelegramButton } from "@/components/telegram-button";
-import type { AdminMe } from "@/lib/admin-api";
+import { adminEnrolSchema, adminLoginNextSchema, adminVerifiedSchema, type AdminMe } from "@/lib/admin-api";
 import { api, ApiError } from "@/lib/api";
 
 /**
@@ -27,7 +27,7 @@ export function AdminLogin({ me, onSignedIn }: { me: AdminMe | null; onSignedIn:
     setBusy(true);
     setError(null);
     try {
-      const result = await api<{ next: "enrol" | "code" }>(path, { method: "POST", ...(body ? { body } : {}) });
+      const result = await api(path, adminLoginNextSchema, { method: "POST", ...(body ? { body } : {}) });
       setStage(result.next);
     } catch (failure) {
       setError(failure instanceof ApiError && failure.code === "admin_not_configured" ? t("notConfigured") : failure instanceof ApiError && failure.code === "too_many_requests" ? t("tooManyTries") : t("notAnAdmin"));
@@ -73,9 +73,6 @@ export function AdminLogin({ me, onSignedIn }: { me: AdminMe | null; onSignedIn:
 
 function LoginFrame({ children }: { children: ReactNode }) {
   const t = useTranslations("AdminApp");
-  const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
   return (
     <div className="min-h-dvh bg-canvas p-4 text-fg">
       <div className="mx-auto flex w-full max-w-[420px] flex-col gap-4 pt-10">
@@ -84,14 +81,7 @@ function LoginFrame({ children }: { children: ReactNode }) {
             <ShieldHalf className="h-6 w-6 text-brand" aria-hidden="true" />
             {t("title")}
           </span>
-          <SegmentedControl
-            value={locale}
-            onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
-            options={[
-              { value: "km", label: "ខ្មែរ" },
-              { value: "en", label: "EN" },
-            ]}
-          />
+          <LanguageSwitch />
         </div>
         {children}
       </div>
@@ -126,7 +116,7 @@ function useCodeSubmit(onDone: (result: { backupCodes?: string[] }) => void) {
     setBusy(true);
     setError(undefined);
     try {
-      onDone(await api<{ ok: true; backupCodes?: string[] }>("/admin/auth/verify", { method: "POST", body: { code } }));
+      onDone(await api("/admin/auth/verify", adminVerifiedSchema, { method: "POST", body: { code } }));
     } catch (failure) {
       setError(failure instanceof ApiError && failure.code === "code_locked" ? t("locked") : failure instanceof ApiError && failure.code === "too_many_requests" ? t("tooManyTries") : failure instanceof ApiError && failure.status === 401 ? t("expired") : t("wrongCode"));
       setCode("");
@@ -144,7 +134,7 @@ function Enrol({ onEnrolled }: { onEnrolled: (codes: string[]) => void }) {
   const { code, setCode, error, busy, submit } = useCodeSubmit((result) => onEnrolled(result.backupCodes ?? []));
 
   useEffect(() => {
-    api<{ otpauthUri: string; secret: string }>("/admin/auth/enrol", { method: "POST" })
+    api("/admin/auth/enrol", adminEnrolSchema, { method: "POST" })
       .then(async ({ otpauthUri, secret }) => setQr({ image: await QRCode.toDataURL(otpauthUri, { margin: 1, width: 220 }), secret }))
       .catch(() => setFailed(true));
   }, []);

@@ -4,7 +4,8 @@ import { Button, Card, IconButton } from "@khmio/ui";
 import { Check, ExternalLink, Send, Trash2, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type StaffGroup, type TelegramLink } from "@/lib/api";
+import { api, ApiError, apiSend, type StaffGroup, staffGroupSchema, type TelegramLink, telegramLinkSchema } from "@/lib/api";
+import { z } from "zod";
 
 /**
  * Where order alerts go: the seller's own chat with the bot (signing in with
@@ -20,7 +21,7 @@ export function TelegramAlerts({ signedInWithTelegram }: { signedInWithTelegram:
   const [problem, setProblem] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    api<StaffGroup[]>("/store/telegram-groups").then(setGroups, () => setGroups([]));
+    api("/store/telegram-groups", z.array(staffGroupSchema)).then(setGroups, () => setGroups([]));
   }, []);
   useEffect(load, [load]);
 
@@ -28,7 +29,7 @@ export function TelegramAlerts({ signedInWithTelegram }: { signedInWithTelegram:
     setBusy(true);
     setProblem(null);
     try {
-      setLink(await api<TelegramLink>("/store/telegram-groups/link", { method: "POST" }));
+      setLink(await api("/store/telegram-groups/link", telegramLinkSchema, { method: "POST" }));
     } catch (failure) {
       setProblem(
         failure instanceof ApiError && failure.code === "telegram_not_configured"
@@ -45,7 +46,7 @@ export function TelegramAlerts({ signedInWithTelegram }: { signedInWithTelegram:
   }
 
   async function unlink(id: string) {
-    await api(`/store/telegram-groups/${id}`, { method: "DELETE" }).catch(() => undefined);
+    await apiSend(`/store/telegram-groups/${id}`, { method: "DELETE" }).catch(() => undefined);
     load();
   }
 

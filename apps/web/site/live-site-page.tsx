@@ -4,7 +4,7 @@ import type { WaitlistSignup } from "@khmio/shared";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { BotCheck, TURNSTILE_SITE_KEY } from "@/components/bot-check";
-import { api, ApiError } from "@/lib/api";
+import { ApiError, apiSend } from "@/lib/api";
 import { SITE_PAGES } from "./content";
 import { liveSiteHref, liveSiteImage } from "./links";
 import { SITE_PAGE_INFO, type SitePageKey } from "./pages";
@@ -23,7 +23,7 @@ export function LiveSitePage({ pageKey }: { pageKey: SitePageKey }) {
   async function submit(signup: WaitlistSignup) {
     if (TURNSTILE_SITE_KEY && !botToken.current) throw new BotCheckNotReady();
     try {
-      await api("/public/waitlist", { method: "POST", body: { ...signup, ...(botToken.current ? { botCheck: botToken.current } : {}) } });
+      await apiSend("/public/waitlist", { method: "POST", body: { ...signup, ...(botToken.current ? { botCheck: botToken.current } : {}) } });
     } finally {
       setBotReset((count) => count + 1);
     }

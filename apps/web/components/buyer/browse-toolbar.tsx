@@ -4,7 +4,7 @@ import { cn, GroupTitle, SearchInput } from "@khmio/ui";
 import { ArrowUpDown, ChevronDown, History, LayoutGrid, List } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, type ReactNode } from "react";
-import { PRODUCT_SORTS, type ProductBrowse, type ProductSort } from "./use-product-browse";
+import { PRODUCT_SORTS, type ProductBrowse } from "./use-product-browse";
 
 /** One pill style for the category chips, Grid / List and Sort. */
 const PILL = "flex min-h-touch shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors";
@@ -76,7 +76,7 @@ export function BrowseToolbar({
                       onClick={() => {
                         browse.setQuery(entry);
                         setFocused(false);
-                        (document.activeElement as HTMLElement | null)?.blur();
+                        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                       }}
                       className="flex min-h-touch w-full items-center gap-3 px-3 text-left text-sm hover:bg-border/20"
                     >
@@ -145,7 +145,10 @@ export function BrowseToolbar({
           <span className="sr-only">{t("sortLabel")}</span>
           <select
             value={browse.sort}
-            onChange={(event) => browse.setSort(event.target.value as ProductSort)}
+            onChange={(event) => {
+              const picked = PRODUCT_SORTS.find((value) => value === event.target.value);
+              if (picked) browse.setSort(picked);
+            }}
             className="min-h-touch w-full min-w-0 cursor-pointer appearance-none truncate bg-transparent focus:outline-none"
           >
             {PRODUCT_SORTS.map((value) => (

@@ -97,7 +97,8 @@ export function useDueText() {
 /** "Today" / "3 days ago". */
 export function useDaysAgo() {
   const t = useTranslations("Admin");
-  return (days: number) => (days === 0 ? t("today") : t("daysAgo", { count: days }));
+  const tDates = useTranslations("Dates");
+  return (days: number) => (days === 0 ? t("today") : tDates("daysAgo", { count: days }));
 }
 
 /** A store's name by id, in the viewer's language — for rows that only carry the id. */

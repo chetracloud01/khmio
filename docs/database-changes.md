@@ -24,3 +24,4 @@ first.
 | 2026-10-07 | `worker_heartbeat` | When the worker was last seen | The admin can see the worker is alive | Yes |
 | 2026-10-22 | `garage_business_type` | New business type `garage` | Garages as a kind of shop | Yes (a value is only added) |
 | 2026-10-22 | `invoice_tracking` | A unique tracking code on every order (filled in for old orders too); the shop's tax number | Invoices and "Track my order" | Yes |
+| 2026-10-23 | `shop_map_link` | The shop's map link (empty for every existing shop), with a check that it is empty or a web link of at most 300 characters | The buyer's Map button opens the shop's exact place (Shop details → Location and pickup) | Yes (a column is only added) |

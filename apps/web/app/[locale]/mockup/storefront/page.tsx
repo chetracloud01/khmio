@@ -1,8 +1,8 @@
 "use client";
 
 import { formatKhr, formatUsd, isStorefrontOpen, maxOrderQuantity, type Currency } from "@khmio/shared";
-import { Badge, Button, cn, SegmentedControl, Skeleton, ThemeSwitcher } from "@khmio/ui";
-import { ChevronRight, Clock, Info, SearchX, ShoppingBag, Store, X } from "lucide-react";
+import { Badge, Button, cn, Skeleton, ThemeSwitcher } from "@khmio/ui";
+import { ChevronRight, Info, SearchX, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -10,6 +10,7 @@ import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { CartPanel } from "@/components/buyer/cart-panel";
 import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
 import { ShopHero } from "@/components/buyer/shop-hero";
+import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
 import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
 import { TrackOrderCard } from "@/components/invoice/track-order-card";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -17,15 +18,16 @@ import { getStartingVariant, getStoreMaxDiscountPercent, getUnitUsdCents, mockSt
 import { useAdmin } from "../admin-context";
 import { useCart } from "../cart-context";
 import { useDeliverySettings } from "../delivery-settings-context";
+import { useStorePayments, useStoreSettings } from "../store-settings-context";
 import { useMerchantSubscription } from "../merchant-subscription-context";
 import { useOnlineStock } from "../online-stock";
 import { useCheckoutTotal } from "../use-checkout-total";
+import { LanguageSwitch } from "@/components/language-switch";
 import { useThemeLabels } from "@/components/use-theme-labels";
 import { ProductCard } from "../shared-ui";
 import { useShopIdentity } from "../shop-identity";
 import { useShopProducts } from "../shop-products";
 import { ProductDetail } from "./product-detail";
-import { ShopInfo } from "./shop-info";
 
 // A paused store (trial ended or subscription unpaid) keeps its link working
 // but takes no orders — see docs/blueprint.md "Subscription life cycle".
@@ -103,7 +105,12 @@ function Storefront() {
   const locale = useLocale();
   const router = useRouter();
   const { quantities, setQuantities, currency } = useCart();
-  const { name: storeName, initial: storeInitial, logoDataUrl } = useShopIdentity();
+  const identity = useShopIdentity();
+  const { name: storeName, initial: storeInitial, logoDataUrl } = identity;
+  const [infoOpen, setInfoOpen] = useState(false);
+  const { settings: deliverySettings } = useDeliverySettings();
+  const { settings: storeSettings, rate } = useStoreSettings();
+  const { khqrReady } = useStorePayments();
   // The seller's logo once they've added one; the shop's first letter until then.
   const logo = logoDataUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- merchant's own upload preview, not a remote image
@@ -111,7 +118,6 @@ function Storefront() {
   ) : (
     storeInitial
   );
-  const ratingCountLabel = locale === "km" ? mockStore.ratingCountLabelKm : mockStore.ratingCountLabelEn;
 
   const { products, categories } = useShopProducts();
 
@@ -232,29 +238,27 @@ function Storefront() {
             highlight={maxDiscount > 0 ? t("upTo", { percent: maxDiscount }) : undefined}
             controls={
               <>
-                <SegmentedControl
-                  value={locale}
-                  onChange={(next) => router.push(`/${next}/mockup/storefront`)}
-                  options={[
-                    { value: "km", label: "ខ្មែរ" },
-                    { value: "en", label: "EN" },
-                  ]}
-                />
+                <LanguageSwitch />
                 <ThemeSwitcher labels={themeLabels} />
               </>
             }
-            facts={
-              <>
-                {/* Only after the super admin approved the owner's ID — the badge is a promise to buyers. */}
-                {demoKycStatus === "approved" && <Badge>{t("verified")}</Badge>}
-                <span>{t("rating", { value: mockStore.ratingValue, count: ratingCountLabel })}</span>
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-4 w-4" aria-hidden="true" />
-                  {t("deliveryTime", { min: mockStore.deliveryEtaMinMinutes, max: mockStore.deliveryEtaMaxMinutes })}
-                </span>
-              </>
-            }
-            info={<ShopInfo />}
+            // Only after the super admin approved the owner's ID — the badge is a promise to buyers.
+            nameBadge={demoKycStatus === "approved" ? <Badge>{t("verified")}</Badge> : undefined}
+            info={<ShopInfoButton onClick={() => setInfoOpen(true)} />}
+          />
+          <ShopInfoSheet
+            open={infoOpen}
+            onClose={() => setInfoOpen(false)}
+            shop={{
+              ...identity,
+              logo,
+              openLabel: t("openNow"),
+              delivery: deliverySettings,
+              currency,
+              rate,
+              khqrReady,
+              allowCod: storeSettings.allowCod,
+            }}
           />
         </div>
 

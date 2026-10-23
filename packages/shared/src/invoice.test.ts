@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTrackingCode, getInvoiceState, parseTrackingCode, trackingCodePrefix, trackOrderInputSchema } from "./invoice";
+import { formatTrackingCode, getInvoiceState, parseTrackingCode, socialLinkUrl, trackingCodePrefix, trackOrderInputSchema } from "./invoice";
 
 describe("invoice state", () => {
   it("is a receipt once cash is handed over, never before", () => {
@@ -55,5 +55,19 @@ describe("tracking code in Telegram messages", () => {
     const update = buyerUpdateText({ orderNumber: 7, shopName: "Mekong", status: "confirmed", fulfilment: "pickup", dispatch: null, trackingCode: "MEK-7K4P-9QXR" });
     expect(update).toContain("MEK-7K4P-9QXR");
     expect(buyerUpdateText({ orderNumber: 7, shopName: "Mekong", status: "confirmed", fulfilment: "pickup", dispatch: null })).not.toContain("Tracking");
+  });
+});
+
+describe("socialLinkUrl", () => {
+  it("opens whatever the seller typed as a web link", () => {
+    expect(socialLinkUrl("telegram", "t.me/sokhacoffee")).toBe("https://t.me/sokhacoffee");
+    expect(socialLinkUrl("telegram", "@sokhacoffee")).toBe("https://t.me/sokhacoffee");
+    expect(socialLinkUrl("facebook", "sokhacoffee")).toBe("https://facebook.com/sokhacoffee");
+    expect(socialLinkUrl("facebook", " https://fb.com/sokha ")).toBe("https://fb.com/sokha");
+  });
+
+  it("gives nothing for an empty field or a non-web link", () => {
+    expect(socialLinkUrl("telegram", "  ")).toBeNull();
+    expect(socialLinkUrl("facebook", "javascript:alert(1)")).toBeNull();
   });
 });

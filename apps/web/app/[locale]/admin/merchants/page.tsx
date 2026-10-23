@@ -18,11 +18,13 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
 import { useFormErrorText } from "@/components/form-ui";
-import type { AdminMerchantDetail, AdminMerchantRow } from "@/lib/admin-api";
-import { api, ApiError } from "@/lib/api";
+import { adminMerchantDetailSchema, adminMerchantRowSchema, type AdminMerchantDetail, type AdminMerchantRow } from "@/lib/admin-api";
+import { api, ApiError, apiSend } from "@/lib/api";
+import { useDateText } from "@/components/use-date-text";
 import { useAdminMe } from "../admin-context";
-import { LoadState, PageHeader, Pill, STATUS_STYLES, useDateText } from "../admin-ui";
+import { LoadState, PageHeader, Pill, STATUS_STYLES } from "../admin-ui";
 import { useAuditText } from "../audit-text";
+import { z } from "zod";
 
 const STATUSES: SubscriptionStatus[] = ["trialing", "active", "grace", "paused"];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,7 +58,7 @@ function Merchants() {
 
   const load = useCallback(() => {
     setFailed(false);
-    api<AdminMerchantRow[]>("/admin/merchants").then(setRows, () => setFailed(true));
+    api("/admin/merchants", z.array(adminMerchantRowSchema)).then(setRows, () => setFailed(true));
   }, []);
   useEffect(load, [load]);
 
@@ -211,7 +213,7 @@ function MerchantPanel({ storeId, onClose, onChanged }: { storeId: string; onClo
 
   const load = useCallback(() => {
     setFailed(false);
-    api<AdminMerchantDetail>(`/admin/merchants/${storeId}`).then(setDetail, () => setFailed(true));
+    api(`/admin/merchants/${storeId}`, adminMerchantDetailSchema).then(setDetail, () => setFailed(true));
   }, [storeId]);
   useEffect(load, [load]);
 
@@ -226,7 +228,7 @@ function MerchantPanel({ storeId, onClose, onChanged }: { storeId: string; onClo
     setBusy(kind);
     setMessage(null);
     try {
-      await api(`/admin/merchants/${storeId}/${kind === "extend" ? "extend" : "plan"}`, { method: "POST", body: parsed.data });
+      await apiSend(`/admin/merchants/${storeId}/${kind === "extend" ? "extend" : "plan"}`, { method: "POST", body: parsed.data });
       setMessage({ tone: "success", text: kind === "extend" ? t("extendDone", { count: Number(days) }) : t("planDone", { plan: tPlans(plan) }) });
       setNote("");
       load();

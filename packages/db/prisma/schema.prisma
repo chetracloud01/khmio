@@ -260,6 +260,8 @@ model Store {
   invoiceNote             String       @default("") @map("invoice_note")
   telegramLink            String       @default("") @map("telegram_link")
   facebookLink            String       @default("") @map("facebook_link")
+  /// Copied from Google Maps on Shop details; the buyer's Map button opens it (design/screens.md S10). Empty = search the pickup address.
+  mapUrl                  String       @default("") @map("map_url")
   /// The last order number given out; the next order takes this + 1 (app_next_order_number()).
   lastOrderNumber         Int          @default(0) @map("last_order_number")
   createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)

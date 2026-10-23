@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { apiBaseUrl, type PublicShop } from "@/lib/api";
+import { apiBaseUrl, publicShopSchema, type PublicShop } from "@/lib/api";
 import { ShopView } from "./shop-view";
 
 // The buyer's shop page (roadmap step 3: read-only — ordering comes with step
@@ -11,7 +11,7 @@ async function loadShop(slug: string): Promise<PublicShop | null> {
   const response = await fetch(`${apiBaseUrl()}/public/stores/${encodeURIComponent(slug)}`, { cache: "no-store" });
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`shop page: API answered ${response.status}`);
-  return (await response.json()) as PublicShop;
+  return publicShopSchema.parse(await response.json());
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {

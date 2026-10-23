@@ -11,7 +11,8 @@ export function isLocalNetworkHost(hostname: string): boolean {
   if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
   const parts = host.split(".").map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
-  const [a, b] = parts as [number, number, number, number];
+  // Four parts were checked just above; the defaults only satisfy the type.
+  const [a = -1, b = -1] = parts;
   return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31);
 }
 

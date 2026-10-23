@@ -127,3 +127,14 @@ export function adminCookie(token: string, expiresAt: Date, secure: boolean): st
 export function clearedAdminCookie(secure: boolean): string {
   return [`${ADMIN_COOKIE}=`, "Path=/admin", "HttpOnly", "SameSite=Strict", "Max-Age=0", ...(secure ? ["Secure"] : [])].join("; ");
 }
+
+/** Development's admin login: the first owner who isn't disabled. */
+export function firstActiveOwner(db: SystemDb) {
+  return db.adminUser.findFirst({ where: { role: "owner", disabledAt: null }, orderBy: { createdAt: "asc" }, select: { id: true } });
+}
+
+/** Whether the admin has set up their authenticator app: then step two asks for a code, else it enrols them. */
+export async function hasAuthenticator(db: SystemDb, adminId: string): Promise<boolean> {
+  const admin = await db.adminUser.findUniqueOrThrow({ where: { id: adminId }, select: { totpSecretEnc: true } });
+  return Boolean(admin.totpSecretEnc);
+}

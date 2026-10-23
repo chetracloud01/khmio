@@ -6,10 +6,11 @@ import { ListChecks } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
-import type { AdminWaitlist } from "@/lib/admin-api";
+import { adminWaitlistSchema, type AdminWaitlist } from "@/lib/admin-api";
 import { api, ApiError } from "@/lib/api";
 import { SITE_PRODUCTS } from "@/site/content";
-import { LoadState, PageHeader, Pill, useDateText } from "../admin-ui";
+import { useDateText } from "@/components/use-date-text";
+import { LoadState, PageHeader, Pill } from "../admin-ui";
 
 type Signup = AdminWaitlist["signups"][number];
 const productName = (id: PlatformProductId) => SITE_PRODUCTS.find((product) => product.id === id)?.name ?? id;
@@ -34,7 +35,7 @@ export default function WaitlistPage() {
   const load = useCallback((before?: string) => {
     setFailed(false);
     const query = new URLSearchParams({ limit: String(BATCH), ...(before ? { before } : {}) }).toString();
-    return api<AdminWaitlist>(`/admin/waitlist?${query}`).then(
+    return api(`/admin/waitlist?${query}`, adminWaitlistSchema).then(
       (page) => setData((previous) => (before && previous ? { ...page, signups: [...previous.signups, ...page.signups] } : page)),
       (error: unknown) => (error instanceof ApiError && error.status === 403 ? setNotAllowed(true) : setFailed(true)),
     );

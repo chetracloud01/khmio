@@ -13,6 +13,7 @@ import { useOrders } from "../orders-context";
 // the real page asks the API.
 export default function MockTrackPage() {
   const t = useTranslations("Track");
+  const tOrders = useTranslations("Orders");
   const locale = useLocale();
   const router = useRouter();
   const { hydrated, orders } = useOrders();
@@ -28,7 +29,7 @@ export default function MockTrackPage() {
 
   const samples = hydrated ? orders.slice(0, 2) : [];
   return (
-    <TrackForm find={find} fill={fill}>
+    <TrackForm back={{ href: `/${locale}/mockup/storefront`, label: tOrders("backToShop") }} find={find} fill={fill}>
       {samples.length > 0 && (
         <section className="flex flex-col gap-2 rounded-2xl border border-dashed border-border p-4 text-sm">
           <p className="text-muted">{t("sampleHint")}</p>

@@ -1,10 +1,10 @@
-import { withContext, type AppDb, type SystemDb } from "@khmio/db";
+import type { AppDb, SystemDb } from "@khmio/db";
 import { telegramLoginPayloadSchema } from "@khmio/shared";
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Post, Req, Res, ServiceUnavailableException, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { getEnv } from "../config";
 import { APP_DB, SYSTEM_DB } from "../db";
-import { findOrCreateTelegramMerchant } from "./accounts";
+import { findOrCreateTelegramMerchant, readMe } from "./accounts";
 import { DEV_MERCHANTS } from "./dev-merchants";
 import { CurrentMerchant, SessionGuard } from "./session.guard";
 import { clearedSessionCookie, createSession, readCookie, revokeSession, SESSION_COOKIE, sessionCookie } from "./sessions";
@@ -70,34 +70,7 @@ export class AuthController {
   @Get("me")
   @UseGuards(SessionGuard)
   async me(@CurrentMerchant() merchantId: string) {
-    const { merchant, storeIds } = await withContext(this.app, { merchantId }, async (tx) => ({
-      merchant: await tx.merchant.findUniqueOrThrow({
-        where: { id: merchantId },
-        select: { firstName: true, lastName: true, identities: { select: { method: true, telegramUsername: true, providerUserId: true } } },
-      }),
-      storeIds: (await tx.storeMember.findMany({ where: { merchantId }, select: { storeId: true }, orderBy: { createdAt: "asc" } })).map((member) => member.storeId),
-    }));
-    const storeId = storeIds[0];
-    const store = storeId
-      ? await withContext(this.app, { merchantId, storeId }, (tx) =>
-          tx.store.findUnique({
-            where: { id: storeId },
-            select: {
-              id: true,
-              slug: true,
-              name: true,
-              businessType: true,
-              phone: true,
-              subscription: { select: { plan: true, status: true, trialEndsAt: true } },
-            },
-          }),
-        )
-      : null;
-    const telegram = merchant.identities.find((identity) => identity.method === "telegram");
-    return {
-      merchant: { firstName: merchant.firstName, lastName: merchant.lastName, telegramUsername: telegram?.telegramUsername ?? null, signedInWithTelegram: telegram !== undefined },
-      store,
-    };
+    return readMe(this.app, merchantId);
   }
 
   private async signIn(merchantId: string, res: CookieResponse) {

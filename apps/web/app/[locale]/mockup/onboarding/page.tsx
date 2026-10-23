@@ -1,16 +1,16 @@
 "use client";
 
 import { BUSINESS_TYPES, SHARE_REQUIREMENTS, shopNameSchema, shopSlugSchema, suggestShopSlug, toFieldErrors, type BusinessType, type ShareRequirement } from "@khmio/shared";
-import { Button, cn, Input, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, cn, Input, Mio, ThemeSwitcher } from "@khmio/ui";
 import { Car, Check, LayoutGrid, Store, Upload, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
 import { mockTakenSlugs, slugify } from "@/mock/mock-data";
 import { ACCEPTED_IMAGE_TYPES, compressImage } from "@/components/compress-image";
 import { useFormErrorText } from "@/components/form-ui";
+import { LanguageSwitch } from "@/components/language-switch";
 import { ShopLinkCard } from "@/components/shop-link-card";
 import { NextSteps, OnboardingSteps, ShopPreview, SignUpFrame } from "@/components/sign-up-frame";
 import { useThemeLabels } from "@/components/use-theme-labels";
@@ -51,7 +51,6 @@ export default function OnboardingMockupPage() {
   const tMascot = useTranslations("Mascot");
   const themeLabels = useThemeLabels();
   const locale = useLocale();
-  const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
   const [done, setDone] = useState(false);
 
@@ -135,14 +134,7 @@ export default function OnboardingMockupPage() {
 
   const controls = (
     <>
-      <SegmentedControl
-        value={locale}
-        onChange={(next) => router.push(`/${next}/mockup/onboarding`)}
-        options={[
-          { value: "km", label: "ខ្មែរ" },
-          { value: "en", label: "EN" },
-        ]}
-      />
+      <LanguageSwitch />
       <ThemeSwitcher labels={themeLabels} />
     </>
   );

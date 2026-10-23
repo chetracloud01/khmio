@@ -6,7 +6,8 @@ import type { OrderStatus } from "./orders";
 // Invoices, receipts and tracking codes (design/screens.md B7 and B8).
 
 /** What the document says at the top and stamps across it. */
-export type InvoiceState = "unpaid" | "paid" | "cancelled";
+export const invoiceStateSchema = z.enum(["unpaid", "paid", "cancelled"]);
+export type InvoiceState = z.infer<typeof invoiceStateSchema>;
 
 /**
  * "Invoice" until the buyer has paid, then "Receipt". KHQR is paid from the
@@ -62,3 +63,20 @@ export const invoiceDetailsSchema = z.object({
   facebookLink: z.string().trim().max(100, "too_long"),
 });
 export type InvoiceDetails = z.infer<typeof invoiceDetailsSchema>;
+
+const SOCIAL_HOMES = { telegram: "https://t.me/", facebook: "https://facebook.com/" } as const;
+export type SocialNetwork = keyof typeof SOCIAL_HOMES;
+
+/**
+ * A seller's Telegram or Facebook as they typed it ("t.me/shop", "@shop",
+ * "https://facebook.com/shop" or just "shop") as a link a buyer can open.
+ * Only http(s) links come out: the text is the seller's, never a javascript: URL.
+ */
+export function socialLinkUrl(network: SocialNetwork, text: string): string | null {
+  const value = text.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return null;
+  if (value.includes(".")) return `https://${value}`;
+  return `${SOCIAL_HOMES[network]}${value.replace(/^@/, "")}`;
+}

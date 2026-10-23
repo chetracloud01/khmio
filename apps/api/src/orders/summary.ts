@@ -1,5 +1,5 @@
 import type { Tx } from "@khmio/db";
-import { isCashOrder, needsSellerAction, type Currency, type OrderStatus, type PaymentMethod } from "@khmio/shared";
+import { DAY_MS, isCashOrder, needsSellerAction, phnomPenhDay, type Currency, type OrderStatus, type PaymentMethod } from "@khmio/shared";
 
 // The seller's home page numbers (design/screens.md S3), worked out by the
 // database so they stay right however many orders a shop has. Days are
@@ -13,7 +13,6 @@ export const TOP_PRODUCTS = 5;
 /** The sales card's periods, in days back from today (Phnom Penh). */
 export const SALES_PERIODS = { today: 1, week: 7, month: 30 } as const;
 export type SalesPeriod = keyof typeof SALES_PERIODS;
-const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
 /** Orders that count as sales: not cancelled, and not still waiting for an online payment. */
 const NOT_SALES = ["cancelled", "awaiting_payment"];
 
@@ -66,7 +65,7 @@ export interface ItemRow {
 
 /** "2026-10-08": the Phnom Penh date `daysAgo` days before `now`. */
 export function phnomPenhDate(now: Date, daysAgo = 0): string {
-  return new Date(now.getTime() + PHNOM_PENH_OFFSET_MS - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return phnomPenhDay(new Date(now.getTime() - daysAgo * DAY_MS));
 }
 
 const emptyMoney = (): Money => ({ USD: 0, KHR: 0 });

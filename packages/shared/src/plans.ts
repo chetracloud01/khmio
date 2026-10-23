@@ -27,12 +27,15 @@ export interface PlanDefinition {
   features: Record<PlanFeature, boolean>;
 }
 
+/** A new shop's Free trial: every shop starts on it (apps/api create-store.ts). */
+export const FREE_TRIAL_DAYS = 14;
+
 export const PLANS: Record<PlanId, PlanDefinition> = {
   free: {
     id: "free",
     monthlyPrice: { usdCents: 0, khr: 0 },
     maxProducts: 10,
-    trialDays: 14,
+    trialDays: FREE_TRIAL_DAYS,
     features: { stock: false, wholesalePrice: false, warehouses: false },
   },
   basic: {

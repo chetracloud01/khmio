@@ -16,12 +16,13 @@ import {
   type FormErrorCode,
 } from "@khmio/shared";
 import { Button, Card, cn, IconButton, Input, MoneyInput, Notice, Select, Switch } from "@khmio/ui";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Store, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { MenuList } from "@/components/menu-list";
 import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, type DeliveryResponse } from "@/lib/api";
+import { api, ApiError, type DeliveryResponse, deliveryResponseSchema } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
 import { SubPage } from "@/components/seller-frame/sub-page";
@@ -43,7 +44,6 @@ interface DriverDraft {
 
 interface Draft {
   zones: ZoneDraft[];
-  pickup: { enabled: boolean; address: string; hours: string };
   province: { enabled: boolean; feeUsd: string; feeKhr: string; note: string };
   drivers: DriverDraft[];
 }
@@ -52,16 +52,16 @@ interface Draft {
 function toDraft(settings: DeliverySettings): Draft {
   return {
     zones: settings.zones.map((zone) => ({ id: zone.id, name: zone.name, feeUsd: usdInputText(zone.feeUsdCents), feeKhr: khrInputText(zone.feeKhr), districtIds: zone.districtIds })),
-    pickup: settings.pickup,
     province: { enabled: settings.province.enabled, feeUsd: usdInputText(settings.province.feeUsdCents), feeKhr: khrInputText(settings.province.feeKhr), note: settings.province.note },
     drivers: settings.drivers.map((driver) => ({ ...driver, phone: formatKhmerPhoneLocal(driver.phone) })),
   };
 }
 
-function toInput(draft: Draft) {
+/** Pickup is set on Shop details (shop-details#location); a delivery save is checked with it as saved. */
+function toInput(draft: Draft, pickup: DeliverySettings["pickup"]) {
   return {
     zones: draft.zones.map((zone) => ({ id: zone.id, name: zone.name, districtIds: zone.districtIds, feeUsdCents: parseUsdInput(zone.feeUsd), feeKhr: parseKhrInput(zone.feeKhr) })),
-    pickup: draft.pickup,
+    pickup,
     province: { enabled: draft.province.enabled, note: draft.province.note, feeUsdCents: parseUsdInput(draft.province.feeUsd), feeKhr: parseKhrInput(draft.province.feeKhr) },
     drivers: draft.drivers,
   };
@@ -75,26 +75,24 @@ function newId(prefix: string): string {
 
 /**
  * A shop that has never saved its delivery starts from the suggestion
- * (packages/shared SUGGESTED_DELIVERY_SETTINGS). Buyers usually come to a
- * salon or a repair shop, so a service shop starts with pickup on.
+ * (packages/shared SUGGESTED_DELIVERY_SETTINGS), with pickup as set on Shop details.
  */
-function startingSettings(response: DeliveryResponse, isService: boolean): DeliverySettings {
+function startingSettings(response: DeliveryResponse): DeliverySettings {
   if (response.configured) return response.settings;
-  return { ...SUGGESTED_DELIVERY_SETTINGS, pickup: { ...SUGGESTED_DELIVERY_SETTINGS.pickup, enabled: isService } };
+  return { ...SUGGESTED_DELIVERY_SETTINGS, pickup: response.settings.pickup };
 }
 
 export default function DeliveryPage() {
-  const { store } = useMerchant();
   const [response, setResponse] = useState<DeliveryResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
-    api<DeliveryResponse>("/delivery").then(setResponse, () => setFailed(true));
+    api("/delivery", deliveryResponseSchema).then(setResponse, () => setFailed(true));
   }, []);
   useEffect(load, [load]);
   if (failed) return <PageOffline onRetry={load} />;
   if (!response) return <PageLoading />;
-  return <DeliveryForm initial={startingSettings(response, store.businessType === "service")} configured={response.configured} />;
+  return <DeliveryForm initial={startingSettings(response)} configured={response.configured} />;
 }
 
 // The standard form (components/form-ui.tsx) over deliverySettingsSchema — the
@@ -108,6 +106,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   const formRef = useRef<HTMLDivElement>(null);
 
   const [saved, setSaved] = useState<Draft>(() => toDraft(initial));
+  const [pickup, setPickup] = useState(initial.pickup);
   const [configured, setConfigured] = useState(initiallyConfigured);
   const [draft, setDraft] = useState<Draft>(saved);
   const [errors, setErrors] = useState<Record<string, FormErrorCode>>({});
@@ -155,7 +154,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   }
 
   async function handleSave() {
-    const result = deliverySettingsSchema.safeParse(toInput(draft));
+    const result = deliverySettingsSchema.safeParse(toInput(draft, pickup));
     if (!result.success) {
       setErrors(toFieldErrors(result.error));
       focusFirstInvalidField(formRef.current);
@@ -164,8 +163,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
     setSaving(true);
     setSaveError(null);
     try {
-      const next = await api<DeliveryResponse>("/delivery", { method: "PUT", body: result.data });
+      const next = await api("/delivery", deliveryResponseSchema, { method: "PUT", body: result.data });
       const nextDraft = toDraft(next.settings);
+      setPickup(next.settings.pickup);
       setSaved(nextDraft);
       setDraft(nextDraft);
       setConfigured(next.configured);
@@ -174,7 +174,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
       await refreshStore().catch(() => undefined);
     } catch (failure) {
       if (failure instanceof ApiError && Object.keys(failure.fields).length > 0) {
-        setErrors(failure.fields as Record<string, FormErrorCode>);
+        setErrors(failure.fields);
         focusFirstInvalidField(formRef.current);
       } else {
         setSaveError(failure instanceof ApiError && failure.code === "store_paused" ? tApp("storePaused") : tApp("saveFailed"));
@@ -300,27 +300,20 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         <FormSection stacked title={t("sectionPickup")} description={t("sectionPickupHelp")}>
-          <Switch checked={draft.pickup.enabled} onChange={(enabled) => change({ ...draft, pickup: { ...draft.pickup, enabled } }, "pickup.address", "zones")} label={t("pickupEnabled")} />
-          {draft.pickup.enabled && (
-            <>
-              <Input
-                label={t("pickupAddress")}
-                placeholder={t("pickupAddressPlaceholder")}
-                maxLength={200}
-                value={draft.pickup.address}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, address: e.target.value } }, "pickup.address")}
-                error={error("pickup.address")}
-              />
-              <Input
-                label={t("pickupHours")}
-                placeholder={t("pickupHoursPlaceholder")}
-                maxLength={100}
-                value={draft.pickup.hours}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, hours: e.target.value } }, "pickup.hours")}
-                error={error("pickup.hours")}
-              />
-            </>
-          )}
+          {/* Set with the shop's address and map link on Shop details. */}
+          <MenuList
+            rows={[
+              {
+                key: "pickup",
+                href: `/${locale}/m/shop-details#location`,
+                icon: Store,
+                tone: pickup.enabled ? "success" : "muted",
+                title: pickup.enabled ? t("pickupOn") : t("pickupOff"),
+                detail: [pickup.address, pickup.hours].filter(Boolean).join(" · ") || t("pickupChangeHint"),
+                value: t("pickupChange"),
+              },
+            ]}
+          />
         </FormSection>
 
         <FormSection stacked title={t("sectionProvince")} description={t("sectionProvinceHelp")}>

@@ -5,7 +5,7 @@ import { Card, Input, Notice, Switch } from "@khmio/ui";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
-import type { AdminSettings } from "@/lib/admin-api";
+import { adminSettingsSchema, type AdminSettings } from "@/lib/admin-api";
 import { api, ApiError } from "@/lib/api";
 import { useAdminMe } from "../admin-context";
 import { LoadState, PageHeader } from "../admin-ui";
@@ -28,7 +28,7 @@ export default function AdminSettingsPage() {
   const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
-    api<AdminSettings>("/admin/settings").then(setSettings, () => setFailed(true));
+    api("/admin/settings", adminSettingsSchema).then(setSettings, () => setFailed(true));
   }, []);
   useEffect(load, [load]);
   if (!settings) return <LoadState failed={failed} onRetry={load} />;
@@ -66,7 +66,7 @@ function SettingsForm({ initial }: { initial: AdminSettings }) {
     }
     setStatus("saving");
     try {
-      const next = toDraft(await api<AdminSettings>("/admin/settings", { method: "PUT", body: result.data }));
+      const next = toDraft(await api("/admin/settings", adminSettingsSchema, { method: "PUT", body: result.data }));
       setSaved(next);
       setDraft(next);
       setStatus("saved");

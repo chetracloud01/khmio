@@ -34,6 +34,7 @@ export default function AdminMerchantsPage() {
 
 function Merchants() {
   const t = useTranslations("Admin");
+  const tDates = useTranslations("Dates");
   const tNav = useTranslations("AdminNav");
   const tPlan = useTranslations("Plans");
   const tType = useTranslations("BusinessType");
@@ -114,8 +115,8 @@ function Merchants() {
       sortable: true,
       defaultHidden: true,
       value: (row) => row.joinedDaysAgo,
-      exportValue: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : t("daysAgo", { count: row.joinedDaysAgo })),
-      cell: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : t("daysAgo", { count: row.joinedDaysAgo })),
+      exportValue: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : tDates("daysAgo", { count: row.joinedDaysAgo })),
+      cell: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : tDates("daysAgo", { count: row.joinedDaysAgo })),
     },
     {
       key: "actions",

@@ -3,7 +3,7 @@ import { formatTrackingCode, listQueryFromParams, listQuerySchemaFor, ORDER_LIST
 import { readListPage } from "../list/list-page";
 
 export const orderListQuerySchema = listQuerySchemaFor(ORDER_LIST_SPEC);
-export const parseOrderListQuery = (params: unknown) => orderListQuerySchema.parse(listQueryFromParams(params && typeof params === "object" ? (params as Record<string, unknown>) : {}));
+export const parseOrderListQuery = (params: unknown) => orderListQuerySchema.parse(listQueryFromParams(params && typeof params === "object" ? Object.fromEntries(Object.entries(params)) : {}));
 
 export const orderListSelect = {
   id: true,
@@ -60,12 +60,15 @@ const ORDER_FILTER_WHERE: { [K in keyof typeof ORDER_LIST_SPEC.filters]: Record<
   fulfilment: { delivery: { fulfilment: "delivery" }, pickup: { fulfilment: "pickup" } },
 };
 
-const ORDER_BY: Record<(typeof ORDER_LIST_SPEC.sorts)[number], (dir: Prisma.SortOrder) => Prisma.OrderOrderByWithRelationInput[]> = {
+type OrderSort = (typeof ORDER_LIST_SPEC.sorts)[number];
+const ORDER_BY: Record<OrderSort, (dir: Prisma.SortOrder) => Prisma.OrderOrderByWithRelationInput[]> = {
   order: (dir) => [{ createdAt: dir }],
   buyer: (dir) => [{ buyerName: dir }, { createdAt: "desc" }],
   total: (dir) => [{ totalMinor: dir }, { createdAt: "desc" }],
   status: (dir) => [{ status: dir }, { createdAt: "desc" }],
 };
+const ORDER_SORTS: readonly string[] = ORDER_LIST_SPEC.sorts;
+const isOrderSort = (sort: string): sort is OrderSort => ORDER_SORTS.includes(sort);
 
 /**
  * One page of the seller's orders (the data grid's server mode). Under "All"
@@ -73,11 +76,12 @@ const ORDER_BY: Record<(typeof ORDER_LIST_SPEC.sorts)[number], (dir: Prisma.Sort
  * packing, sending, delivered, problems, not paid yet), as the list groups them.
  */
 export async function readOrderListPage(tx: Prisma.TransactionClient, storeId: string, storeSlug: string, query: ListQuery): Promise<ListPage<ReturnType<typeof toListedOrder>>> {
+  const filterWhere: Record<string, Record<string, Prisma.OrderWhereInput>> = ORDER_FILTER_WHERE;
   const chosen = Object.entries(query.filters).flatMap(([key, value]) => {
-    const where = ORDER_FILTER_WHERE[key as keyof typeof ORDER_FILTER_WHERE]?.[value as never] as Prisma.OrderWhereInput | undefined;
+    const where = filterWhere[key]?.[value];
     return where ? [[key, where] as const] : [];
   });
-  const sort = query.sort as keyof typeof ORDER_BY;
+  const sort = isOrderSort(query.sort) ? query.sort : ORDER_LIST_SPEC.defaultSort.key;
   const grouped = query.chip === "all" && sort === "order";
   const page = await readListPage({
     query,
@@ -92,4 +96,21 @@ export async function readOrderListPage(tx: Prisma.TransactionClient, storeId: s
     find: ({ where, orderBy, skip, take }) => tx.order.findMany({ where, orderBy, skip, take, select: orderListSelect }),
   });
   return { ...page, rows: page.rows.map((order) => toListedOrder(order, storeSlug)) };
+}
+
+/** Most orders the plain list returns; older ones stay in the database. */
+const ORDER_LIST_LIMIT = 200;
+
+/** The store's link, which prints every tracking code (MEK-7K4P-9QXR). */
+export async function readStoreSlug(tx: Prisma.TransactionClient, storeId: string): Promise<string> {
+  return (await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { slug: true } })).slug;
+}
+
+/** The newest orders, with the tracking code as printed so the list's search finds an order by it. */
+export async function readOrderList(tx: Prisma.TransactionClient, storeId: string) {
+  const [slug, orders] = await Promise.all([
+    readStoreSlug(tx, storeId),
+    tx.order.findMany({ where: { storeId }, orderBy: { createdAt: "desc" }, take: ORDER_LIST_LIMIT, select: orderListSelect }),
+  ]);
+  return orders.map((order) => toListedOrder(order, slug));
 }

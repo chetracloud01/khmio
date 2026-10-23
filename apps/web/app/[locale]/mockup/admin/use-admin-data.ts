@@ -4,6 +4,7 @@ import { getPlanPrice, type AdminOverride, type KycRejection } from "@khmio/shar
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { mockStore, type MockAdminStore } from "@/mock/mock-data";
+import { useDateText } from "@/components/use-date-text";
 import { DEMO_STORE_ID, useAdmin, type AdminAuditEntry } from "../admin-context";
 import { useMerchantProducts } from "../merchant-products-context";
 import { useMerchantProfile } from "../merchant-profile-context";
@@ -107,12 +108,7 @@ export function useAuditText() {
   };
 }
 
-/** "3 min ago" / "2 hr ago" / "4 days ago", from the Admin messages. */
+/** "3 min ago" / "2 hr ago" / "4 days ago", from a number of minutes (the live screens' hook). */
 export function useTimeAgo() {
-  const t = useTranslations("Admin");
-  return (minutes: number) => {
-    if (minutes < 60) return t("minutesAgo", { count: minutes });
-    if (minutes < 1440) return t("hoursAgo", { count: Math.round(minutes / 60) });
-    return t("daysAgo", { count: Math.round(minutes / 1440) });
-  };
+  return useDateText().ago;
 }

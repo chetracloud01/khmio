@@ -9,10 +9,11 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, type Catalog, type Product } from "@/lib/api";
+import { api, ApiError, apiSend, type Catalog, catalogSchema, type Product, productSchema } from "@/lib/api";
 import { priceText, startingVariant, usdValue } from "@/lib/product-price";
 import { useMerchant } from "../merchant-context";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { z } from "zod";
 
 // The seller's products, from the API: search, filters, Hidden badge, and
 // delete (soft — old orders keep pointing at the product).
@@ -31,7 +32,7 @@ export default function ProductsPage() {
 
   const load = useCallback(() => {
     setFailed(false);
-    Promise.all([api<Product[]>("/products"), api<Catalog>("/catalog")])
+    Promise.all([api("/products", z.array(productSchema)), api("/catalog", catalogSchema)])
       .then(([list, names]) => {
         setProducts(list);
         setCatalog(names);
@@ -184,7 +185,7 @@ export default function ProductsPage() {
     const apply = (visible: boolean) => setProducts((list) => list && list.map((entry) => (entry.id === product.id ? { ...entry, isVisible: visible } : entry)));
     apply(isVisible);
     try {
-      await api(`/products/${product.id}/visibility`, { method: "PATCH", body: { isVisible } });
+      await apiSend(`/products/${product.id}/visibility`, { method: "PATCH", body: { isVisible } });
       void refreshStore();
     } catch (error) {
       apply(!isVisible);
@@ -200,7 +201,7 @@ export default function ProductsPage() {
   async function deleteProducts(rows: Product[]) {
     setDeleteError(null);
     try {
-      for (const product of rows) await api(`/products/${product.id}`, { method: "DELETE" });
+      for (const product of rows) await apiSend(`/products/${product.id}`, { method: "DELETE" });
     } catch (error) {
       setDeleteError(error instanceof ApiError && error.code === "store_paused" ? tApp("storePaused") : tApp("saveFailed"));
     }

@@ -26,6 +26,7 @@ import { useMerchantSubscription } from "../../merchant-subscription-context";
 import { useOnlineStock } from "../../online-stock";
 import { DataGrid } from "@/components/data-grid";
 import { useFormErrorText } from "@/components/form-ui";
+import { useDateText } from "@/components/use-date-text";
 import { UpgradePrompt } from "../upgrade-prompt";
 
 type SheetMode = "purchase" | "sale" | "transfer" | "adjust" | null;
@@ -299,10 +300,7 @@ function StockScreen({ multiLocation }: { multiLocation: boolean }) {
     adjust: t("submitAdjustment"),
   };
 
-  function timeAgoLabel(minutes: number) {
-    if (minutes < 60) return t("minutesAgo", { count: minutes });
-    return t("hoursAgo", { count: Math.round(minutes / 60) });
-  }
+  const { ago: timeAgoLabel } = useDateText();
 
   const locationTransactions = selectedLocation
     ? transactions
@@ -409,7 +407,7 @@ function StockScreen({ multiLocation }: { multiLocation: boolean }) {
           {onlineLocation && (
             <p className="-mt-3 text-xs text-muted">
               {t("onlineSellsFrom", { location: locationLabel(onlineLocation.type, onlineLocation.id) })}{" "}
-              <Link href={`/${locale}/mockup/dashboard/settings`} className="font-medium text-brand underline-offset-2 hover:underline">
+              <Link href={`/${locale}/mockup/dashboard/profile#prices`} className="font-medium text-brand underline-offset-2 hover:underline">
                 {t("change")}
               </Link>
             </p>

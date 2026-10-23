@@ -1,11 +1,11 @@
 "use client";
 
 import type { Currency } from "@khmio/shared";
-import { Button, IconButton, PriceTag, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, IconButton, PriceTag, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { CartPanel } from "@/components/buyer/cart-panel";
@@ -13,16 +13,18 @@ import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
 import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
 import { QuantityControl } from "@/components/buyer/quantity-control";
 import { ShopHero } from "@/components/buyer/shop-hero";
+import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
 import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
 import { formatMoney } from "@/components/order-ui";
 import { useThemeLabels } from "@/components/use-theme-labels";
 import { shareOrCopyLink } from "@/components/share-link";
 import type { Product, ProductVariant, PublicShop } from "@/lib/api";
+import { withShop } from "@/lib/buyer-back";
 import { cartLines, cartTotal, useShopCart } from "@/lib/cart";
 import { discounted, startingVariant, usdValue } from "@/lib/product-price";
 import { isTakingOrders } from "@/lib/shop-ordering";
 import { BuyerOrderLinks } from "@/components/invoice/track-order-card";
-import { ShopInfo } from "./shop-info";
+import { LanguageSwitch } from "@/components/language-switch";
 import { PhotoThumb } from "@/components/photo-thumb";
 
 // What a buyer sees at /s/<link>: the shop, its categories and its visible
@@ -60,7 +62,6 @@ function OpenShop({ shop }: { shop: PublicShop }) {
   const tCart = useTranslations("Cart");
   const themeLabels = useThemeLabels();
   const locale = useLocale();
-  const router = useRouter();
   const pathname = usePathname();
   const { store, categories, products } = shop;
   // The open product lives in the link (?product=…), so one product can be shared and Back closes it.
@@ -71,6 +72,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
   const cart = useShopCart(store.slug);
   const ordering = isTakingOrders(shop);
   const currency: Currency = cart.currency ?? store.defaultCurrency;
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   // The list's search, category, sort and grid-or-list (shared with the mockup: components/buyer).
@@ -132,29 +134,40 @@ function OpenShop({ shop }: { shop: PublicShop }) {
           openLabel={t("openNow")}
           controls={
             <>
-              <SegmentedControl
-                value={locale}
-                onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
-                options={[
-                  { value: "km", label: "ខ្មែរ" },
-                  { value: "en", label: "EN" },
-                ]}
-              />
+              <LanguageSwitch />
               <ThemeSwitcher labels={themeLabels} />
             </>
           }
-          facts={store.description ? <span>{store.description}</span> : undefined}
           info={
             <div className="flex flex-col gap-2">
-              <ShopInfo shop={shop} currency={currency} />
+              <ShopInfoButton onClick={() => setInfoOpen(true)} />
               {!ordering && <p className="rounded-DEFAULT bg-info/5 p-3 text-sm text-muted">{tCheckout("noPaymentMethods")}</p>}
             </div>
           }
         />
+        <ShopInfoSheet
+          open={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          shop={{
+            name: store.name,
+            logo,
+            openLabel: t("openNow"),
+            phone: store.phone,
+            address: shop.delivery.pickup.address,
+            mapUrl: store.mapUrl,
+            telegram: store.telegramLink,
+            facebook: store.facebookLink,
+            delivery: shop.delivery,
+            currency,
+            rate: store.usdToKhrRate,
+            khqrReady: shop.ordering.khqrReady,
+            allowCod: store.allowCod,
+          }}
+        />
 
         {/* For buyers without Telegram: their tracking code and phone open the order again (design/screens.md B8). */}
         <div className="px-4 pb-3">
-          <BuyerOrderLinks myOrdersHref={`/${locale}/orders`} trackHref={`/${locale}/track`} />
+          <BuyerOrderLinks myOrdersHref={withShop(`/${locale}/orders`, store.slug)} trackHref={withShop(`/${locale}/track`, store.slug)} />
         </div>
 
         <BrowseToolbar browse={browse} categories={browseCategories} />

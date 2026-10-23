@@ -5,6 +5,8 @@ import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
+import { readStored, writeStored } from "@/lib/device-storage";
 import { ADMIN_NAV, adminPath, isComingSoon, type AdminArea, type AdminBadge, type AdminNavGroup } from "./admin-nav";
 
 /** Every page not built yet in this admin, gathered at the bottom and folded until opened. */
@@ -20,13 +22,7 @@ interface Indicator {
 const closedGroupsKey = (area: AdminArea) => `khmio:${area}-admin-nav-closed`;
 
 function readClosedGroups(area: AdminArea): Set<string> {
-  try {
-    const raw = window.localStorage.getItem(closedGroupsKey(area));
-    const parsed: unknown = raw ? JSON.parse(raw) : [COMING_LATER];
-    return new Set(Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === "string") : []);
-  } catch {
-    return new Set([COMING_LATER]);
-  }
+  return new Set(readStored(closedGroupsKey(area), z.array(z.string())) ?? [COMING_LATER]);
 }
 
 /**
@@ -86,11 +82,7 @@ export function AdminNavMenu({
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      try {
-        window.localStorage.setItem(closedGroupsKey(area), JSON.stringify([...next]));
-      } catch {
-        // Storage unavailable — the choice just won't be remembered.
-      }
+      writeStored(closedGroupsKey(area), [...next]); // not remembered when storage refuses
       return next;
     });
   }

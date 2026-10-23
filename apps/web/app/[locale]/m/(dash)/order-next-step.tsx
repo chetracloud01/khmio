@@ -1,13 +1,13 @@
 "use client";
 
-import { getDispatchRoute, getSellerActions, type OrderActionRequest, type SellerOrderAction } from "@khmio/shared";
+import { getDispatchRoute, getSellerActions, isPlainOrderAction, isSellerOrderAction, type OrderActionRequest, type SellerOrderAction } from "@khmio/shared";
 import { Button } from "@khmio/ui";
 import { ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState } from "react";
 import { useOrderText } from "@/components/order-ui";
-import { api, ApiError, type SellerOrder } from "@/lib/api";
+import { ApiError, apiSend, type SellerOrder } from "@/lib/api";
 import { useMerchant } from "./merchant-context";
 
 /**
@@ -25,7 +25,7 @@ function isOneTap(order: SellerOrder, action: SellerOrderAction): boolean {
 /** The order's next step, or null when there's nothing to do but look. */
 export function nextAction(order: SellerOrder): SellerOrderAction | null {
   const action = getSellerActions(order)[0];
-  return action && action !== "cancel" ? (action as SellerOrderAction) : null;
+  return action && action !== "cancel" && isSellerOrderAction(action) ? action : null;
 }
 
 /**
@@ -57,8 +57,8 @@ export function OrderNextStep({
     onProblem(null);
     try {
       // "Ready for pickup" is the dispatch step with the pickup route, which carries no details.
-      const body: OrderActionRequest = step === "dispatch" ? { action: "dispatch", dispatch: { route: "pickup" } } : ({ action: step } as OrderActionRequest);
-      await api(`/orders/${order.id}/actions`, { method: "POST", body });
+      const body: OrderActionRequest | null = step === "dispatch" ? { action: "dispatch", dispatch: { route: "pickup" } } : isPlainOrderAction(step) ? { action: step } : null;
+      if (body) await apiSend(`/orders/${order.id}/actions`, { method: "POST", body });
     } catch (failure) {
       onProblem(failure instanceof ApiError && failure.code === "store_paused" ? tApp("storePaused") : failure instanceof ApiError && failure.code === "action_not_allowed" ? tApp("orderMovedOn") : tApp("saveFailed"));
     } finally {

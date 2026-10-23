@@ -1,8 +1,12 @@
+import { z } from "zod";
 import { AppException } from "../errors";
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export type BotCheckOutcome = "passed" | "failed" | "unreachable";
+
+/** Cloudflare's answer when the token is from a person; anything else is a fail. */
+const passedSchema = z.object({ success: z.literal(true) });
 
 /** Asks Cloudflare whether this Turnstile token is from a person. Never throws. */
 export async function checkTurnstile(secret: string, token: string | undefined, address: string, fetcher: typeof fetch = fetch): Promise<BotCheckOutcome> {
@@ -15,8 +19,7 @@ export async function checkTurnstile(secret: string, token: string | undefined, 
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return "unreachable";
-    const result = (await response.json()) as { success?: unknown };
-    return result.success === true ? "passed" : "failed";
+    return passedSchema.safeParse(await response.json()).success ? "passed" : "failed";
   } catch {
     return "unreachable";
   }

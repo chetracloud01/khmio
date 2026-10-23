@@ -1,9 +1,9 @@
 "use client";
 
-import { IconBadge, SegmentedControl, ThemePicker } from "@khmio/ui";
+import { IconBadge, ThemePicker } from "@khmio/ui";
 import { Languages, Palette } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { LanguageSwitch } from "@/components/language-switch";
 import { SubPage } from "@/components/seller-frame/sub-page";
 import { useThemeLabels } from "@/components/use-theme-labels";
 
@@ -12,9 +12,6 @@ import { useThemeLabels } from "@/components/use-theme-labels";
 // once and stay on this device.
 export default function DisplayPage() {
   const t = useTranslations("DashboardProfile");
-  const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
   const themeLabels = useThemeLabels();
   return (
     <SubPage title={t("languageAndDisplay")}>
@@ -27,15 +24,7 @@ export default function DisplayPage() {
               <p className="text-xs text-muted">{t("languageDetail")}</p>
             </div>
           </div>
-          <SegmentedControl
-            value={locale}
-            onChange={(next) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`))}
-            options={[
-              { value: "km", label: "ភាសាខ្មែរ" },
-              { value: "en", label: "English" },
-            ]}
-            className="w-full [&>*]:flex-1"
-          />
+          <LanguageSwitch size="long" className="w-full [&>*]:flex-1" />
         </div>
         <div className="flex flex-col gap-3 border-t border-border pt-4">
           <div className="flex items-center gap-3">

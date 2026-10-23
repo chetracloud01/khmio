@@ -20,10 +20,12 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { z } from "zod";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, uploadPhoto, type Catalog, type CatalogName, type Product } from "@/lib/api";
+import { api, ApiError, apiSend, type Catalog, type CatalogName, catalogNameSchema, catalogSchema, type Product, productSchema, uploadPhoto } from "@/lib/api";
+import { readStored, writeStored } from "@/lib/device-storage";
 import { useMerchant } from "../../merchant-context";
 
 /** The small copy of each photo, for the shop grid and lists. */
@@ -31,16 +33,17 @@ const THUMB_SIDE = 400;
 
 const NEW_VALUE = "__new__";
 
-interface VariantDraft {
-  id: string;
-  labelKm: string;
-  labelEn: string;
-  sku: string;
-  retailUsd: string;
-  retailKhr: string;
-  wholesaleUsd: string;
-  wholesaleKhr: string;
-}
+const variantDraftSchema = z.object({
+  id: z.string(),
+  labelKm: z.string(),
+  labelEn: z.string(),
+  sku: z.string(),
+  retailUsd: z.string(),
+  retailKhr: z.string(),
+  wholesaleUsd: z.string(),
+  wholesaleKhr: z.string(),
+});
+type VariantDraft = z.infer<typeof variantDraftSchema>;
 
 /** A photo in the form: shrunk and uploading, uploaded (has a key), or failed. */
 interface PhotoSlot {
@@ -59,41 +62,34 @@ function nextDraftId(): string {
 
 // A new product is kept on this device while it's being typed, so a phone
 // call or a closed tab doesn't lose it — photos too, as their uploaded keys.
-interface ProductDraft {
-  titleKm: string;
-  titleEn: string;
-  descriptionKm: string;
-  descriptionEn: string;
-  visible: boolean;
-  categoryId: string;
-  brandId: string;
-  uomId: string;
-  retailUsd: string;
-  retailKhr: string;
-  wholesaleUsd: string;
-  wholesaleKhr: string;
-  discountPercent: string;
-  variantDrafts: VariantDraft[];
-  photos: { key: string; url: string }[];
-}
+const productDraftSchema = z.object({
+  titleKm: z.string(),
+  titleEn: z.string(),
+  descriptionKm: z.string(),
+  descriptionEn: z.string(),
+  visible: z.boolean(),
+  categoryId: z.string(),
+  brandId: z.string(),
+  uomId: z.string(),
+  retailUsd: z.string(),
+  retailKhr: z.string(),
+  wholesaleUsd: z.string(),
+  wholesaleKhr: z.string(),
+  discountPercent: z.string(),
+  variantDrafts: z.array(variantDraftSchema),
+  photos: z.array(z.object({ key: z.string(), url: z.string() })),
+});
+type ProductDraft = z.infer<typeof productDraftSchema>;
 
 const draftStorageKey = (slug: string) => `khmio:product-draft:${slug}`;
 
+/** The kept draft; a field kept by an older version that no longer fits is left out. */
 function readDraft(slug: string): Partial<ProductDraft> | null {
-  try {
-    const raw = window.localStorage.getItem(draftStorageKey(slug));
-    return raw ? (JSON.parse(raw) as Partial<ProductDraft>) : null;
-  } catch {
-    return null;
-  }
+  return readStored(draftStorageKey(slug), productDraftSchema.partial());
 }
 
 function clearDraft(slug: string) {
-  try {
-    window.localStorage.removeItem(draftStorageKey(slug));
-  } catch {
-    // Storage unavailable — there was no draft to clear.
-  }
+  writeStored(draftStorageKey(slug), null);
 }
 
 
@@ -171,7 +167,7 @@ export default function ProductFormPage() {
 
   const load = () => {
     setState("loading");
-    Promise.all([api<Catalog>("/catalog"), isNew ? Promise.resolve(null) : api<Product>(`/products/${params.id}`)])
+    Promise.all([api("/catalog", catalogSchema), isNew ? Promise.resolve(null) : api(`/products/${params.id}`, productSchema)])
       .then(([names, existing]) => {
         setCatalog(names);
         setProduct(existing);
@@ -355,11 +351,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
         variantDrafts,
         photos: readyPhotos.map(({ key, url }) => ({ key, url })),
       };
-      try {
-        window.localStorage.setItem(draftStorageKey(store.slug), JSON.stringify(draft));
-      } catch {
-        // Storage full or unavailable — the draft just isn't kept this time.
-      }
+      writeStored(draftStorageKey(store.slug), draft); // not kept this time when storage refuses
     }, 400);
     return () => clearTimeout(timer);
     // The snapshot changes whenever any of the fields above does.
@@ -408,7 +400,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
     setAddingBusy(true);
     setAddingError(undefined);
     try {
-      const entry = await api<CatalogName>(`/catalog/${adding}`, { method: "POST", body: names });
+      const entry = await api(`/catalog/${adding}`, catalogNameSchema, { method: "POST", body: names });
       if (adding === "categories") {
         setCategories((previous) => [...previous, entry]);
         setCategoryId(entry.id);
@@ -520,15 +512,15 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
     setSaving(true);
     try {
       const body = { product: result.data, photoKeys: readyPhotos.map((photo) => photo.key) };
-      if (isNew) await api("/products", { method: "POST", body });
-      else await api(`/products/${existing.id}`, { method: "PUT", body });
+      if (isNew) await apiSend("/products", { method: "POST", body });
+      else await apiSend(`/products/${existing.id}`, { method: "PUT", body });
       if (isNew) clearDraft(store.slug);
       await refreshStore().catch(() => undefined);
       router.push(`/${locale}/m/products`);
     } catch (failure) {
       setSaving(false);
       if (failure instanceof ApiError && Object.keys(failure.fields).length > 0) {
-        setErrors(failure.fields as Record<string, FormErrorCode>);
+        setErrors(failure.fields);
         focusFirstInvalidField(formRef.current);
         return;
       }

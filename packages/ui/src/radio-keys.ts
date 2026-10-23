@@ -7,13 +7,13 @@ import type { KeyboardEvent } from "react";
 const STEPS: Record<string, number> = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
 /** Which choice Tab lands on: the chosen one, or the first while none is chosen. */
-export function radioTabIndex(values: string[], current: string | null, value: string): 0 | -1 {
+export function radioTabIndex<V extends string>(values: readonly V[], current: V | null, value: V): 0 | -1 {
   const focusable = current !== null && values.includes(current) ? current : values[0];
   return value === focusable ? 0 : -1;
 }
 
 /** Put on the group: arrow keys pick the next or previous choice and move focus to it. */
-export function radioKeyDown(event: KeyboardEvent<HTMLElement>, values: string[], current: string | null, onChange: (value: string) => void) {
+export function radioKeyDown<V extends string>(event: KeyboardEvent<HTMLElement>, values: readonly V[], current: V | null, onChange: (value: V) => void) {
   const step = STEPS[event.key];
   if (!step || values.length === 0) return;
   event.preventDefault();

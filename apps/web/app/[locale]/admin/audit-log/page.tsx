@@ -5,9 +5,10 @@ import { ScrollText } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
-import type { AdminAuditEntry } from "@/lib/admin-api";
+import { adminAuditPageSchema, type AdminAuditEntry } from "@/lib/admin-api";
 import { api } from "@/lib/api";
-import { LoadState, PageHeader, Pill, useDateText } from "../admin-ui";
+import { useDateText } from "@/components/use-date-text";
+import { LoadState, PageHeader, Pill } from "../admin-ui";
 import { useAuditText } from "../audit-text";
 
 /** Quick filters: the first part of an action ("subscription.extended" → subscription). */
@@ -40,7 +41,7 @@ export default function AuditLogPage() {
   const load = useCallback((before?: string) => {
     setFailed(false);
     const query = new URLSearchParams({ limit: String(BATCH), ...(before ? { before } : {}) }).toString();
-    return api<{ entries: AdminAuditEntry[]; more: boolean }>(`/admin/audit-log?${query}`).then(
+    return api(`/admin/audit-log?${query}`, adminAuditPageSchema).then(
       (page) => {
         setEntries((previous) => (before && previous ? [...previous, ...page.entries] : page.entries));
         setMore(page.more);

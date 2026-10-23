@@ -10,11 +10,11 @@ import { BuyerShell } from "@/components/buyer-shell";
 import { type InvoiceData } from "@/components/invoice/invoice-document";
 import { InvoiceScreen } from "@/components/invoice/invoice-screen";
 import { useOrderText } from "@/components/order-ui";
-import { mockInvoiceDetails, mockStore, mockStoreSettings, mockTrackingCode } from "@/mock/mock-data";
+import { mockStore, mockStoreSettings, mockTrackingCode } from "@/mock/mock-data";
 import { orderLineLabel, type OrderRecord } from "@/mock/mock-orders";
 import { useMerchantProducts } from "../../../merchant-products-context";
-import { useMerchantProfile } from "../../../merchant-profile-context";
 import { useOrders } from "../../../orders-context";
+import { useShopIdentity } from "../../../shop-identity";
 
 // The invoice / receipt (design/screens.md B7) for one sample order. Buyer
 // and seller see the same document; the seller reaches it from the order
@@ -44,7 +44,7 @@ function Invoice({ order }: { order: OrderRecord }) {
   const t = useTranslations("Invoice");
   const locale = useLocale();
   const { products } = useMerchantProducts();
-  const profile = useMerchantProfile();
+  const shop = useShopIdentity();
   const { placeLabel, paymentLabel } = useOrderText();
   // Full addresses for the QR and the printed link, once the page knows where it's open.
   const [origin, setOrigin] = useState("");
@@ -55,14 +55,14 @@ function Invoice({ order }: { order: OrderRecord }) {
     const state = getInvoiceState(order);
     return {
       shop: {
-        name: profile.hasProfile ? profile.shopName : locale === "km" ? mockStore.nameKm : mockStore.nameEn,
-        logoUrl: profile.logoDataUrl,
-        phone: profile.phone || mockStore.phone,
-        address: locale === "km" ? mockInvoiceDetails.addressKm : mockInvoiceDetails.addressEn,
-        taxNumber: mockInvoiceDetails.taxNumber,
-        telegram: mockInvoiceDetails.telegram,
-        facebook: mockInvoiceDetails.facebook,
-        note: locale === "km" ? mockInvoiceDetails.noteKm : mockInvoiceDetails.noteEn,
+        name: shop.name,
+        logoUrl: shop.logoDataUrl,
+        phone: shop.phone,
+        address: shop.address,
+        taxNumber: shop.taxNumber,
+        telegram: shop.telegram,
+        facebook: shop.facebook,
+        note: shop.invoiceNote,
       },
       orderNumber: order.orderNumber,
       trackingCode: formatTrackingCode(mockStore.slug, mockTrackingCode(order.orderNumber)),
@@ -88,7 +88,7 @@ function Invoice({ order }: { order: OrderRecord }) {
       orderUrl: `${origin}/${locale}/mockup/order/${encodeURIComponent(order.orderNumber)}`,
       trackUrl: `${origin}/${locale}/mockup/track`,
     };
-  }, [order, profile, locale, products, placeLabel, paymentLabel, origin]);
+  }, [order, shop, locale, products, placeLabel, paymentLabel, origin]);
 
   return (
     <InvoiceScreen

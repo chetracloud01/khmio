@@ -29,10 +29,12 @@ const a = await login("a");
 const b = await login("b");
 const slugA = (await call("/auth/me", { cookie: a })).json.store.slug;
 
+/** Days of history the home's numbers carry (apps/api orders/summary.ts SUMMARY_DAYS). */
+const SUMMARY_DAYS = 60;
 const before = (await call("/orders/summary", { cookie: a })).json;
 check(
-  "A's numbers come back in their shape: 30 days, both currencies kept apart",
-  before?.days?.length === 30 && typeof before.salesToday?.USD === "number" && typeof before.salesToday?.KHR === "number" && typeof before.cashToCollect?.KHR === "number",
+  "A's numbers come back in their shape: 60 days, both currencies kept apart",
+  before?.days?.length === SUMMARY_DAYS && typeof before.salesToday?.USD === "number" && typeof before.salesToday?.KHR === "number" && typeof before.cashToCollect?.KHR === "number",
   JSON.stringify(before)?.slice(0, 200),
 );
 const listA = (await call("/orders", { cookie: a })).json;

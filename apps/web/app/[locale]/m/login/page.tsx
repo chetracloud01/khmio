@@ -1,15 +1,16 @@
 "use client";
 
 import type { TelegramLoginPayload } from "@khmio/shared";
-import { Button, Card, Mio, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { Button, Card, Mio, ThemeSwitcher } from "@khmio/ui";
 import { Car, FlaskConical, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
 import { SignUpFrame } from "@/components/sign-up-frame";
 import { BOT_USERNAME, SHOW_DEV_LOGIN, TelegramButton } from "@/components/telegram-button";
 import { useThemeLabels } from "@/components/use-theme-labels";
-import { api, ApiError, getMe } from "@/lib/api";
+import { ApiError, apiSend, getMe } from "@/lib/api";
 import { AppLoading, AppOffline } from "../app-frame";
 
 // Real merchant login (roadmap step 2). Sign-up and log-in are one flow:
@@ -21,7 +22,6 @@ export default function LoginPage() {
   const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
-  const pathname = usePathname();
   const [state, setState] = useState<"checking" | "ready" | "offline">("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await api(path, { method: "POST", body });
+      await apiSend(path, { method: "POST", body });
       router.replace(`/${locale}/m`);
     } catch (caught) {
       setError(caught instanceof ApiError && caught.status === 0 ? t("offlineBody") : caught instanceof ApiError && caught.code === "too_many_requests" ? t("tooManyTries") : t("loginFailed"));
@@ -55,14 +55,7 @@ export default function LoginPage() {
     <SignUpFrame
       controls={
         <>
-          <SegmentedControl
-            value={locale}
-            onChange={(next) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`))}
-            options={[
-              { value: "km", label: "ខ្មែរ" },
-              { value: "en", label: "EN" },
-            ]}
-          />
+          <LanguageSwitch />
           <ThemeSwitcher labels={themeLabels} />
         </>
       }

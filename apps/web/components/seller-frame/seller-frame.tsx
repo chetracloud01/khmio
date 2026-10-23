@@ -1,11 +1,13 @@
 "use client";
 
-import { cn, SegmentedControl, ThemeSwitcher } from "@khmio/ui";
+import { cn, ThemeSwitcher } from "@khmio/ui";
 import { Lock, Store, type LucideIcon } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { LANGUAGE_NAMES, LanguageSwitch, useLocaleSwitch } from "@/components/language-switch";
+import { routing } from "@/i18n/routing";
 import { useThemeLabels } from "@/components/use-theme-labels";
 
 export interface SellerNavItem {
@@ -95,13 +97,11 @@ export function SellerFrame({
   showSettings?: boolean;
   children: ReactNode;
 }) {
-  const locale = useLocale();
-  const router = useRouter();
+  const { locale, switchTo } = useLocaleSwitch();
   const pathname = usePathname();
   const themeLabels = useThemeLabels();
   const tFrame = useTranslations("SellerApp");
-  const otherLocale = locale === "km" ? "en" : "km";
-  const switchLocale = (next: string) => router.replace(pathname.replace(/^\/(km|en)(?=\/|$)/, `/${next}`));
+  const otherLocale = routing.locales.find((value) => value !== locale) ?? routing.defaultLocale;
 
   const isActive = (href: string) => (href === homeHref ? pathname === href : pathname.startsWith(href));
   /** The item's own page, or one of the pages reached from it (e.g. Delivery from "My shop"). */
@@ -109,14 +109,7 @@ export function SellerFrame({
 
   const settings = (direction: "up" | "down") => (
     <div className="flex shrink-0 items-center gap-1">
-      <SegmentedControl
-        value={locale}
-        onChange={switchLocale}
-        options={[
-          { value: "km", label: "ខ្មែរ" },
-          { value: "en", label: "EN" },
-        ]}
-      />
+      <LanguageSwitch />
       <ThemeSwitcher labels={themeLabels} direction={direction} />
     </div>
   );
@@ -221,12 +214,12 @@ export function SellerFrame({
             <>
               <button
                 type="button"
-                onClick={() => switchLocale(otherLocale)}
+                onClick={() => switchTo(otherLocale)}
                 lang={otherLocale}
                 aria-label={tFrame("switchLanguage")}
                 className="flex h-11 min-w-11 items-center justify-center rounded-full border border-border bg-bg px-3 text-sm font-semibold"
               >
-                {otherLocale === "km" ? "ខ្មែរ" : "EN"}
+                {LANGUAGE_NAMES[otherLocale].short}
               </button>
               <ThemeSwitcher labels={themeLabels} direction="down" />
             </>

@@ -1,6 +1,8 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 
 export * from "@prisma/client";
+export * from "./alerts";
+export * from "./audit";
 
 // Two ways into the database (docs/blueprint.md "Multi-tenant safety"):
 //

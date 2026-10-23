@@ -257,12 +257,20 @@ export const SELLER_ORDER_ACTIONS = [
 ] as const satisfies readonly OrderAction[];
 export type SellerOrderAction = (typeof SELLER_ORDER_ACTIONS)[number];
 
+const sellerOrderActions: readonly string[] = SELLER_ORDER_ACTIONS;
+export const isSellerOrderAction = (action: OrderAction): action is SellerOrderAction => sellerOrderActions.includes(action);
+
+/** The steps a request carries nothing else for: no driver, ticket or reason. */
+const plainOrderActionSchema = z.enum(["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "fail_delivery", "rebook"]);
+export type PlainOrderAction = z.infer<typeof plainOrderActionSchema>;
+export const isPlainOrderAction = (action: OrderAction): action is PlainOrderAction => plainOrderActionSchema.safeParse(action).success;
+
 /**
  * What the dashboard sends to move an order on. Sending needs how it went
  * (driver, bus or pickup); cancelling needs a reason the seller may give.
  */
 export const orderActionRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "fail_delivery", "rebook"]) }),
+  z.object({ action: plainOrderActionSchema }),
   z.object({ action: z.literal("dispatch"), dispatch: dispatchInputSchema }),
   z.object({
     action: z.literal("cancel"),

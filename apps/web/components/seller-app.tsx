@@ -224,7 +224,7 @@ export function InstallSheet({ open, onClose }: { open: boolean; onClose: () => 
 /** A short two-note chime for a new order, made in the browser (no sound file to download). */
 export function playNewOrderChime() {
   try {
-    const AudioContextClass = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;
     if (!AudioContextClass) return;
     const audio = new AudioContextClass();
     [880, 1320].forEach((frequency, index) => {
@@ -366,11 +366,6 @@ export function useServiceWorker() {
   }, []);
 }
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
 const INSTALL_DISMISSED_KEY = "khmio.installDismissed";
 
 /**
@@ -384,16 +379,16 @@ export function useInstallPrompt() {
   const [installed, setInstalled] = useState(true);
   const [dismissed, setDismissed] = useState(true);
   useEffect(() => {
-    const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
     setInstalled(standalone);
     try {
       setDismissed(window.localStorage.getItem(INSTALL_DISMISSED_KEY) === "1");
     } catch {
       setDismissed(false);
     }
-    const onPrompt = (event: Event) => {
+    const onPrompt = (event: BeforeInstallPromptEvent) => {
       event.preventDefault();
-      setDeferred(event as BeforeInstallPromptEvent);
+      setDeferred(event);
     };
     const onInstalled = () => setInstalled(true);
     window.addEventListener("beforeinstallprompt", onPrompt);

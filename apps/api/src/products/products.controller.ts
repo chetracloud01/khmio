@@ -1,12 +1,11 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { planHasFeature } from "@khmio/shared";
 import { Body, Controller, Delete, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Put, UseGuards } from "@nestjs/common";
 import { z } from "zod";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
-import { assertStoreWritable, storePlan } from "../merchant/plan";
+import { assertStoreWritable } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
-import { parseProductSave, productInclude, saveProduct, toProductDto } from "./products";
+import { deleteProduct, parseProductSave, productExists, readProduct, readProducts, saveProduct, setProductVisibility } from "./products";
 
 const visibilitySchema = z.object({ isVisible: z.boolean() });
 
@@ -23,21 +22,14 @@ export class ProductsController {
 
   @Get()
   async list(@CurrentStore() context: MerchantStore) {
-    return withContext(this.app, context, async (tx) => {
-      const { plan } = await storePlan(tx, context.storeId);
-      const products = await tx.product.findMany({ where: { deletedAt: null }, include: productInclude, orderBy: { createdAt: "desc" } });
-      return products.map((product) => toProductDto(product, this.url, planHasFeature(plan, "wholesalePrice")));
-    });
+    return withContext(this.app, context, (tx) => readProducts(tx, context.storeId, this.url));
   }
 
   @Get(":id")
   async get(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string) {
-    return withContext(this.app, context, async (tx) => {
-      const { plan } = await storePlan(tx, context.storeId);
-      const product = await tx.product.findFirst({ where: { id, deletedAt: null }, include: productInclude });
-      if (!product) throw new NotFoundException();
-      return toProductDto(product, this.url, planHasFeature(plan, "wholesalePrice"));
-    });
+    const product = await withContext(this.app, context, (tx) => readProduct(tx, context.storeId, id, this.url));
+    if (!product) throw new NotFoundException();
+    return product;
   }
 
   @Post()
@@ -54,7 +46,7 @@ export class ProductsController {
     const input = parseProductSave(body);
     return withContext(this.app, context, async (tx) => {
       const plan = await assertStoreWritable(tx, context.storeId);
-      if (!(await tx.product.findFirst({ where: { id, deletedAt: null }, select: { id: true } }))) throw new NotFoundException();
+      if (!(await productExists(tx, id))) throw new NotFoundException();
       return { id: await saveProduct(tx, context.storeId, plan, input, id) };
     });
   }
@@ -65,8 +57,7 @@ export class ProductsController {
     const { isVisible } = visibilitySchema.parse(body);
     return withContext(this.app, context, async (tx) => {
       await assertStoreWritable(tx, context.storeId);
-      const { count } = await tx.product.updateMany({ where: { id, deletedAt: null }, data: { isVisible } });
-      if (count === 0) throw new NotFoundException();
+      if (!(await setProductVisibility(tx, id, isVisible))) throw new NotFoundException();
       return { id, isVisible };
     });
   }
@@ -77,10 +68,7 @@ export class ProductsController {
   async remove(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string) {
     return withContext(this.app, context, async (tx) => {
       await assertStoreWritable(tx, context.storeId);
-      const now = new Date();
-      const { count } = await tx.product.updateMany({ where: { id, deletedAt: null }, data: { deletedAt: now } });
-      if (count === 0) throw new NotFoundException();
-      await tx.productVariant.updateMany({ where: { productId: id, deletedAt: null }, data: { deletedAt: now } });
+      if (!(await deleteProduct(tx, id))) throw new NotFoundException();
       return { id, deleted: true };
     });
   }

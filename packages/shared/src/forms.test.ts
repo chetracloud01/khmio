@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canUnlinkLoginMethod, otpCodeSchema, phoneLoginSchema } from "./auth";
 import { checkoutInputSchema, getAvailablePaymentMethods } from "./checkout";
-import { deliveryFeeIn, deliverySettingsSchema, getDeliveryQuote, type DeliverySettings } from "./delivery";
+import { deliveryFeeIn, deliverySettingsSchema, deliverySettingsShape, getDeliveryQuote, type DeliverySettings } from "./delivery";
 import { toFieldErrors } from "./form-errors";
 import { parseKhrInput, parseUsdInput } from "./money";
 import { formatKhmerPhoneLocal } from "./phone";
@@ -209,6 +209,12 @@ describe("delivery settings and quotes", () => {
   it("needs at least one way to get an order to a buyer", () => {
     const nothing = { zones: [], pickup: { enabled: false, address: "", hours: "" }, province: { enabled: false, note: "" }, drivers: [] };
     expect(errorsOf(deliverySettingsSchema.safeParse(nothing))).toEqual({ zones: "delivery_required" });
+  });
+
+  it("reads a shop's saved settings by their shape alone, even before delivery is set up", () => {
+    const notSetUp = { zones: [], pickup: { enabled: false, address: "", hours: "" }, province: { enabled: false, note: "" }, drivers: [] };
+    expect(deliverySettingsShape.safeParse(notSetUp).success).toBe(true);
+    expect(deliverySettingsShape.safeParse({ ...notSetUp, pickup: { enabled: "yes" } }).success).toBe(false);
   });
 });
 
