@@ -3,6 +3,7 @@
 // the buyer's order page and the seller's order list. PASS/FAIL lines.
 // Usage: node tests/e2e/step4.mjs <api url>   (run after step2/3 on the same database)
 import { randomUUID } from "node:crypto";
+import { saveShopDetails } from "./lib.mjs";
 
 const B = process.argv[2] ?? "http://localhost:4105";
 let failures = 0;
@@ -90,24 +91,31 @@ const deliveryBody = {
 const dup = await call("/delivery", { method: "PUT", cookie: a, body: { ...deliveryBody, zones: [deliveryBody.zones[0], { ...deliveryBody.zones[1], districtIds: ["daun-penh"] }] } });
 check("a district in two zones is refused", dup.json?.fields?.["zones.1.districtIds"] === "district_duplicate", dup.raw);
 const saved = await call("/delivery", { method: "PUT", cookie: a, body: deliveryBody });
-check("delivery saves: zones, pickup, provinces and the driver", saved.status === 200 && saved.json?.settings?.zones?.length === 2 && saved.json.settings.drivers[0]?.phone === "85512345678" && saved.json.configured === true, saved.raw);
+check("delivery saves: zones, provinces and the driver", saved.status === 200 && saved.json?.settings?.zones?.length === 2 && saved.json.settings.drivers[0]?.phone === "85512345678" && saved.json.configured === true, saved.raw);
 const driverId = saved.json.settings.drivers[0].id;
 const resaved = await call("/delivery", { method: "PUT", cookie: a, body: { ...deliveryBody, drivers: [{ ...deliveryBody.drivers[0], id: driverId, name: "Dara S." }] } });
 check("saving again keeps the driver's id", resaved.json?.settings?.drivers?.[0]?.id === driverId && resaved.json.settings.drivers[0].name === "Dara S.");
+check("delivery doesn't switch pickup on: that's on Shop details", resaved.json?.settings?.pickup?.enabled === false);
+// Pickup is set with the shop address on Shop details (design/screens.md S10).
+const pickupOn = await saveShopDetails(call, a, { address: "St. 271, near Aeon 2", pickupEnabled: true, pickupHours: "8:00–18:00" });
+check("pickup switches on with the shop address", pickupOn.status === 200 && pickupOn.json?.pickupEnabled === true && pickupOn.json.pickupAddress === "St. 271, near Aeon 2", pickupOn.raw);
+const deliveryAgain = await call("/delivery", { method: "PUT", cookie: a, body: { ...deliveryBody, pickup: { enabled: false, address: "", hours: "" } } });
+check("saving delivery leaves pickup as Shop details set it", deliveryAgain.json?.settings?.pickup?.enabled === true && deliveryAgain.json.settings.pickup.address === "St. 271, near Aeon 2", deliveryAgain.raw);
 check("the setup checklist now counts delivery as done", (await call("/store", { cookie: a })).json?.readiness?.deliveryConfigured === true);
 check("B's delivery page shows none of A's zones or drivers", (await call("/delivery", { cookie: b })).json?.settings?.zones?.length === 0);
 const shopA = (await call(`/public/stores/${slugA}`)).json;
 check("the shop page shows zones, pickup and provinces — and no drivers", shopA.delivery?.zones?.length === 2 && shopA.delivery.pickup.enabled && !JSON.stringify(shopA).includes("Dara"));
 
 // ---------------------------------------------------------------- store settings
-const settings = (await call("/store/settings", { cookie: a })).json;
-check("store settings come with the platform's allowed rate band", settings?.usdToKhrRate === 4100 && settings.rateBand?.min > 0, JSON.stringify(settings));
-const outOfBand = await call("/store/settings", { method: "PUT", cookie: a, body: { defaultCurrency: "USD", usdToKhrRate: 9999, allowCod: true, vatPercent: 0 } });
+// Prices & tax are part of Shop details (design/screens.md S9 → S10).
+const settings = (await call("/store", { cookie: a })).json;
+check("shop details come with the platform's allowed rate band", settings?.usdToKhrRate === 4100 && settings.rateBand?.min > 0, JSON.stringify(settings));
+const outOfBand = await saveShopDetails(call, a, { usdToKhrRate: 9999 });
 check("a rate outside the band is refused", outOfBand.json?.fields?.usdToKhrRate === "rate_out_of_band", outOfBand.raw);
-const badVat = await call("/store/settings", { method: "PUT", cookie: a, body: { defaultCurrency: "USD", usdToKhrRate: 4000, allowCod: true, vatPercent: 25 } });
+const badVat = await saveShopDetails(call, a, { usdToKhrRate: 4000, vatPercent: 25 });
 check("VAT over 20% is refused", badVat.json?.fields?.vatPercent === "vat_range", badVat.raw);
-const set = await call("/store/settings", { method: "PUT", cookie: a, body: { defaultCurrency: "USD", usdToKhrRate: 4000, allowCod: true, vatPercent: 10 } });
-check("store settings save (rate 4,000៛, VAT 10%)", set.json?.usdToKhrRate === 4000 && set.json.vatPercent === 10, set.raw);
+const set = await saveShopDetails(call, a, { usdToKhrRate: 4000, allowCod: true, vatPercent: 10 });
+check("prices & tax save (rate 4,000៛, VAT 10%)", set.json?.usdToKhrRate === 4000 && set.json.vatPercent === 10, set.raw);
 
 // ---------------------------------------------------------------- a cash order, totals checked
 const key = randomUUID();
@@ -152,10 +160,10 @@ check("an unknown shop link is 404", (await order([{ variantId: bread, quantity:
 check("an unknown order link is 404", (await call(`/public/orders/${"x".repeat(32)}`)).status === 404);
 check("a malformed order link is 404", (await call("/public/orders/1")).status === 404);
 
-await call("/store/settings", { method: "PUT", cookie: a, body: { defaultCurrency: "USD", usdToKhrRate: 4000, allowCod: false, vatPercent: 10 } });
+await saveShopDetails(call, a, { usdToKhrRate: 4000, allowCod: false, vatPercent: 10 });
 const noWayToPay = await order([{ variantId: bread, quantity: 1 }]);
 check("with cash on delivery off and no KHQR yet, the shop doesn't take orders", noWayToPay.status === 409 && noWayToPay.json?.error === "not_accepting_orders", noWayToPay.raw);
-await call("/store/settings", { method: "PUT", cookie: a, body: { defaultCurrency: "USD", usdToKhrRate: 4100, allowCod: true, vatPercent: 0 } });
+await saveShopDetails(call, a, { usdToKhrRate: 4100, allowCod: true, vatPercent: 0 });
 
 // ---------------------------------------------------------------- the seller's order list
 const listA = (await call("/orders", { cookie: a })).json;

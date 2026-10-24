@@ -2,6 +2,7 @@
 // details and the public shop read, with two merchants. PASS/FAIL lines.
 // Usage: node tests/e2e/step3.mjs <api url> <path to a real .jpg>
 import { readFileSync } from "node:fs";
+import { saveShopDetails } from "./lib.mjs";
 
 const B = process.argv[2] ?? "http://localhost:4000";
 const JPG = readFileSync(process.argv[3] ?? new URL("./fixtures/photo.jpg", import.meta.url));
@@ -149,15 +150,24 @@ check("a badly formed shop link is 404", (await call("/public/stores/..%2Fadmin"
 await call(`/products/${opt.id}/visibility`, { method: "PATCH", cookie: a, body: { isVisible: true } });
 
 // ---------------------------------------------------------------- shop details
-const details = (await call("/store", { cookie: a })).json;
-const save = await call("/store", { method: "PUT", cookie: a, body: { shopName: details.name, businessType: details.businessType, phone: "077 888 999", area: "phnom_penh", description: "Cotton clothes", bakongId: "srey@aclb", logoKey: photos[0] } });
+const save = await saveShopDetails(call, a, { phone: "077 888 999", description: "Cotton clothes", bakongId: "srey@aclb", logoKey: photos[0] });
 check("shop details save, with the phone stored as 855…", save.status === 200 && save.json?.phone === "85577888999" && save.json?.bakongId === "srey@aclb" && !!save.json?.logoUrl, save.raw);
-check("a wrong phone is refused", (await call("/store", { method: "PUT", cookie: a, body: { shopName: details.name, businessType: details.businessType, phone: "123", area: "phnom_penh", description: "", bakongId: "", logoKey: null } })).json?.fields?.phone === "phone_invalid");
+check("a wrong phone is refused", (await saveShopDetails(call, a, { phone: "123" })).json?.fields?.phone === "phone_invalid");
 const bLogo = (await upload(b, JPG)).json.key;
-check("another store's photo can't be A's logo", (await call("/store", { method: "PUT", cookie: a, body: { shopName: details.name, businessType: details.businessType, phone: "", area: "phnom_penh", description: "", bakongId: "", logoKey: bLogo } })).json?.fields?.logoKey === "photo_required");
-const cleared = await call("/store", { method: "PUT", cookie: a, body: { shopName: details.name, businessType: details.businessType, phone: "077 888 999", area: "phnom_penh", description: "Cotton clothes", bakongId: "", logoKey: photos[0] } });
+check("another store's photo can't be A's logo", (await saveShopDetails(call, a, { logoKey: bLogo })).json?.fields?.logoKey === "photo_required");
+check("another store's photo can't be A's payment QR", (await saveShopDetails(call, a, { paymentQrKey: bLogo })).json?.fields?.paymentQrKey === "photo_required");
+const cleared = await saveShopDetails(call, a, { bakongId: "" });
 check("clearing the Bakong ID turns KHQR off", cleared.json?.bakongId === "");
 check("the shop page shows the logo and phone", (await call(`/public/stores/${slugA}`)).json?.store?.phone === "85577888999");
+
+// Location and invoices are saved with the rest (design/screens.md S10).
+check("a map link that isn't a web link is refused", (await saveShopDetails(call, a, { mapUrl: "javascript:alert(1)" })).json?.fields?.mapUrl === "map_link_invalid");
+check("pickup needs the shop address", (await saveShopDetails(call, a, { pickupEnabled: true, address: "" })).json?.fields?.address === "required");
+const located = await saveShopDetails(call, a, { mapUrl: "https://maps.app.goo.gl/test", telegramLink: "t.me/shopa", taxNumber: "K001-1" });
+check("the map link, Telegram and VAT TIN save with the shop", located.status === 200 && located.json?.mapUrl === "https://maps.app.goo.gl/test" && located.json.telegramLink === "t.me/shopa", located.raw);
+const shopPage = (await call(`/public/stores/${slugA}`)).json;
+check("buyers get the map link and Telegram, never the VAT TIN or invoice note", shopPage?.store?.mapUrl === "https://maps.app.goo.gl/test" && shopPage.store.telegramLink === "t.me/shopa" && !("taxNumber" in shopPage.store) && !("invoiceNote" in shopPage.store));
+check("the old invoice and store settings routes are gone", (await call("/store/invoice", { method: "PUT", cookie: a, body: {} })).status === 404 && (await call("/store/settings", { cookie: a })).status === 404);
 
 console.log(failures === 0 ? "\nALL PASSED" : `\n${failures} FAILED`);
 console.log(JSON.stringify({ productIds: [created.json.id, opt.id, third.json.id] }));

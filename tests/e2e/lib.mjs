@@ -22,3 +22,35 @@ export function psql(query, { asApp = false } = {}) {
   // Options first: psql on Windows stops reading options at the first plain argument.
   return execFileSync(PSQL, ["-tA", "-c", query, `--dbname=${asApp ? APP_URL : OWNER_URL}`], { stdio: ["ignore", "pipe", "pipe"] }).toString();
 }
+
+/**
+ * PUT /store saves all of Shop details at once (packages/shared
+ * shopDetailsSaveSchema): the shop as saved, with `changes` on top — like the
+ * web app's lib/shop-details-save.ts. `call` is the script's own API helper.
+ */
+export async function saveShopDetails(call, cookie, changes = {}) {
+  const store = (await call("/store", { cookie })).json;
+  const body = {
+    shopName: store.name,
+    businessType: store.businessType,
+    phone: store.phone,
+    area: store.area,
+    description: store.description,
+    bakongId: store.bakongId,
+    logoKey: store.logoKey,
+    paymentQrKey: store.paymentQrKey,
+    address: store.pickupAddress,
+    mapUrl: store.mapUrl,
+    pickupEnabled: store.pickupEnabled,
+    pickupHours: store.pickupHours,
+    defaultCurrency: store.defaultCurrency,
+    usdToKhrRate: store.usdToKhrRate,
+    allowCod: store.allowCod,
+    vatPercent: store.vatPercent,
+    taxNumber: store.taxNumber,
+    invoiceNote: store.invoiceNote,
+    telegramLink: store.telegramLink,
+    facebookLink: store.facebookLink,
+  };
+  return call("/store", { method: "PUT", cookie, body: { ...body, ...changes } });
+}

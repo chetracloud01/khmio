@@ -18,7 +18,7 @@ import { ROOT } from "./lib.mjs";
 
 const PORT = 4105;
 const API = `http://localhost:${PORT}`;
-const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "step7", "r1a", "home"];
+const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "counter", "step7", "r1a", "home"];
 
 if (!existsSync(join(ROOT, "apps/api/dist/main.js"))) {
   console.error('Build first: pnpm build');
