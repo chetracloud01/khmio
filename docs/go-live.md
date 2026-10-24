@@ -157,17 +157,22 @@ admin Settings, set the alert chat.
    `https://api.<domain>/health` and `https://<domain>/km`, alerting your Telegram or email.
 2. Sentry alerts (if `SENTRY_DSN` is set) to your email or Telegram.
 
-## 11. Smoke test (about 20 minutes, on your phone, mobile data)
+## 11. Smoke test (about 30 minutes, on your phone, mobile data)
 
 - [ ] `https://<domain>/km`: page loads in Kantumruy Pro, padlock shown.
 - [ ] Seller: Log in with Telegram → 2 questions → shop open.
 - [ ] Add a product with 2 photos → photos load from `files.<domain>`; the shop grid shows them.
-- [ ] Delivery zones and phone saved → the checklist reaches "Share your shop" → Share works.
-- [ ] Buyer (another phone): open the shop link → cart → checkout (the bot check passes silently) → order page.
+- [ ] Shop details: phone, shop address, a Google Maps link (tap "Check your map link": the right pin opens), pickup on with hours, Telegram → Save.
+- [ ] Delivery zones saved; its Pickup row shows "Pickup is on · address" → the checklist reaches "Share your shop" → Share works.
+- [ ] Buyer (another phone): open the shop link → **Shop info & contact** → Call opens the dialler, Map opens the right pin, Telegram opens the app; the sheet lists the delivery fees.
+- [ ] Buyer: cart → checkout (the bot check passes silently) → order page → **My orders** and **Track my order** → the back arrow returns to the shop.
 - [ ] The seller's Telegram gets the alert with **Confirm** and **Open**; Confirm works.
 - [ ] Buyer taps "Get updates on Telegram" → presses Start → gets the "confirmed" message.
 - [ ] Seller moves the order to delivered and cash collected; the buyer's page follows.
 - [ ] Add the bot to a staff group from My shop → the group gets the next alert.
+- [ ] Shop details › Getting paid: upload the payment QR from your bank app (follow "How to get your payment QR").
+- [ ] **Sell in shop** (Home's first tile): a cash sale → the change shown → Receipt at 80 mm → Print or Share works; a **Shop QR** sale (pay yourself a small amount, tick only after it shows in the bank app); no Telegram alert for either.
+- [ ] Today's sales: cash and shop QR totals are right → Void one → it's crossed out and not counted; Orders → filter **In shop** shows both.
 - [ ] Admin: login with the authenticator code → the shop is listed → extend its trial → it's in the audit log.
 - [ ] Worker log: `database backup done` after 03:00 the next night, or run it now:
       Railway → worker → SSH → `pnpm db:backup`.
