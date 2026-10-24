@@ -83,6 +83,7 @@ export class StoreController {
       // The rate must sit inside the band the platform allows today — refused on save, never silently clamped at checkout.
       const input = shopDetailsSaveSchema(await readRateBand(tx)).parse(body);
       if (input.logoKey && !isStorePhotoKey(context.storeId, input.logoKey)) throw new InvalidInputException({ logoKey: "photo_required" });
+      if (input.paymentQrKey && !isStorePhotoKey(context.storeId, input.paymentQrKey)) throw new InvalidInputException({ paymentQrKey: "photo_required" });
       await assertStoreWritable(tx, context.storeId);
       const pickupProblem = pickupSwitchProblem(await readDeliverySettings(tx, context.storeId), input.pickupEnabled);
       if (pickupProblem) throw new InvalidInputException({ pickupEnabled: pickupProblem });

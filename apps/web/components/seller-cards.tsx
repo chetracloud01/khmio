@@ -1,6 +1,6 @@
 "use client";
 
-import { getOrderTab, parseTrackingCode, type Fulfilment, type OrderStatus } from "@khmio/shared";
+import { getOrderTab, parseTrackingCode, type OrderFulfilment, type OrderStatus } from "@khmio/shared";
 import { ActionTiles, cn, GroupTitle, IconBadge, PillInput, PillInputButton } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, Copy, Download, History, Link2, QrCode, Search, Send, Share2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -21,7 +21,7 @@ import { readStored, writeStored } from "@/lib/device-storage";
 const CARD = "flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-bg p-4 shadow-card";
 
 /** The order's status as a coloured circle with its icon (orange waiting, blue moving, green done, red stopped). */
-export function OrderStatusCircle({ status, fulfilment, label, className }: { status: OrderStatus; fulfilment?: Fulfilment; label: string; className?: string }) {
+export function OrderStatusCircle({ status, fulfilment, label, className }: { status: OrderStatus; fulfilment?: OrderFulfilment; label: string; className?: string }) {
   return <IconBadge icon={orderStatusIcon({ status, fulfilment })} tone={ORDER_STATUS_TONE[status]} shape="circle" label={label} className={className} />;
 }
 
@@ -36,7 +36,7 @@ export interface ActionRow {
   total: string;
   status: OrderStatus;
   /** Pickup orders show the shop, not a truck, when ready. */
-  fulfilment?: Fulfilment;
+  fulfilment?: OrderFulfilment;
   statusLabel: string;
   next: ReactNode;
 }

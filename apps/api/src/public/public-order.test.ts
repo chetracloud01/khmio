@@ -7,6 +7,7 @@ type OrderRow = Parameters<typeof toPublicOrder>[0];
 const AT = new Date("2026-10-20T03:00:00Z");
 const order = (overrides: Partial<OrderRow> = {}): OrderRow => ({
   orderNumber: 7,
+  channel: "online",
   trackingCode: "7K4P9QXR",
   status: "cod_pending",
   paymentMethod: "cod",

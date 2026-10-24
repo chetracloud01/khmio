@@ -42,6 +42,7 @@ import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks, focusFirstIn
 import { InvoiceFields } from "@/components/shop-details/invoice-fields";
 import { LocationFields } from "@/components/shop-details/location-fields";
 import { PricingFields, toPricingDraft, toPricingInput } from "@/components/shop-details/pricing-fields";
+import { PaymentQrField } from "@/components/counter/payment-qr-field";
 import { useMerchantInventory } from "../../merchant-inventory-context";
 import { useStoreSettings } from "../../store-settings-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
@@ -70,6 +71,8 @@ interface Draft {
   vatPercent: string;
   /** Advance: "type::id" of where online orders ship from, or "" for the main branch. */
   onlineStockKey: string;
+  /** The seller's own payment QR, for buyers paying at the counter. */
+  paymentQrDataUrl: string | null;
   // On your invoices
   taxNumber: string;
   telegramLink: string;
@@ -145,6 +148,7 @@ function ProfileForm() {
     allowCod: storeSettings.allowCod,
     ...toPricingDraft(storeSettings),
     onlineStockKey: storeSettings.onlineStockLocation ? locationKey(storeSettings.onlineStockLocation) : "",
+    paymentQrDataUrl: profile.paymentQrDataUrl,
     ...profile.invoiceDetails,
   };
   const [draft, setDraft] = useState<Draft>(saved);
@@ -250,6 +254,7 @@ function ProfileForm() {
     profile.setDescription(valid.description);
     profile.setBakongId(valid.bakongId);
     profile.setLogoDataUrl(draft.logoDataUrl);
+    profile.setPaymentQrDataUrl(draft.paymentQrDataUrl);
     profile.setMapUrl(location.data.mapUrl);
     profile.setInvoiceDetails(invoice.data);
     saveSettings(settings.data);
@@ -421,6 +426,17 @@ function ProfileForm() {
           )}
           <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod)} label={tStore("codLabel")} description={tStore("codHint")} />
           {!draft.allowCod && <Notice tone="warning">{tApp("codOffWarning")}</Notice>}
+          <PaymentQrField
+            previewUrl={draft.paymentQrDataUrl}
+            onFile={(file) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === "string") update("paymentQrDataUrl", reader.result);
+              };
+              reader.readAsDataURL(file);
+            }}
+            onRemove={() => update("paymentQrDataUrl", null)}
+          />
         </FormSection>
 
         <PricingFields values={draft} band={band} errors={errors} onChange={updateFields} onCheck={checkField}>

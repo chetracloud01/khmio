@@ -7,6 +7,7 @@ import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "../orders/inv
 
 export const publicOrderSelect = {
   orderNumber: true,
+  channel: true,
   trackingCode: true,
   status: true,
   paymentMethod: true,

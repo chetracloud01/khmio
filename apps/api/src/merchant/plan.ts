@@ -1,5 +1,5 @@
 import type { Tx } from "@khmio/db";
-import { effectivePlan, type PlanId, type SubscriptionStatus } from "@khmio/shared";
+import { effectivePlan, planHasFeature, type PlanFeature, type PlanId, type SubscriptionStatus } from "@khmio/shared";
 import { AppException } from "../errors";
 
 /**
@@ -28,4 +28,9 @@ export async function assertStoreWritable(tx: Tx, storeId: string): Promise<Plan
   const { plan, paused } = await storePlan(tx, storeId);
   if (paused) throw new AppException(403, "store_paused");
   return plan;
+}
+
+/** A feature the plan in force doesn't include (packages/shared plans.ts) is refused here, not only hidden on screen. */
+export function assertPlanFeature(plan: PlanId, feature: PlanFeature): void {
+  if (!planHasFeature(plan, feature)) throw new AppException(403, "plan_limit");
 }

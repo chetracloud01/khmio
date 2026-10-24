@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { formatTrackingCode, getInvoiceState, parseTrackingCode, socialLinkUrl, trackingCodePrefix, trackOrderInputSchema } from "./invoice";
 
 describe("invoice state", () => {
+  it("is a receipt for a sale at the counter, until it's voided", () => {
+    expect(getInvoiceState({ status: "completed", paymentMethod: "cash" })).toBe("paid");
+    expect(getInvoiceState({ status: "completed", paymentMethod: "shop_qr" })).toBe("paid");
+    expect(getInvoiceState({ status: "cancelled", paymentMethod: "cash" })).toBe("cancelled");
+  });
+
   it("is a receipt once cash is handed over, never before", () => {
     expect(getInvoiceState({ status: "cod_pending", paymentMethod: "cod" })).toBe("unpaid");
     expect(getInvoiceState({ status: "out_for_delivery", paymentMethod: "cod" })).toBe("unpaid");

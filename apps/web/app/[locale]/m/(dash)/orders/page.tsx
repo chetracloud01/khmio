@@ -138,7 +138,7 @@ export default function OrdersPage() {
       value: (order) => `${placeLabel(order)} · ${paymentLabel(order)}`,
       cell: (order) => (
         <div className="flex items-start gap-2">
-          {order.fulfilment === "pickup" ? <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" /> : <Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />}
+          {order.fulfilment === "delivery" ? <Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" /> : <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />}
           <div className="min-w-0">
             <p className="truncate">{placeLabel(order)}</p>
             <p className="truncate text-xs text-muted">{paymentLabel(order)}</p>
@@ -213,6 +213,7 @@ export default function OrdersPage() {
             options: [
               { value: "delivery", label: t("filterDelivery") },
               { value: "pickup", label: t("filterPickup") },
+              { value: "in_store", label: t("filterInStore") },
             ],
           },
         ]}

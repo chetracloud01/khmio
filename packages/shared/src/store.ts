@@ -86,9 +86,14 @@ export const storeProfileSchema = z.object({
 
 export type StoreProfileInput = z.input<typeof storeProfileSchema>;
 
-/** The shop details page sends the profile plus the logo (an uploaded photo's key, or null to remove it). */
+/**
+ * The shop details page sends the profile plus the logo and the payment QR
+ * picture (each an uploaded photo's key, or null to remove it).
+ */
 export const storeDetailsSaveSchema = storeProfileSchema.extend({
   logoKey: z.string().min(1).max(200).nullable(),
+  /** The seller's own KHQR picture, shown to buyers paying at the counter (design/screens.md P2). */
+  paymentQrKey: z.string().min(1).max(200).nullable(),
 });
 export type StoreDetailsSave = z.infer<typeof storeDetailsSaveSchema>;
 

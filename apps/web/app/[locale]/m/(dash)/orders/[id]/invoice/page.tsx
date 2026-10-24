@@ -47,7 +47,12 @@ export default function SellerInvoicePage() {
 
 function SellerInvoice({ invoice, id }: { invoice: OrderInvoice; id: string }) {
   const t = useTranslations("Invoice");
+  const tCounter = useTranslations("Counter");
   const locale = useLocale();
   const data = useInvoiceData(invoice);
+  // A sale at the counter prints on the 80 mm roll, and goes back to today's sales.
+  if (invoice.order.channel === "in_store") {
+    return <InvoiceScreen data={data} initialSize="receipt" backHref={`/${locale}/m/sell/today`} backLabel={tCounter("todayTitle")} />;
+  }
   return <InvoiceScreen data={data} backHref={`/${locale}/m/orders/${id}`} backLabel={t("backToOrder")} />;
 }

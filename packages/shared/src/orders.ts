@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { PaymentMethod } from "./checkout";
-import type { Fulfilment } from "./delivery";
+import type { OrderPaymentMethod, PaymentMethod } from "./checkout";
+import type { OrderFulfilment } from "./delivery";
 import type { ListSpec } from "./list-query";
 import { khmerPhoneSchema } from "./phone";
 
@@ -43,8 +43,8 @@ export type DispatchRoute = "driver" | "pickup" | "bus";
 /** The parts of an order the rules below need. */
 export interface OrderFacts {
   status: OrderStatus;
-  paymentMethod: PaymentMethod;
-  fulfilment: Fulfilment;
+  paymentMethod: OrderPaymentMethod;
+  fulfilment: OrderFulfilment;
   area: "phnom_penh" | "province";
 }
 
@@ -59,7 +59,8 @@ export function getInitialOrderStatus(paymentMethod: PaymentMethod): OrderStatus
 
 /** How this order must be sent: the buyer chose it at checkout, the seller doesn't pick. */
 export function getDispatchRoute(order: Pick<OrderFacts, "fulfilment" | "area">): DispatchRoute {
-  if (order.fulfilment === "pickup") return "pickup";
+  // Collected at the shop, or handed over at the counter.
+  if (order.fulfilment !== "delivery") return "pickup";
   return order.area === "province" ? "bus" : "driver";
 }
 
@@ -169,7 +170,7 @@ export function orderStatusesForTab(tab: OrderTab): OrderStatus[] {
 export const ORDER_LIST_SPEC = {
   sorts: ["order", "buyer", "total", "status"],
   chips: ORDER_TABS,
-  filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup"] },
+  filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup", "in_store"] },
   defaultSort: { key: "order", dir: "desc" },
 } as const satisfies ListSpec;
 
@@ -225,7 +226,11 @@ export const dispatchInputSchema = z.discriminatedUnion("route", [
 ]);
 export type DispatchInput = z.infer<typeof dispatchInputSchema>;
 
-export const orderCancelReasonSchema = z.enum(["payment_timeout", "buyer_cancelled", "out_of_stock", "cannot_deliver", "other"]);
+export const orderCancelReasonSchema = z.enum(["payment_timeout", "buyer_cancelled", "out_of_stock", "cannot_deliver", "other", "counter_void"]);
+
+/** Where an order was made: the shop page, or the counter (design/screens.md P1). */
+export const orderChannelSchema = z.enum(["online", "in_store"]);
+export type OrderChannel = z.infer<typeof orderChannelSchema>;
 export type OrderCancelReason = z.infer<typeof orderCancelReasonSchema>;
 
 /** Reasons a seller can pick (the other two are set by the system and the buyer). */

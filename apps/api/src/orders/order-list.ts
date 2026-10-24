@@ -8,6 +8,7 @@ export const parseOrderListQuery = (params: unknown) => orderListQuerySchema.par
 export const orderListSelect = {
   id: true,
   orderNumber: true,
+  channel: true,
   trackingCode: true,
   status: true,
   paymentMethod: true,
@@ -56,8 +57,9 @@ const tabWhere = (tab: OrderTab): Prisma.OrderWhereInput => ({ status: { in: ord
 
 /** Each filter value as a where (keys and values from ORDER_LIST_SPEC.filters). */
 const ORDER_FILTER_WHERE: { [K in keyof typeof ORDER_LIST_SPEC.filters]: Record<(typeof ORDER_LIST_SPEC.filters)[K][number], Prisma.OrderWhereInput> } = {
-  payment: { online: { paymentMethod: { not: "cod" } }, cod: { paymentMethod: "cod" } },
-  fulfilment: { delivery: { fulfilment: "delivery" }, pickup: { fulfilment: "pickup" } },
+  // "Online" = paid on the shop page (KHQR, PayWay) — not cash on delivery, and not a sale at the counter.
+  payment: { online: { paymentMethod: { in: ["khqr", "aba_payway"] } }, cod: { paymentMethod: "cod" } },
+  fulfilment: { delivery: { fulfilment: "delivery" }, pickup: { fulfilment: "pickup" }, in_store: { fulfilment: "in_store" } },
 };
 
 type OrderSort = (typeof ORDER_LIST_SPEC.sorts)[number];

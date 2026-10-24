@@ -14,9 +14,22 @@ import { InvoiceDocument, type InvoiceData, type InvoiceSize } from "./invoice-d
  * the image and PDF. The buyer's page, the seller's page and the mockup all
  * show this one screen.
  */
-export function InvoiceScreen({ data, backHref, backLabel, badge }: { data: InvoiceData; backHref: string; backLabel: string; badge?: string }) {
+export function InvoiceScreen({
+  data,
+  backHref,
+  backLabel,
+  badge,
+  initialSize = "a4",
+}: {
+  data: InvoiceData;
+  backHref: string;
+  backLabel: string;
+  badge?: string;
+  /** "receipt" for a sale at the counter, printed on an 80 mm roll. */
+  initialSize?: InvoiceSize;
+}) {
   const t = useTranslations("Invoice");
-  const [size, setSize] = useState<InvoiceSize>("a4");
+  const [size, setSize] = useState<InvoiceSize>(initialSize);
   const exportRef = useRef<HTMLDivElement>(null);
   const documentName = data.state === "paid" ? t("titleReceipt") : t("titleInvoice");
 

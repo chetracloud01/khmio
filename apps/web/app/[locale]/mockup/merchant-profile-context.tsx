@@ -41,6 +41,9 @@ interface MerchantProfileContextValue {
   /** "On your invoices": VAT TIN, Telegram, Facebook, note. */
   invoiceDetails: InvoiceDetails;
   setInvoiceDetails: Dispatch<SetStateAction<InvoiceDetails>>;
+  /** The seller's own payment QR (a picture from their bank app), shown to buyers paying at the counter. */
+  paymentQrDataUrl: string | null;
+  setPaymentQrDataUrl: Dispatch<SetStateAction<string | null>>;
   /** True once the seller has copied or shared the shop link (the setup checklist's last step). */
   linkShared: boolean;
   setLinkShared: Dispatch<SetStateAction<boolean>>;
@@ -66,6 +69,7 @@ interface PersistedProfile {
   description: string;
   mapUrl: string;
   invoiceDetails: InvoiceDetails;
+  paymentQrDataUrl: string | null;
   linkShared: boolean;
 }
 
@@ -83,6 +87,7 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
   const [description, setDescription] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [invoiceDetails, setInvoiceDetails] = useState<InvoiceDetails>(EMPTY_INVOICE_DETAILS);
+  const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
   const [linkShared, setLinkShared] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -109,6 +114,7 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         if (storedMapUrl.success) setMapUrl(storedMapUrl.data);
         const storedInvoice = invoiceDetailsSchema.safeParse(parsed.invoiceDetails);
         if (storedInvoice.success) setInvoiceDetails(storedInvoice.data);
+        if (parsed.paymentQrDataUrl) setPaymentQrDataUrl(parsed.paymentQrDataUrl);
         if (parsed.linkShared) setLinkShared(true);
         if (parsed.shopName) setHasProfile(true);
       }
@@ -136,13 +142,14 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         description,
         mapUrl,
         invoiceDetails,
+        paymentQrDataUrl,
         linkShared,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Storage full or unavailable — profile just won't persist this time.
     }
-  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, mapUrl, invoiceDetails, linkShared, hydrated]);
+  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, mapUrl, invoiceDetails, paymentQrDataUrl, linkShared, hydrated]);
 
   return (
     <MerchantProfileContext.Provider
@@ -173,6 +180,8 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         setMapUrl,
         invoiceDetails,
         setInvoiceDetails,
+        paymentQrDataUrl,
+        setPaymentQrDataUrl,
         linkShared,
         setLinkShared,
         hasProfile,

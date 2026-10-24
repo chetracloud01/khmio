@@ -16,6 +16,7 @@ export * from "./local-network";
 export * from "./money";
 export * from "./notifications";
 export * from "./invoice";
+export * from "./counter-sale";
 export * from "./list-query";
 export * from "./order-total";
 export * from "./orders";

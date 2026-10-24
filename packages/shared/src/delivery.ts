@@ -7,8 +7,13 @@ import { khmerPhoneSchema } from "./phone";
 // Phnom Penh districts grouped into zones with a fee each, pickup at the
 // shop, provinces by bus, and the drivers an order can be handed to.
 
+/** How a buyer on the shop page gets the order. */
 export const fulfilmentSchema = z.enum(["delivery", "pickup"]);
 export type Fulfilment = z.infer<typeof fulfilmentSchema>;
+
+/** Any order's: the shop page's two, or handed over at the counter — what a saved order is read with. */
+export const orderFulfilmentSchema = z.enum([...fulfilmentSchema.options, "in_store"]);
+export type OrderFulfilment = z.infer<typeof orderFulfilmentSchema>;
 
 export const MAX_DELIVERY_ZONES = PHNOM_PENH_DISTRICTS.length;
 export const MAX_DRIVERS = 50;

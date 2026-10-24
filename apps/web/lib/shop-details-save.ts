@@ -15,6 +15,7 @@ export function savedShopDetails(store: StoreDetails): ShopDetailsSave {
     description: store.description,
     bakongId: store.bakongId,
     logoKey: store.logoKey,
+    paymentQrKey: store.paymentQrKey,
     address: store.pickupAddress,
     mapUrl: store.mapUrl,
     pickupEnabled: store.pickupEnabled,

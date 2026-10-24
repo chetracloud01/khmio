@@ -1,6 +1,6 @@
 "use client";
 
-import { formatKhr, formatUsd, PLAN_ORDER, PLANS, type PlanFeature, type PlanId, type SiteSectionOf } from "@khmio/shared";
+import { formatKhr, formatUsd, PLAN_FEATURES, PLAN_ORDER, PLANS, type PlanFeature, type PlanId, type SiteSectionOf } from "@khmio/shared";
 import { Check, Minus } from "lucide-react";
 import { useState } from "react";
 import { buttonVariants } from "../Button";
@@ -32,7 +32,6 @@ export interface SitePlansLabels {
   days: (count: number) => string;
 }
 
-const FEATURES: PlanFeature[] = ["stock", "wholesalePrice", "warehouses"];
 
 /**
  * The Shop's plans. Prices, limits and features always come from plans.ts —
@@ -87,7 +86,7 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
                       {labels.trial(plan.trialDays)}
                     </li>
                   )}
-                  {FEATURES.map((feature) => {
+                  {PLAN_FEATURES.map((feature) => {
                     const has = plan.features[feature];
                     return (
                       <li key={feature} className={cn("flex items-start gap-2", !has && "text-muted")}>
@@ -162,7 +161,7 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
                     );
                   })}
                 </tr>
-                {FEATURES.map((feature) => (
+                {PLAN_FEATURES.map((feature) => (
                   <tr key={feature}>
                     <th scope="row" className="px-4 py-3 font-medium">
                       {labels.features[feature]}

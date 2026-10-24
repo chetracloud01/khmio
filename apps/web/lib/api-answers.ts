@@ -3,11 +3,12 @@ import {
   currencySchema,
   deliveryAreaSchema,
   deliverySettingsShape,
-  fulfilmentSchema,
+  orderFulfilmentSchema,
   invoiceStateSchema,
   orderCancelReasonSchema,
   orderStatusSchema,
-  paymentMethodSchema,
+  orderChannelSchema,
+  orderPaymentMethodSchema,
   planIdSchema,
   SELLER_ORDER_ACTIONS,
   subscriptionStatusSchema,
@@ -90,6 +91,9 @@ export const storeDetailsSchema = z.object({
   pickupAddress: z.string(),
   pickupHours: z.string(),
   mapUrl: z.string(),
+  /** The seller's own payment QR for sales at the counter; null = none yet. */
+  paymentQrKey: z.string().nullable(),
+  paymentQrUrl: z.string().nullable(),
   /** "Getting paid" and "Prices & tax" (once Store settings). */
   allowCod: z.boolean(),
   vatPercent: z.number(),
@@ -181,7 +185,9 @@ const orderFactsShape = {
   /** As printed: MEK-7K4P-9QXR. With the buyer's phone it opens this order on "Track my order". */
   trackingCode: z.string(),
   status: orderStatusSchema,
-  paymentMethod: paymentMethodSchema,
+  /** "in_store" = sold at the counter (design/screens.md P1). */
+  channel: orderChannelSchema,
+  paymentMethod: orderPaymentMethodSchema,
   currency: currencySchema,
   subtotalMinor: z.number(),
   discountMinor: z.number(),
@@ -190,7 +196,7 @@ const orderFactsShape = {
   vatMinor: z.number(),
   totalMinor: z.number(),
   exchangeRateUsed: z.number(),
-  fulfilment: fulfilmentSchema,
+  fulfilment: orderFulfilmentSchema,
   area: deliveryAreaSchema,
   districtId: z.string().nullable(),
   provinceId: z.string().nullable(),
@@ -257,12 +263,14 @@ export const sellerOrderSchema = z.object({
   /** As printed: MEK-7K4P-9QXR (the list's search finds it). */
   trackingCode: z.string(),
   status: orderStatusSchema,
-  paymentMethod: paymentMethodSchema,
+  /** "in_store" = sold at the counter (design/screens.md P1). */
+  channel: orderChannelSchema,
+  paymentMethod: orderPaymentMethodSchema,
   currency: currencySchema,
   totalMinor: z.number(),
   buyerName: z.string(),
   buyerPhone: z.string(),
-  fulfilment: fulfilmentSchema,
+  fulfilment: orderFulfilmentSchema,
   area: deliveryAreaSchema,
   districtId: z.string().nullable(),
   provinceId: z.string().nullable(),
@@ -304,6 +312,9 @@ export const orderInvoiceSchema = z.object({
     state: invoiceStateSchema,
     /** In full for the seller; "012 ••• 678" for the buyer. */
     buyerPhone: z.string(),
+    /** Cash at the counter: handed over and given back; null otherwise. */
+    cashReceivedMinor: z.number().nullable(),
+    changeMinor: z.number().nullable(),
     items: z.array(z.object(orderItemShape)),
   }),
   shop: z.object({
@@ -321,6 +332,40 @@ export const orderInvoiceSchema = z.object({
   orderToken: z.string(),
 });
 export type OrderInvoice = z.infer<typeof orderInvoiceSchema>;
+
+/** POST /counter/sales: the sale as the server worked it out. */
+export const counterSaleResultSchema = z.object({
+  id: z.string(),
+  orderNumber: z.number(),
+  currency: currencySchema,
+  totalMinor: z.number(),
+  /** Cash: what to hand back; null for the shop's QR. */
+  changeMinor: z.number().nullable(),
+  created: z.boolean(),
+});
+export type CounterSaleResult = z.infer<typeof counterSaleResultSchema>;
+
+const counterDaySumsSchema = z.object({ count: z.number(), USD: z.number(), KHR: z.number() });
+
+/** GET /counter/sales/today: today's sales at the counter and their totals (voided ones listed, not counted). */
+export const counterDaySchema = z.object({
+  sales: z.array(
+    z.object({
+      id: z.string(),
+      orderNumber: z.number(),
+      createdAt: z.string(),
+      status: orderStatusSchema,
+      paymentMethod: orderPaymentMethodSchema,
+      currency: currencySchema,
+      totalMinor: z.number(),
+      buyerName: z.string(),
+      lineCount: z.number(),
+      voided: z.boolean(),
+    }),
+  ),
+  totals: z.object({ all: counterDaySumsSchema, cash: counterDaySumsSchema, shopQr: counterDaySumsSchema }),
+});
+export type CounterDay = z.infer<typeof counterDaySchema>;
 
 /** POST /public/track: the order link for a tracking code and phone. */
 export const trackedOrderSchema = z.object({ token: z.string() });

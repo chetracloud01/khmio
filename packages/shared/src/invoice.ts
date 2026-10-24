@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { khmerPhoneSchema } from "./phone";
-import type { PaymentMethod } from "./checkout";
+import type { OrderPaymentMethod } from "./checkout";
 import type { OrderStatus } from "./orders";
 
 // Invoices, receipts and tracking codes (design/screens.md B7 and B8).
@@ -12,9 +12,10 @@ export type InvoiceState = z.infer<typeof invoiceStateSchema>;
 /**
  * "Invoice" until the buyer has paid, then "Receipt". KHQR is paid from the
  * "paid" status on; cash is paid once it's handed over — at delivery (or
- * pickup), so "delivered" and "completed".
+ * pickup), so "delivered" and "completed". A sale at the counter is paid when
+ * it's made, until it's voided.
  */
-export function getInvoiceState(order: { status: OrderStatus; paymentMethod: PaymentMethod }): InvoiceState {
+export function getInvoiceState(order: { status: OrderStatus; paymentMethod: OrderPaymentMethod }): InvoiceState {
   if (order.status === "cancelled") return "cancelled";
   if (order.paymentMethod === "cod") return order.status === "delivered" || order.status === "completed" ? "paid" : "unpaid";
   return order.status === "awaiting_payment" ? "unpaid" : "paid";

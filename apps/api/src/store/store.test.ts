@@ -26,6 +26,7 @@ const rows = (overrides: Partial<StoreDetailsRows> = {}, store: Partial<StoreDet
     pickupAddress: "",
     pickupHours: "",
     mapUrl: "",
+    paymentQrKey: "",
     ...store,
   },
   bakongId: null,
@@ -111,5 +112,12 @@ describe("the audit entry for prices and tax", () => {
 describe("the details page's rate box", () => {
   it("gets today's allowed band, cash on delivery and VAT with the details", () => {
     expect(toStoreDetails(rows(), photoUrl)).toMatchObject({ rateBand: { min: 3900, max: 4300 }, allowCod: true, vatPercent: 0 });
+  });
+});
+
+describe("the payment QR on the details page", () => {
+  it("gives the picture's address, not its storage key, and none when there isn't one", () => {
+    expect(toStoreDetails(rows({}, { paymentQrKey: "stores/store-1/qr.jpg" }), photoUrl)).toMatchObject({ paymentQrKey: "stores/store-1/qr.jpg", paymentQrUrl: "https://files.test/stores/store-1/qr.jpg" });
+    expect(toStoreDetails(rows(), photoUrl)).toMatchObject({ paymentQrKey: null, paymentQrUrl: null });
   });
 });

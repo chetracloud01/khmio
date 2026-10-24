@@ -128,6 +128,13 @@ export const orderLineRequestSchema = z.object({
     .max(MAX_LINE_QUANTITY, "quantity_invalid"),
 });
 
+/** The lines of an order or a counter sale: each product option once. */
+export const orderLinesRequestSchema = z
+  .array(orderLineRequestSchema)
+  .min(1, "cart_empty")
+  .max(MAX_ORDER_LINES, "too_long")
+  .refine((lines) => new Set(lines.map((line) => line.variantId)).size === lines.length, "product_unavailable");
+
 /**
  * What the shop page sends to place an order. `checkout` is the buyer's form,
  * checked by checkoutInputSchema once the API adds the store's own settings;
@@ -136,11 +143,7 @@ export const orderLineRequestSchema = z.object({
  */
 export const placeOrderRequestSchema = z.object({
   idempotencyKey: z.string().uuid("required"),
-  lines: z
-    .array(orderLineRequestSchema)
-    .min(1, "cart_empty")
-    .max(MAX_ORDER_LINES, "too_long")
-    .refine((lines) => new Set(lines.map((line) => line.variantId)).size === lines.length, "product_unavailable"),
+  lines: orderLinesRequestSchema,
   checkout: z.record(z.unknown()),
   /** Cloudflare Turnstile's token from the checkout page; the API checks it when Turnstile is set up. */
   botCheck: z.string().max(4096).optional(),

@@ -31,6 +31,7 @@ export const storeSelect = {
   pickupAddress: true,
   pickupHours: true,
   mapUrl: true,
+  paymentQrKey: true,
 } satisfies Prisma.StoreSelect;
 
 export interface StoreDetailsRows {
@@ -58,10 +59,12 @@ export async function readStoreDetails(tx: Tx, storeId: string, photoUrl: (key: 
 
 /** The shop's details, plus what the dashboard needs around them: the plan in force and the setup checklist's facts. */
 export function toStoreDetails(rows: StoreDetailsRows, photoUrl: (key: string) => string) {
-  const { deliveryConfiguredAt, linkSharedAt, ...store } = rows.store;
+  const { deliveryConfiguredAt, linkSharedAt, paymentQrKey, ...store } = rows.store;
   const bakongId = rows.bakongId ?? "";
   return {
     ...store,
+    paymentQrKey: paymentQrKey || null,
+    paymentQrUrl: paymentQrKey ? photoUrl(paymentQrKey) : null,
     rateBand: rows.rateBand,
     logoUrl: store.logoKey ? photoUrl(store.logoKey) : null,
     bakongId,
@@ -114,6 +117,7 @@ export async function saveStoreDetails(tx: Tx, context: MerchantStore, input: Sh
       area: input.area,
       description: input.description,
       logoKey: input.logoKey,
+      paymentQrKey: input.paymentQrKey ?? "",
       pickupAddress: input.address,
       mapUrl: input.mapUrl,
       pickupEnabled: input.pickupEnabled,

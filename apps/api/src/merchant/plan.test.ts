@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planInForce } from "./plan";
+import { assertPlanFeature, planInForce } from "./plan";
 
 describe("the plan in force", () => {
   it("is Free for a shop with no subscription row", () => {
@@ -14,5 +14,12 @@ describe("the plan in force", () => {
   it("locks only a paused shop; one in its grace days can still change things", () => {
     expect(planInForce({ plan: "basic", status: "paused" }, null).paused).toBe(true);
     expect(planInForce({ plan: "basic", status: "grace" }, null).paused).toBe(false);
+  });
+});
+
+describe("a plan feature on the server", () => {
+  it("refuses selling in the shop on Free, from Basic up it's allowed", () => {
+    expect(() => assertPlanFeature("free", "counterSales")).toThrow();
+    expect(() => assertPlanFeature("basic", "counterSales")).not.toThrow();
   });
 });

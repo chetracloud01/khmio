@@ -42,8 +42,8 @@ export interface InvoiceLine {
 export interface InvoiceData {
   shop: InvoiceShop;
   orderNumber: string;
-  /** As printed: MEK-7K4P-9QXR. */
-  trackingCode: string;
+  /** As printed: MEK-7K4P-9QXR. None for a sale at the counter. */
+  trackingCode?: string;
   placedAtIso: string;
   state: InvoiceState;
   currency: Currency;
@@ -56,12 +56,15 @@ export interface InvoiceData {
   vatPercent: number;
   vat: number;
   total: number;
-  buyer: { name: string; phone: string; pickup: boolean; place?: string; landmark?: string };
+  /** Sold at the counter (design/screens.md P3): no delivery line, no order QR. */
+  inStore?: boolean;
+  /** None for a walk-in buyer at the counter who gave no name. */
+  buyer?: { name: string; phone: string; pickup: boolean; place?: string; landmark?: string };
   paymentLabel: string;
-  /** The order page the QR opens. */
-  orderUrl: string;
+  /** The order page the QR opens. A counter sale has none, so no QR. */
+  orderUrl?: string;
   /** The "Track my order" page, printed under the QR. */
-  trackUrl: string;
+  trackUrl?: string;
 }
 
 const STAMP: Record<InvoiceState, string> = {
@@ -76,6 +79,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
     const { dateTime } = useDateText();
     const [qr, setQr] = useState<string | null>(null);
     useEffect(() => {
+      if (!data.orderUrl) return;
       let live = true;
       void QRCode.toDataURL(data.orderUrl, { margin: 1, width: 360, errorCorrectionLevel: "M" }).then((url) => live && setQr(url));
       return () => {
@@ -115,7 +119,10 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
       <dl className="flex flex-col gap-1 text-sm">
         <Row label={t("subtotal")} value={money(data.subtotal)} />
         {data.discount > 0 && <Row label={t("discount")} value={`−${money(data.discount)}`} />}
-        <Row label={data.buyer.pickup ? t("pickup") : t("delivery")} value={data.deliveryFee === 0 ? t("free") : money(data.deliveryFee)} />
+        {/* Sold at the counter: nothing was delivered or picked up. */}
+        {data.buyer && !data.inStore && (
+          <Row label={data.buyer.pickup ? t("pickup") : t("delivery")} value={data.deliveryFee === 0 ? t("free") : money(data.deliveryFee)} />
+        )}
         {data.vatPercent > 0 && <Row label={t("vat", { percent: data.vatPercent })} value={money(data.vat)} />}
         <div className="mt-1 flex items-baseline justify-between gap-3 border-t-2 border-paper-ink pt-2">
           <dt className="font-bold">{t("total")}</dt>
@@ -129,7 +136,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
       </dl>
     );
 
-    const qrBlock = (
+    const qrBlock = data.orderUrl && data.trackUrl && (
       <div className={cn("flex items-center gap-3", receipt && "flex-col text-center")}>
         {qr ? (
           // eslint-disable-next-line @next/next/no-img-element -- a generated data URL
@@ -179,15 +186,17 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
           <dl className="flex flex-col gap-1">
             <Row label={t("orderNumber")} value={data.orderNumber} strong />
             <Row label={t("date")} value={date} />
-            <Row label={t("trackingCode")} value={data.trackingCode} strong mono />
+            {data.trackingCode && <Row label={t("trackingCode")} value={data.trackingCode} strong mono />}
           </dl>
-          <div className={cn(wide ? "border-l border-paper-line pl-4" : !receipt && "sm:border-l sm:border-paper-line sm:pl-4")}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-paper-muted">{t("billTo")}</p>
-            <p className="font-semibold">{data.buyer.name}</p>
-            <p className="tabular-nums">{formatKhmerPhoneLocal(data.buyer.phone)}</p>
-            <p className="text-paper-muted">{data.buyer.pickup ? t("pickupAtShop") : data.buyer.place}</p>
-            {data.buyer.landmark && <p className="text-paper-muted">{data.buyer.landmark}</p>}
-          </div>
+          {data.buyer && (
+            <div className={cn(wide ? "border-l border-paper-line pl-4" : !receipt && "sm:border-l sm:border-paper-line sm:pl-4")}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-paper-muted">{t("billTo")}</p>
+              {data.buyer.name && <p className="font-semibold">{data.buyer.name}</p>}
+              {data.buyer.phone && <p className="tabular-nums">{formatKhmerPhoneLocal(data.buyer.phone)}</p>}
+              {(data.buyer.pickup || data.buyer.place) && <p className="text-paper-muted">{data.buyer.pickup ? t("pickupAtShop") : data.buyer.place}</p>}
+              {data.buyer.landmark && <p className="text-paper-muted">{data.buyer.landmark}</p>}
+            </div>
+          )}
         </section>
 
         {/* Items */}

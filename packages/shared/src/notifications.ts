@@ -1,3 +1,5 @@
+import type { OrderPaymentMethod } from "./checkout";
+import type { OrderFulfilment } from "./delivery";
 import { z } from "zod";
 import { formatKhr, formatUsd, type Currency } from "./money";
 import { PHNOM_PENH_DISTRICTS, PROVINCES } from "./locations";
@@ -11,8 +13,8 @@ export interface OrderAlertFacts {
   orderNumber: number;
   totalMinor: number;
   currency: Currency;
-  paymentMethod: "khqr" | "aba_payway" | "cod";
-  fulfilment: "delivery" | "pickup";
+  paymentMethod: OrderPaymentMethod;
+  fulfilment: OrderFulfilment;
   districtId: string | null;
   provinceId: string | null;
   itemCount: number;
@@ -24,6 +26,7 @@ const money = (amount: number, currency: Currency) => (currency === "USD" ? form
 
 function place(facts: OrderAlertFacts): { km: string; en: string } {
   if (facts.fulfilment === "pickup") return { km: "មកយកផ្ទាល់", en: "Pickup" };
+  if (facts.fulfilment === "in_store") return { km: "លក់នៅហាង", en: "In shop" };
   const district = PHNOM_PENH_DISTRICTS.find((entry) => entry.id === facts.districtId);
   if (district) return { km: district.nameKm, en: district.nameEn };
   const province = PROVINCES.find((entry) => entry.id === facts.provinceId);
@@ -123,7 +126,7 @@ export interface BuyerUpdateFacts {
   orderNumber: number;
   shopName: string;
   status: string;
-  fulfilment: "delivery" | "pickup";
+  fulfilment: OrderFulfilment;
   /** How it was sent, once sent: the driver's name or the bus ticket — never a phone number. */
   dispatch: { route: "driver" | "bus" | "pickup"; driverName: string; busCompany: string; ticketNumber: string } | null;
   /** As printed, MEK-7K4P-9QXR. */

@@ -8,6 +8,9 @@ import { formatTrackingCode, getInvoiceState, maskKhmerPhone } from "@khmio/shar
 
 export const invoiceOrderSelect = {
   orderNumber: true,
+  channel: true,
+  cashReceivedMinor: true,
+  changeMinor: true,
   trackingCode: true,
   publicToken: true,
   status: true,

@@ -8,6 +8,11 @@ import { useMemo, useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn } from "@/components/data-grid";
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks } from "@/components/form-ui";
 import { ShopHero } from "@/components/buyer/shop-hero";
+import { CashPayment } from "@/components/counter/cash-payment";
+import { CounterCart } from "@/components/counter/counter-cart";
+import { PaymentQrField } from "@/components/counter/payment-qr-field";
+import { QrPayment } from "@/components/counter/qr-payment";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
 import { LANGUAGE_NAMES, LanguageSwitch } from "@/components/language-switch";
 import { MenuList } from "@/components/menu-list";
@@ -23,6 +28,8 @@ import { Demo, Section } from "./styleguide-ui";
 
 const WAITING = new Set<OrderRecord["status"]>(["awaiting_payment", "cod_pending"]);
 const SAMPLE_HOURS_AGO = 3;
+const SAMPLE_LATTE_CENTS = 200;
+const SAMPLE_COOKIE_CENTS = 100;
 /** The platform's default rate band, for the Prices & tax sample. */
 const SAMPLE_RATE_BAND = { min: DEFAULT_ADMIN_SETTINGS.usdToKhrMin, max: DEFAULT_ADMIN_SETTINGS.usdToKhrMax };
 
@@ -47,6 +54,12 @@ export function AppBlocksTab() {
   const [invoice, setInvoice] = useState<InvoiceDetails>(mockInvoiceDetails);
   const [pricing, setPricing] = useState<PricingDraft>(() => toPricingDraft(mockStoreSettings));
   const [shopInfoOpen, setShopInfoOpen] = useState(false);
+  // Selling at the counter, with a sample sale of two lines.
+  const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({ latte: 2, cookie: 1 });
+  const [cashText, setCashText] = useState("");
+  const [qrSeen, setQrSeen] = useState(false);
+  const tCounterDemo = useTranslations("Counter");
+  const sampleCounterTotal = (counterQuantities.latte ?? 0) * SAMPLE_LATTE_CENTS + (counterQuantities.cookie ?? 0) * SAMPLE_COOKIE_CENTS;
   const dirty = shopName !== savedShopName;
   const orders = useMemo(() => buildSampleOrders(new Date()), []);
   const dates = useDateText();
@@ -120,6 +133,42 @@ export function AppBlocksTab() {
                 shop={{ name: t("detailShopValue"), logoUrl: null, phone: mockStore.phone, address: location.address }}
               />
             </Card>
+          </Demo>
+        </div>
+      </Section>
+
+      <Section title={t("counterSection")} description={t("counterHint")}>
+        {/* Sell in shop (design/screens.md P1–P2): the sale, cash with change, the shop's own QR, and where the QR is added. */}
+        <div className="grid gap-8 md:grid-cols-2">
+          <Demo name="CounterCart">
+            <CounterCart
+              lines={(["latte", "cookie"] as const)
+                .filter((key) => (counterQuantities[key] ?? 0) > 0)
+                .map((key) => ({
+                  key,
+                  title: key === "latte" ? t("sampleLatte") : t("sampleCookie"),
+                  quantity: counterQuantities[key] ?? 0,
+                  lineTotal: formatMoney((counterQuantities[key] ?? 0) * (key === "latte" ? SAMPLE_LATTE_CENTS : SAMPLE_COOKIE_CENTS), "USD"),
+                }))}
+              totals={{
+                subtotal: formatMoney(sampleCounterTotal, "USD"),
+                total: formatMoney(sampleCounterTotal, "USD"),
+                approx: "",
+              }}
+              onQuantity={(key, quantity) => setCounterQuantities((current) => ({ ...current, [key]: Math.max(0, quantity) }))}
+            />
+          </Demo>
+          <Demo name="CashPayment">
+            <CashPayment total={sampleCounterTotal} currency="USD" receivedText={cashText} onReceivedText={setCashText} />
+          </Demo>
+          <Demo name="QrPayment">
+            <QrPayment qrUrl={null} amount={formatMoney(sampleCounterTotal, "USD")} setupHref="#" confirmed={qrSeen} onConfirmed={setQrSeen} />
+          </Demo>
+          <Demo name={["PaymentQrField", "PaymentQrGuide"]}>
+            <PaymentQrField previewUrl={null} onFile={() => undefined} onRemove={() => undefined} />
+          </Demo>
+          <Demo name="UpgradePrompt">
+            <UpgradePrompt title={tCounterDemo("upgradeTitle")} body={tCounterDemo("upgradeBody")} plan="basic" href="#" />
           </Demo>
         </div>
       </Section>

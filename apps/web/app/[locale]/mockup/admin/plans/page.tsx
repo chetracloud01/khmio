@@ -9,18 +9,14 @@ import {
   PLAN_ORDER,
   PLANS,
   planHasFeature,
-  type PlanFeature,
+  PLAN_FEATURES,
 } from "@khmio/shared";
 import { Card } from "@khmio/ui";
 import { Check, Minus } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePlanFeatureLabels } from "@/components/plan-features";
 import { PageHeader, SectionTitle } from "../admin-ui";
 
-const FEATURES: { key: PlanFeature; label: "featureStock" | "featureWholesale" | "featureWarehouses" }[] = [
-  { key: "stock", label: "featureStock" },
-  { key: "wholesalePrice", label: "featureWholesale" },
-  { key: "warehouses", label: "featureWarehouses" },
-];
 
 // Read-only on purpose: packages/shared/src/plans.ts is the single source of
 // truth for prices and features, so this page can never disagree with what
@@ -30,6 +26,7 @@ export default function AdminPlansPage() {
   const tNav = useTranslations("AdminNav");
   const tPlan = useTranslations("Plans");
   const tBilling = useTranslations("Billing");
+  const featureLabels = usePlanFeatureLabels();
 
   const included = (yes: boolean, label: string) =>
     yes ? (
@@ -52,9 +49,9 @@ export default function AdminPlansPage() {
                 <th scope="col" className="px-4 py-2 text-right font-medium">{t("colPriceUsd")}</th>
                 <th scope="col" className="px-4 py-2 text-right font-medium">{t("colPriceKhr")}</th>
                 <th scope="col" className="px-4 py-2 font-medium">{t("colProductLimit")}</th>
-                {FEATURES.map((feature) => (
-                  <th key={feature.key} scope="col" className="px-4 py-2 text-center font-medium">
-                    {tBilling(feature.label)}
+                {PLAN_FEATURES.map((feature) => (
+                  <th key={feature} scope="col" className="px-4 py-2 text-center font-medium">
+                    {featureLabels[feature]}
                   </th>
                 ))}
               </tr>
@@ -77,10 +74,10 @@ export default function AdminPlansPage() {
                     <td className="px-4 py-3">
                       {definition.maxProducts === null ? t("unlimited") : definition.maxProducts}
                     </td>
-                    {FEATURES.map((feature) => (
-                      <td key={feature.key} className="px-4 py-3">
+                    {PLAN_FEATURES.map((feature) => (
+                      <td key={feature} className="px-4 py-3">
                         <span className="flex justify-center">
-                          {included(planHasFeature(plan, feature.key), tBilling(feature.label))}
+                          {included(planHasFeature(plan, feature), featureLabels[feature])}
                         </span>
                       </td>
                     ))}
@@ -107,10 +104,10 @@ export default function AdminPlansPage() {
                     <span className="text-muted">{t("colProductLimit")}</span>
                     <span>{definition.maxProducts === null ? t("unlimited") : definition.maxProducts}</span>
                   </li>
-                  {FEATURES.map((feature) => (
-                    <li key={feature.key} className="flex items-center justify-between gap-2">
-                      <span className="text-muted">{tBilling(feature.label)}</span>
-                      {included(planHasFeature(plan, feature.key), tBilling(feature.label))}
+                  {PLAN_FEATURES.map((feature) => (
+                    <li key={feature} className="flex items-center justify-between gap-2">
+                      <span className="text-muted">{featureLabels[feature]}</span>
+                      {included(planHasFeature(plan, feature), featureLabels[feature])}
                     </li>
                   ))}
                 </ul>

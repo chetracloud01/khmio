@@ -5,6 +5,7 @@ import { AdminGuard } from "./admin/admin.guard";
 import { AuthController } from "./auth/auth.controller";
 import { SessionGuard } from "./auth/session.guard";
 import { CatalogController } from "./catalog/catalog.controller";
+import { CounterController } from "./counter/counter.controller";
 import { DbShutdown, dbProviders } from "./db";
 import { DeliveryController } from "./delivery/delivery.controller";
 import { FilesController } from "./files/files.controller";
@@ -29,6 +30,7 @@ import { WaitlistController } from "./website/waitlist.controller";
     ProductsController,
     DeliveryController,
     OrdersController,
+    CounterController,
     AdminAuthController,
     AdminController,
     FilesController,

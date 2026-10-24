@@ -12,6 +12,8 @@ export const AUDIT_ACTIONS = [
   "store.settings_saved",
   "store.invoice_details_saved",
   "store.delivery_saved",
+  "counter.sale_recorded",
+  "counter.sale_voided",
   "store.telegram_group_linked",
   "store.telegram_group_unlinked",
   "subscription.extended",

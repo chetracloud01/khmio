@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { AdminProvider } from "./admin-context";
 import { CartProvider } from "./cart-context";
+import { CounterSalesProvider } from "./counter-sales-context";
 import { DeliverySettingsProvider } from "./delivery-settings-context";
 import { MerchantAccountProvider } from "./merchant-account-context";
 import { MerchantInventoryProvider } from "./merchant-inventory-context";
@@ -26,7 +27,9 @@ export default function MockupLayout({ children }: { children: ReactNode }) {
                   <DeliverySettingsProvider>
                     <OrdersProvider>
                       <CartProvider>
-                        <WebsiteProvider>{children}</WebsiteProvider>
+                        <CounterSalesProvider>
+                          <WebsiteProvider>{children}</WebsiteProvider>
+                        </CounterSalesProvider>
                       </CartProvider>
                     </OrdersProvider>
                   </DeliverySettingsProvider>

@@ -9,11 +9,11 @@ import {
   type Currency,
   type DeliveryArea,
   type DispatchRoute,
-  type Fulfilment,
+  type OrderFulfilment,
   type OrderAction,
   type OrderStatus,
   type OrderTab,
-  type PaymentMethod,
+  type OrderPaymentMethod,
 } from "@khmio/shared";
 import { cn, StatusPill, type Tone } from "@khmio/ui";
 import {
@@ -40,8 +40,8 @@ import { useDateText } from "./use-date-text";
 /** The parts of an order these helpers read; the mockup's sample orders and the API's orders both fit. */
 export interface OrderFactsForText {
   status: OrderStatus;
-  fulfilment: Fulfilment;
-  paymentMethod: PaymentMethod;
+  fulfilment: OrderFulfilment;
+  paymentMethod: OrderPaymentMethod;
   area: DeliveryArea;
   districtId?: string | null;
   provinceId?: string | null;
@@ -81,7 +81,7 @@ export const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
 };
 
 /** The status's icon; a pickup order "out for delivery" is waiting at the shop. */
-export function orderStatusIcon(order: { status: OrderStatus; fulfilment?: Fulfilment }): LucideIcon {
+export function orderStatusIcon(order: { status: OrderStatus; fulfilment?: OrderFulfilment }): LucideIcon {
   if (order.status === "out_for_delivery" && order.fulfilment === "pickup") return Store;
   if (order.status === "delivered" && order.fulfilment === "pickup") return HandCoins;
   return ORDER_STATUS_ICON[order.status];
@@ -125,8 +125,9 @@ export function useOrderText() {
   const { timeAgo, clockTime } = useDateText();
   const locale = useLocale();
 
-  /** A pickup order is never "out for delivery": at that point it's waiting at the shop. */
+  /** A pickup order is never "out for delivery": at that point it's waiting at the shop. A counter sale is "sold in shop", or "voided". */
   function statusLabel(order: Pick<OrderFactsForText, "status" | "fulfilment">): string {
+    if (order.fulfilment === "in_store") return order.status === "cancelled" ? t("status_voided") : t("status_sold_in_shop");
     if (order.status === "out_for_delivery" && order.fulfilment === "pickup") return t("status_ready_for_pickup");
     if (order.status === "failed_delivery" && order.fulfilment === "pickup") return t("status_not_collected");
     return t(`status_${order.status}`);
@@ -144,12 +145,15 @@ export function useOrderText() {
 
   function paymentLabel(order: Pick<OrderFactsForText, "paymentMethod" | "status" | "fulfilment">): string {
     if (order.paymentMethod === "cod") return order.fulfilment === "pickup" ? t("payAtPickup") : t("payCod");
+    if (order.paymentMethod === "cash") return t("payCash");
+    if (order.paymentMethod === "shop_qr") return t("payShopQr");
     return order.status === "awaiting_payment" ? t("payOnlinePending") : t("payOnlinePaid");
   }
 
   /** "Daun Penh, Phnom Penh", "Kampot", or "Pickup". */
   function placeLabel(order: Pick<OrderFactsForText, "fulfilment" | "area" | "districtId" | "provinceId">): string {
     if (order.fulfilment === "pickup") return tCheckout("pickup");
+    if (order.fulfilment === "in_store") return t("soldInShop");
     const district = PHNOM_PENH_DISTRICTS.find((place) => place.id === order.districtId);
     if (district) return `${placeName(district, locale)}, ${tCheckout("phnomPenh")}`;
     const province = PROVINCES.find((place) => place.id === order.provinceId);

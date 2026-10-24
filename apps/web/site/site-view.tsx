@@ -5,6 +5,7 @@ import { AnnouncementBar, SiteFooter, SiteHeader, SiteSections, type SiteKitCont
 import { useLocale, useTranslations } from "next-intl";
 import { LanguageSwitch } from "@/components/language-switch";
 import { useFormErrorText } from "@/components/form-ui";
+import { usePlanFeatureLabels } from "@/components/plan-features";
 import { SITE_PRODUCTS } from "./content";
 import { siteHasPath } from "./pages";
 
@@ -45,6 +46,7 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
   const tMascot = useTranslations("Mascot");
   const tPlans = useTranslations("Plans");
   const tBilling = useTranslations("Billing");
+  const featureLabels = usePlanFeatureLabels();
   const locale = useLocale() === "en" ? "en" : "km";
   const shown = (path: string) => !live || siteHasPath(path);
 
@@ -73,7 +75,7 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
       productLimit: (count) => tBilling("featureProductLimit", { count }),
       unlimitedProducts: tBilling("featureUnlimitedProducts"),
       trial: (count) => tBilling("trialLength", { count }),
-      features: { stock: tBilling("featureStock"), wholesalePrice: tBilling("featureWholesale"), warehouses: tBilling("featureWarehouses") },
+      features: featureLabels,
       highlight: t("mostShops"),
       included: t("included"),
       notIncluded: t("notIncluded"),

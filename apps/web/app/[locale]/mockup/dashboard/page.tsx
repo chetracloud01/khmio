@@ -2,7 +2,7 @@
 
 import { isCashOrder, needsSellerAction, trackingCodePrefix } from "@khmio/shared";
 import { BottomSheet, Card, EmptyState, Mio, Skeleton } from "@khmio/ui";
-import { Bell, PackagePlus, Share2 } from "lucide-react";
+import { Bell, PackagePlus, ScanLine, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import { formatMoney, useOrderText } from "@/components/order-ui";
@@ -142,6 +142,7 @@ function DashboardHome() {
     return match ? sellerOrderHref(locale, match.orderNumber) : null;
   };
   const quickActions = [
+    { key: "sell", href: `${base}/sell`, icon: ScanLine, label: tApp("quickSell"), hint: tApp("quickSellHint"), tone: "teal" as const },
     { key: "add", href: `${base}/products/new`, icon: PackagePlus, label: tApp("quickAddProduct"), hint: tApp("addProductHint"), tone: "teal" as const },
     { key: "share", href: `${base}#share`, icon: Share2, label: tApp("quickShareShop"), hint: tApp("shareShopHint"), tone: "amber" as const },
   ];

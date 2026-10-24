@@ -10,8 +10,12 @@ import {
   toFieldErrors,
   type CheckoutInput,
   type FormErrorCode,
+  type OrderLineInput,
+  type OrderTotal,
   type PlaceOrderRequest,
 } from "@khmio/shared";
+
+type OrderLineRequest = PlaceOrderRequest["lines"][number];
 import { readDeliverySettings } from "../delivery/delivery";
 import { AppException, InvalidInputException } from "../errors";
 
@@ -104,21 +108,12 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
   }
 
   // The buyer can only see visible, not-deleted products (step 3 public read), so anything else is simply missing.
-  const variants = await tx.productVariant.findMany({
-    where: { id: { in: request.lines.map((line) => line.variantId) } },
-    include: { product: { select: { titleKm: true, titleEn: true, discountPercent: true } } },
-  });
-  const byId = new Map(variants.map((variant) => [variant.id, variant]));
-  request.lines.forEach((line, index) => {
-    if (!byId.has(line.variantId)) errors[`lines.${index}`] = "product_unavailable";
-  });
+  const { byId, missing } = await readOrderVariants(tx, request.lines);
+  Object.assign(errors, missing);
   if (Object.keys(errors).length > 0) throw new InvalidInputException(errors);
 
   const total = computeOrderTotal({
-    lines: request.lines.map((line) => {
-      const variant = byId.get(line.variantId)!;
-      return { key: line.variantId, quantity: line.quantity, priceUsdCents: variant.priceUsdCents, priceKhr: variant.priceKhr, discountPercent: variant.product.discountPercent };
-    }),
+    lines: orderTotalLines(request.lines, byId),
     currency: checkout.currency,
     usdToKhrRate: store.usdToKhrRate,
     vatPercent: store.vatPercent,
@@ -161,12 +156,52 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
     },
     select: { id: true, orderNumber: true },
   });
-  await tx.orderItem.createMany({
-    data: total.lines.map((line) => {
-      const variant = byId.get(line.key)!;
-      return {
+  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, byId) });
+  await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status, actor: "buyer" }] });
+  // The seller's Telegram alert, sent by the worker — written with the order, so it can't be lost or sent for an order that failed.
+  await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
+  return { token, orderNumber: order.orderNumber, created: true };
+}
+
+const orderVariantInclude = { product: { select: { titleKm: true, titleEn: true, discountPercent: true } } } satisfies Prisma.ProductVariantInclude;
+type OrderVariant = Prisma.ProductVariantGetPayload<{ include: typeof orderVariantInclude }>;
+
+/**
+ * The product options an order or a counter sale names, read with whatever
+ * the caller's database role may see (a buyer: visible products only; the
+ * seller: their own, not deleted). Any that can't be found come back as a
+ * "product_unavailable" error under its line.
+ */
+export async function readOrderVariants(tx: Tx, lines: OrderLineRequest[]): Promise<{ byId: Map<string, OrderVariant>; missing: Record<string, FormErrorCode> }> {
+  const variants = await tx.productVariant.findMany({
+    where: { id: { in: lines.map((line) => line.variantId) }, deletedAt: null, product: { deletedAt: null } },
+    include: orderVariantInclude,
+  });
+  const byId = new Map(variants.map((variant) => [variant.id, variant]));
+  const missing: Record<string, FormErrorCode> = {};
+  lines.forEach((line, index) => {
+    if (!byId.has(line.variantId)) missing[`lines.${index}`] = "product_unavailable";
+  });
+  return { byId, missing };
+}
+
+/** The lines for computeOrderTotal, priced from the catalog — never from the browser. Every line must be in `byId`. */
+export function orderTotalLines(lines: OrderLineRequest[], byId: Map<string, OrderVariant>): OrderLineInput[] {
+  return lines.flatMap((line) => {
+    const variant = byId.get(line.variantId);
+    return variant ? [{ key: line.variantId, quantity: line.quantity, priceUsdCents: variant.priceUsdCents, priceKhr: variant.priceKhr, discountPercent: variant.product.discountPercent }] : [];
+  });
+}
+
+/** The order's lines as saved: names and prices copied, so the order never changes when the product does. */
+export function orderItemRows(storeId: string, orderId: string, total: OrderTotal, byId: Map<string, OrderVariant>): Prisma.OrderItemCreateManyInput[] {
+  return total.lines.flatMap((line) => {
+    const variant = byId.get(line.key);
+    if (!variant) return [];
+    return [
+      {
         storeId,
-        orderId: order.id,
+        orderId,
         variantId: variant.id,
         titleKm: variant.product.titleKm,
         titleEn: variant.product.titleEn,
@@ -175,13 +210,9 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
         unitPriceMinor: line.unitPrice,
         quantity: line.quantity,
         lineTotalMinor: line.lineTotal,
-      };
-    }),
+      },
+    ];
   });
-  await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status, actor: "buyer" }] });
-  // The seller's Telegram alert, sent by the worker — written with the order, so it can't be lost or sent for an order that failed.
-  await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
-  return { token, orderNumber: order.orderNumber, created: true };
 }
 
 /** The buyer's form, checked with the store's own cash-on-delivery setting added. Field names come back as the form's own. */

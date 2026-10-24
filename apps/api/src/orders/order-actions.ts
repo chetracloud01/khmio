@@ -12,6 +12,7 @@ import type { MerchantStore } from "../merchant/store.guard";
 export const orderDetailSelect = {
   id: true,
   orderNumber: true,
+  channel: true,
   trackingCode: true,
   status: true,
   paymentMethod: true,

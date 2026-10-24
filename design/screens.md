@@ -253,6 +253,33 @@ Phone first; sidebar from tablet width; tables on desktop.
 ### S17. Reports — New · 3
 - Daily sales, best sellers, delivery success rate.
 
+### P. Sell in shop (counter) — Built · 2 (Basic and up)
+Selling to a customer standing at the counter; owner only in v1, needs
+internet. Plan feature `counterSales` (packages/shared plans.ts).
+- **P1 Sell** `/dashboard/sell`: the shop's products (search, categories,
+  grid or list) — tap + to add, a product with options opens its options.
+  The sale beside them on a laptop (CounterCart: − n +, subtotal, discount,
+  VAT, total, the other currency small), a Charge bar on a phone. Currency
+  of the sale ($ or ៛) at the top; "Today · n" links to P4.
+- **P2 Take payment**: the sale (still editable), then Cash or Shop QR.
+  Cash: one-tap amounts (exact, then the notes a buyer hands over), cash
+  received, change to give. Shop QR: the seller's own uploaded KHQR with the
+  exact amount; the seller ticks "I see {amount} in my bank app" only after
+  checking their bank app — Khmio never sees this payment. Customer name and
+  phone optional. Complete sale.
+- **P3 Done**: "Sale complete", the change to give in big type, Receipt
+  (the invoice screen at 80 mm, no order QR or tracking code) and New sale.
+- **P4 Today's sales** `/dashboard/sell/today`: totals (all, cash, shop QR;
+  dollars and riel never added together), each sale with time, items,
+  method and its receipt; Void (with the money handed back by the seller).
+- **Payment QR** on S10 › Getting paid: upload the picture of the KHQR the
+  bank app makes, with "How to get your payment QR" — a 7-step guide (open
+  the bank app, find Receive / My QR / KHQR, pick the account, no amount,
+  save as a picture, upload, test once) and a warning never to trust a
+  customer's screenshot.
+- Later: Bakong KHQR with a confirmed status, stock taken off (Pro, Advance),
+  shifts and end-of-day count, staff and permissions, offline sales.
+
 ## Admin (laptop first)
 
 ### A1. Overview — Built

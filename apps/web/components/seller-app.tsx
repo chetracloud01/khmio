@@ -73,7 +73,9 @@ export function QuickActions({ items }: { items: QuickAction[] }) {
   const tile = "group flex min-h-[72px] items-center gap-3 rounded-2xl border border-border bg-bg p-3 text-left shadow-card transition-all hover:border-brand/40 hover:shadow-raised active:scale-[0.99] motion-reduce:transition-none";
   return (
     <nav className="grid grid-cols-2 gap-3">
-      {items.map((item) => {
+      {items.map((item, index) => {
+        // An odd count: the first (the main action) takes the whole row, so none is left alone.
+        const className = cn(tile, index === 0 && items.length % 2 === 1 && "col-span-2");
         const content = (
           <>
             <span
@@ -91,11 +93,11 @@ export function QuickActions({ items }: { items: QuickAction[] }) {
           </>
         );
         return item.href ? (
-          <Link key={item.key} href={item.href} className={tile}>
+          <Link key={item.key} href={item.href} className={className}>
             {content}
           </Link>
         ) : (
-          <button key={item.key} type="button" onClick={item.onClick} className={tile}>
+          <button key={item.key} type="button" onClick={item.onClick} className={className}>
             {content}
           </button>
         );

@@ -3,6 +3,9 @@ import { toInvoice } from "./invoice";
 
 const order = {
   orderNumber: 7,
+  channel: "online" as const,
+  cashReceivedMinor: null,
+  changeMinor: null,
   trackingCode: "7K4P9QXR",
   publicToken: "t".repeat(32),
   status: "delivered" as const,

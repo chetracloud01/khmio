@@ -182,6 +182,8 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           label: tDash("navHome"),
           icon: LayoutDashboard,
           mobile: true,
+          // Sell in shop is opened from Home's first quick action.
+          alsoActiveOn: [`${base}/sell`],
         },
         {
           href: `${base}/products`,

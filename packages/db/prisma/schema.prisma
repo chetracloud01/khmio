@@ -105,11 +105,23 @@ enum PaymentMethod {
   khqr
   aba_payway
   cod
+  /// Paid in cash at the counter (design/screens.md P2) — not cash on delivery.
+  cash
+  /// The seller's own uploaded QR at the counter, checked by the seller in their bank app.
+  shop_qr
+}
+
+/// Where the order was made: the shop page, or the counter (design/screens.md P1).
+enum OrderChannel {
+  online
+  in_store
 }
 
 enum Fulfilment {
   delivery
   pickup
+  /// Sold at the counter: handed over on the spot.
+  in_store
 }
 
 enum DriverKind {
@@ -123,6 +135,8 @@ enum OrderCancelReason {
   out_of_stock
   cannot_deliver
   other
+  /// A sale at the counter undone by the seller (the money handed back by hand).
+  counter_void
 }
 
 enum OrderActor {
@@ -169,6 +183,7 @@ model Merchant {
 
   identities  MerchantIdentity[]
   memberships StoreMember[]
+  salesMade   Order[]            @relation("OrderSoldBy")
   sessions    Session[]
 
   @@map("merchants")
@@ -262,6 +277,8 @@ model Store {
   facebookLink            String       @default("") @map("facebook_link")
   /// Copied from Google Maps on Shop details; the buyer's Map button opens it (design/screens.md S10). Empty = search the pickup address.
   mapUrl                  String       @default("") @map("map_url")
+  /// The seller's own payment QR picture (a storage key, like the logo), shown to buyers paying at the counter. Empty = none.
+  paymentQrKey            String       @default("") @map("payment_qr_key")
   /// The last order number given out; the next order takes this + 1 (app_next_order_number()).
   lastOrderNumber         Int          @default(0) @map("last_order_number")
   createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -527,47 +544,55 @@ model Customer {
 
 /// An order. Every amount is in `currency`, as whole cents or riel, frozen when it was placed.
 model Order {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  storeId          String             @map("store_id") @db.Uuid
-  customerId       String             @map("customer_id") @db.Uuid
-  orderNumber      Int                @map("order_number")
+  id                String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId           String             @map("store_id") @db.Uuid
+  /// Empty for a walk-in buyer at the counter who gave no phone.
+  customerId        String?            @map("customer_id") @db.Uuid
+  orderNumber       Int                @map("order_number")
+  channel           OrderChannel       @default(online)
   /// Random and long: the buyer's order page link. Never the order number.
-  publicToken      String             @unique @map("public_token")
+  publicToken       String             @unique @map("public_token")
   /// 8 characters the buyer can type, with their phone, on "Track my order" (packages/shared invoice.ts).
-  trackingCode     String             @unique @default(dbgenerated("app_new_tracking_code()")) @map("tracking_code")
-  status           OrderStatus
-  paymentMethod    PaymentMethod      @map("payment_method")
-  currency         Currency
-  subtotalMinor    Int                @map("subtotal_minor")
-  discountMinor    Int                @map("discount_minor")
-  deliveryFeeMinor Int                @map("delivery_fee_minor")
-  vatPercent       Int                @map("vat_percent")
-  vatMinor         Int                @map("vat_minor")
-  totalMinor       Int                @map("total_minor")
+  trackingCode      String             @unique @default(dbgenerated("app_new_tracking_code()")) @map("tracking_code")
+  status            OrderStatus
+  paymentMethod     PaymentMethod      @map("payment_method")
+  currency          Currency
+  subtotalMinor     Int                @map("subtotal_minor")
+  discountMinor     Int                @map("discount_minor")
+  deliveryFeeMinor  Int                @map("delivery_fee_minor")
+  vatPercent        Int                @map("vat_percent")
+  vatMinor          Int                @map("vat_minor")
+  totalMinor        Int                @map("total_minor")
   /// The store's USD to KHR rate when the order was placed; old orders are never recomputed.
-  exchangeRateUsed Int                @map("exchange_rate_used")
-  fulfilment       Fulfilment
-  area             DeliveryArea
-  districtId       String?            @map("district_id")
-  provinceId       String?            @map("province_id")
-  landmark         String             @default("")
+  exchangeRateUsed  Int                @map("exchange_rate_used")
+  fulfilment        Fulfilment
+  area              DeliveryArea
+  districtId        String?            @map("district_id")
+  provinceId        String?            @map("province_id")
+  landmark          String             @default("")
   /// Copied from the store at order time, for pickup orders.
-  pickupAddress    String             @default("") @map("pickup_address")
-  pickupHours      String             @default("") @map("pickup_hours")
+  pickupAddress     String             @default("") @map("pickup_address")
+  pickupHours       String             @default("") @map("pickup_hours")
   /// Copied from the checkout, so the order keeps them whatever happens to the customer row.
-  buyerName        String             @map("buyer_name")
-  buyerPhone       String             @map("buyer_phone")
-  cancelReason     OrderCancelReason? @map("cancel_reason")
-  cancelNote       String             @default("") @map("cancel_note")
+  buyerName         String             @map("buyer_name")
+  buyerPhone        String             @map("buyer_phone")
+  cancelReason      OrderCancelReason? @map("cancel_reason")
+  cancelNote        String             @default("") @map("cancel_note")
   /// Pro and Advance: stock was taken for this order.
-  stockTaken       Boolean            @default(false) @map("stock_taken")
+  stockTaken        Boolean            @default(false) @map("stock_taken")
+  /// Cash at the counter: what the buyer handed over and the change given, in the order's currency.
+  cashReceivedMinor Int?               @map("cash_received_minor")
+  changeMinor       Int?               @map("change_minor")
+  /// Who rang up a sale at the counter.
+  soldByMerchantId  String?            @map("sold_by_merchant_id") @db.Uuid
   /// Made once per checkout by the shop page; the same key twice = the same order.
-  idempotencyKey   String             @map("idempotency_key") @db.Uuid
-  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  idempotencyKey    String             @map("idempotency_key") @db.Uuid
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   store      Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer   Customer           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  customer   Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  soldBy     Merchant?          @relation("OrderSoldBy", fields: [soldByMerchantId], references: [id], onDelete: SetNull)
   items      OrderItem[]
   events     OrderStatusEvent[]
   dispatches DeliveryDispatch[]
@@ -777,19 +802,19 @@ model OutboxEvent {
 
 /// One row of platform-wide settings (id is always 1).
 model PlatformSettings {
-  id              Int      @id @default(1)
-  platformName    String   @map("platform_name")
-  supportTelegram String   @map("support_telegram")
-  usdToKhrMin     Int      @map("usd_to_khr_min")
-  usdToKhrMax     Int      @map("usd_to_khr_max")
-  alertChatId     String   @default("") @map("alert_chat_id")
+  id                  Int       @id @default(1)
+  platformName        String    @map("platform_name")
+  supportTelegram     String    @map("support_telegram")
+  usdToKhrMin         Int       @map("usd_to_khr_min")
+  usdToKhrMax         Int       @map("usd_to_khr_max")
+  alertChatId         String    @default("") @map("alert_chat_id")
   /// Release 1 beta: every shop gets Basic's features and limits. Off at Release 2, when billing starts.
-  betaAllBasic    Boolean  @default(true) @map("beta_all_basic")
+  betaAllBasic        Boolean   @default(true) @map("beta_all_basic")
   /// When the monthly full-restore test (blueprint "The routine") last passed, as an owner recorded it.
   restoreTestPassedAt DateTime? @map("restore_test_passed_at") @db.Timestamptz(6)
   /// The worker's last heartbeat (every 5 minutes): the admin overview shows it down when this gets old.
   workerSeenAt        DateTime? @map("worker_seen_at") @db.Timestamptz(6)
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("platform_settings")
 }

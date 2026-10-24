@@ -19,6 +19,7 @@ import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { SubPage } from "@/components/seller-frame/sub-page";
 import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
+import { PaymentQrField } from "@/components/counter/payment-qr-field";
 import { InvoiceFields } from "@/components/shop-details/invoice-fields";
 import { LocationFields } from "@/components/shop-details/location-fields";
 import { PricingFields, toPricingDraft, toPricingInput, type PricingDraft } from "@/components/shop-details/pricing-fields";
@@ -26,20 +27,24 @@ import { api, ApiError, type StoreDetails, storeDetailsSchema, uploadPhoto } fro
 import { savedShopDetails } from "@/lib/shop-details-save";
 import { useMerchant } from "../merchant-context";
 
-/** What PUT /store takes — with the rate and VAT as typed — plus the logo's picture while it's on screen. */
+/** What PUT /store takes — with the rate and VAT as typed — plus the logo's and the payment QR's pictures while on screen. */
 interface Draft extends Omit<ShopDetailsSave, keyof PricingDraft>, PricingDraft {
   logoUrl: string | null;
+  paymentQrUrl: string | null;
 }
+
+/** Longest side of the uploaded payment QR picture, in pixels. */
+const QR_PICTURE_SIZE = 1024;
 
 /** The form's groups, in order: each a FormSection other screens can link to (shop-details#invoices). */
 const SECTION_IDS = ["details", "location", "payments", "prices", "invoices"] as const;
 
 function toDraft(store: StoreDetails): Draft {
   const saved = savedShopDetails(store);
-  return { ...saved, ...toPricingDraft(saved), phone: formatKhmerPhoneLocal(store.phone), logoUrl: store.logoUrl };
+  return { ...saved, ...toPricingDraft(saved), phone: formatKhmerPhoneLocal(store.phone), logoUrl: store.logoUrl, paymentQrUrl: store.paymentQrUrl };
 }
 
-function toInput({ logoUrl: _shown, ...draft }: Draft) {
+function toInput({ logoUrl: _logo, paymentQrUrl: _qr, ...draft }: Draft) {
   return { ...draft, ...toPricingInput(draft) };
 }
 
@@ -64,6 +69,7 @@ export default function ShopDetailsPage() {
   const [justSaved, setJustSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [qrUploading, setQrUploading] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
@@ -99,6 +105,20 @@ export default function ShopDetailsPage() {
       setSaveError(tApp("photoUploadFailed"));
     } finally {
       setLogoUploading(false);
+    }
+  }
+
+  /** The QR stays sharp: a larger picture than the logo, so every square still scans. */
+  async function handleQrFile(file: File) {
+    setQrUploading(true);
+    setSaveError(null);
+    try {
+      const uploaded = await uploadPhoto(await compressImageToBlob(file, QR_PICTURE_SIZE));
+      updateFields({ paymentQrKey: uploaded.key, paymentQrUrl: uploaded.url });
+    } catch {
+      setSaveError(tApp("photoUploadFailed"));
+    } finally {
+      setQrUploading(false);
     }
   }
 
@@ -237,6 +257,13 @@ export default function ShopDetailsPage() {
           />
           <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod)} label={tStore("codLabel")} description={tStore("codHint")} />
           {!draft.allowCod && <Notice tone="warning">{tApp("codOffWarning")}</Notice>}
+          <PaymentQrField
+            previewUrl={draft.paymentQrUrl}
+            busy={qrUploading}
+            onFile={(file) => void handleQrFile(file)}
+            onRemove={() => updateFields({ paymentQrKey: null, paymentQrUrl: null })}
+          />
+          {errors.paymentQrKey && <p className="text-sm text-danger">{errorText(errors.paymentQrKey)}</p>}
         </FormSection>
 
         <PricingFields values={draft} band={store.rateBand} errors={errors} onChange={updateFields} onCheck={checkField} />
@@ -255,7 +282,7 @@ export default function ShopDetailsPage() {
         )}
 
         <FormActions
-          dirty={dirty && !saving && !logoUploading}
+          dirty={dirty && !saving && !logoUploading && !qrUploading}
           onCancel={() => {
             setDraft(saved);
             setErrors({});
