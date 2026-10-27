@@ -34,7 +34,7 @@ jobs:
       DATABASE_URL: postgresql://khmer_micro_store_app:khmer_micro_store_app@localhost:5432/khmer_micro_store
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm's version comes from package.json "packageManager" (naming it here too fails the step).
       - uses: pnpm/action-setup@v4
@@ -107,7 +107,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build the API image
         run: docker build -f infra/docker/api.Dockerfile -t khmio-api .
