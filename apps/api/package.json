@@ -23,7 +23,7 @@
     "@nestjs/platform-express": "^10.4.6",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^8",
-    "multer": "2.0.2",
+    "multer": "2.5.0",
     "pino": "^9",
     "pino-http": "^10",
     "reflect-metadata": "^0.2.2",
@@ -31,7 +31,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/multer": "^1",
+    "@types/multer": "^2",
     "@types/node": "^22.9.0",
     "eslint": "^8.57.0",
     "tsup": "^8",
