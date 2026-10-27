@@ -123,7 +123,8 @@ jobs:
           psql "postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/khmer_micro_store" -c "CREATE ROLE khmer_micro_store_app LOGIN PASSWORD 'khmer_micro_store_app' NOSUPERUSER NOBYPASSRLS"
           OWNER=postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/khmer_micro_store
           APP=postgresql://khmer_micro_store_app:khmer_micro_store_app@localhost:5432/khmer_micro_store
-          docker run --rm --network host -e DATABASE_OWNER_URL=$OWNER khmio-api pnpm db:deploy
+          # Both URLs, as on Railway: Prisma's schema names DATABASE_URL even though migrations run as the owner.
+          docker run --rm --network host -e DATABASE_OWNER_URL=$OWNER -e DATABASE_URL=$APP khmio-api pnpm db:deploy
           docker run -d --name api --network host -e DATABASE_OWNER_URL=$OWNER -e DATABASE_URL=$APP -e NODE_ENV=development -e PORT=4000 khmio-api
           for i in $(seq 1 30); do
             if curl -fs http://localhost:4000/health; then exit 0; fi
