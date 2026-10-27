@@ -3,7 +3,7 @@
 # Includes pg_dump/pg_restore 17 for the nightly backup: a client must be at
 # least the server's version, and 17 also reads 16 servers.
 
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates curl gnupg \
   && install -d /usr/share/postgresql-common/pgdg \

@@ -3,7 +3,7 @@
 # Migrations run before each release (apps/api/railway.json: pnpm db:deploy),
 # so the image keeps the Prisma CLI. Settings come from the host's variables.
 
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 # Prisma's query engine needs OpenSSL.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
