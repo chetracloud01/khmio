@@ -1,6 +1,6 @@
 "use client";
 
-import { stockMovementTypeSchema, type StockMovementInput, type StockTransferInput } from "@khmer-micro-store/shared";
+import { stockMovementTypeSchema, type StockMovementInput, type StockTransferInput } from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -32,9 +32,9 @@ const MerchantInventoryContext = createContext<MerchantInventoryContextValue | n
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const WAREHOUSES_KEY = "khmer-micro-store:mockup-merchant-warehouses";
-const BRANCHES_KEY = "khmer-micro-store:mockup-merchant-branches";
-const TRANSACTIONS_KEY = "khmer-micro-store:mockup-merchant-stock-transactions";
+const WAREHOUSES_KEY = "khmio:mockup-merchant-warehouses";
+const BRANCHES_KEY = "khmio:mockup-merchant-branches";
+const TRANSACTIONS_KEY = "khmio:mockup-merchant-stock-transactions";
 
 let transactionCounter = 0;
 function nextTransactionId(): string {

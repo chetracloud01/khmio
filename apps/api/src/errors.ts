@@ -1,7 +1,8 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from "@nestjs/common";
-import { toFieldErrors, type FormErrorCode } from "@khmer-micro-store/shared";
+import { toFieldErrors, type FormErrorCode } from "@khmio/shared";
 import type { Logger } from "pino";
 import { ZodError } from "zod";
+import { RateLimitedException } from "./security/rate-limit";
 import { captureError } from "./sentry";
 
 /**
@@ -38,7 +39,13 @@ export type ErrorBody =
         // The shop is paused: it takes no orders until it reopens.
         | "store_closed"
         // TELEGRAM_BOT_TOKEN isn't set: no Telegram links.
-        | "telegram_not_configured";
+        | "telegram_not_configured"
+        // Cloudflare Turnstile said this checkout isn't from a person (or no token was sent).
+        | "bot_check_failed"
+        // Admin "Backup now" while a backup is already waiting or running.
+        | "backup_running"
+        // The shop switched off the module this needs (packages/shared business-modules.ts).
+        | "module_off";
     };
 
 const CODE_BY_STATUS: Record<number, Exclude<ErrorBody["error"], "invalid_input">> = {
@@ -62,13 +69,16 @@ export class InvalidInputException extends Error {
 export class AppException extends Error {
   constructor(
     public readonly status: number,
-    public readonly code: "no_store" | "plan_limit" | "store_paused" | "not_accepting_orders" | "action_not_allowed" | "admin_not_configured" | "code_locked" | "store_closed" | "telegram_not_configured",
+    public readonly code: "no_store" | "plan_limit" | "store_paused" | "not_accepting_orders" | "action_not_allowed" | "admin_not_configured" | "code_locked" | "store_closed" | "telegram_not_configured" | "bot_check_failed" | "backup_running" | "module_off",
   ) {
     super(code);
   }
 }
 
-export function toErrorResponse(error: unknown): { status: number; body: ErrorBody } {
+export function toErrorResponse(error: unknown): { status: number; body: ErrorBody; headers?: Record<string, string> } {
+  if (error instanceof RateLimitedException) {
+    return { status: 429, body: { error: "too_many_requests" }, headers: { "Retry-After": String(error.retryAfterSeconds) } };
+  }
   if (error instanceof AppException) {
     return { status: error.status, body: { error: error.code } };
   }
@@ -87,6 +97,7 @@ export function toErrorResponse(error: unknown): { status: number; body: ErrorBo
 }
 
 interface JsonResponse {
+  setHeader(name: string, value: string): void;
   status(code: number): { json(body: unknown): void };
 }
 
@@ -96,11 +107,13 @@ export class AllErrorsFilter implements ExceptionFilter {
   constructor(private readonly logger: Logger) {}
 
   catch(error: unknown, host: ArgumentsHost): void {
-    const { status, body } = toErrorResponse(error);
+    const { status, body, headers } = toErrorResponse(error);
     if (status >= 500) {
       this.logger.error({ err: error }, "unexpected error");
       captureError(error);
     }
-    host.switchToHttp().getResponse<JsonResponse>().status(status).json(body);
+    const response = host.switchToHttp().getResponse<JsonResponse>();
+    for (const [name, value] of Object.entries(headers ?? {})) response.setHeader(name, value);
+    response.status(status).json(body);
   }
 }

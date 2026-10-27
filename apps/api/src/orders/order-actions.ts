@@ -1,8 +1,10 @@
-import type { Prisma, Tx } from "@khmer-micro-store/db";
-import { decideOrderAction, getDispatchRoute, getSellerActions, type OrderActionRequest } from "@khmer-micro-store/shared";
+import { merchantActor, type Prisma, type Tx, writeAudit } from "@khmio/db";
+import { decideOrderAction, formatTrackingCode, getDispatchRoute, getSellerActions, type OrderActionRequest } from "@khmio/shared";
 import { NotFoundException } from "@nestjs/common";
 import { AppException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
+import { returnOrderStock } from "../stock/stock";
+import { orderItemSelect, toOrderItem } from "./order-lines";
 
 // The seller moving an order on (roadmap step 6). Every change goes through
 // packages/shared decideOrderAction — the same rule the screens and the
@@ -12,6 +14,8 @@ import type { MerchantStore } from "../merchant/store.guard";
 export const orderDetailSelect = {
   id: true,
   orderNumber: true,
+  channel: true,
+  trackingCode: true,
   status: true,
   paymentMethod: true,
   currency: true,
@@ -31,13 +35,14 @@ export const orderDetailSelect = {
   pickupHours: true,
   buyerName: true,
   buyerPhone: true,
+  // A booking: when the buyer would like it done.
+  preferredAt: true,
+  // Dine-in: the table it was for ("" = none).
+  tableName: true,
   cancelReason: true,
   cancelNote: true,
   createdAt: true,
-  items: {
-    select: { titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
-    orderBy: { createdAt: "asc" },
-  },
+  items: { select: orderItemSelect, orderBy: { createdAt: "asc" } },
   events: { select: { status: true, actor: true, at: true }, orderBy: { at: "asc" } },
   dispatches: {
     select: { route: true, driverName: true, driverPhone: true, busCompany: true, ticketNumber: true, dispatchedAt: true, pickedUpAt: true, deliveredAt: true, failedAt: true },
@@ -48,14 +53,21 @@ export const orderDetailSelect = {
 type OrderDetailRow = Prisma.OrderGetPayload<{ select: typeof orderDetailSelect }>;
 
 /** The order as the seller's detail page shows it: with the steps the seller may take now and how it must be sent. */
-export function toOrderDetail(order: OrderDetailRow) {
-  return { ...order, actions: getSellerActions(order), route: getDispatchRoute(order) };
+export function toOrderDetail(order: OrderDetailRow, storeSlug: string) {
+  return {
+    ...order,
+    items: order.items.map(toOrderItem),
+    trackingCode: formatTrackingCode(storeSlug, order.trackingCode),
+    actions: getSellerActions(order),
+    route: getDispatchRoute(order),
+  };
 }
 
 export async function readOrderDetail(tx: Tx, orderId: string) {
-  const order = await tx.order.findFirst({ where: { id: orderId }, select: orderDetailSelect });
+  const order = await tx.order.findFirst({ where: { id: orderId }, select: { ...orderDetailSelect, store: { select: { slug: true } } } });
   if (!order) throw new NotFoundException();
-  return toOrderDetail(order);
+  const { store, ...detail } = order;
+  return toOrderDetail(detail, store.slug);
 }
 
 export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: string, request: OrderActionRequest) {
@@ -73,6 +85,8 @@ export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: s
     },
   });
   if (count === 0) throw new AppException(409, "action_not_allowed");
+  // A cancelled order's stock goes back on the shelf (nothing happens if it took none).
+  if (decision.status === "cancelled") await returnOrderStock(tx, order.id);
   await tx.orderStatusEvent.create({ data: { storeId: context.storeId, orderId: order.id, status: decision.status, actor: "merchant", actorMerchantId: context.merchantId } });
   // Buyers following the order on Telegram hear about it (sent by the worker).
   await tx.outboxEvent.createMany({ data: [{ storeId: context.storeId, kind: "order_status_changed", payload: { orderId: order.id, status: decision.status } }] });
@@ -102,17 +116,6 @@ export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: s
     if (dispatch) await tx.deliveryDispatch.update({ where: { id: dispatch.id }, data: { [field]: now } });
   }
 
-  await tx.auditLog.create({
-    data: {
-      actorType: "merchant",
-      actorId: context.merchantId,
-      storeId: context.storeId,
-      action: `order.${request.action}`,
-      entity: "order",
-      entityId: order.id,
-      before: { status: order.status },
-      after: { status: decision.status },
-    },
-  });
+  await writeAudit(tx, merchantActor(context), { action: `order.${request.action}`, entity: "order", entityId: order.id, before: { status: order.status }, after: { status: decision.status } });
   return readOrderDetail(tx, order.id);
 }

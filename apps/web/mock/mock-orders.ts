@@ -13,7 +13,7 @@ import {
   type OrderCancellation,
   type OrderStatus,
   type PaymentMethod,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { mockProducts, parseLineKey, type MockProduct } from "./mock-data";
 
 export interface OrderLine {

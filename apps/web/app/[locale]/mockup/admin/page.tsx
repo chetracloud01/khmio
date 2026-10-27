@@ -1,7 +1,7 @@
 "use client";
 
-import { formatUsd } from "@khmer-micro-store/shared";
-import { Card, cn } from "@khmer-micro-store/ui";
+import { formatUsd } from "@khmio/shared";
+import { Card, cn } from "@khmio/ui";
 import { AlertTriangle, BadgeCheck, ChevronRight, Hourglass, KeyRound, PauseCircle, Wallet } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";

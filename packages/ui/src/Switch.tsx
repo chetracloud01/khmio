@@ -9,11 +9,13 @@ export interface SwitchProps {
   label: string;
   /** One line under the label saying what the current position means. */
   description?: string;
+  /** Only the toggle shows (the label is still read out): for a switch inside a list row. */
+  labelHidden?: boolean;
   className?: string;
 }
 
 /** An on/off setting that takes effect as a whole row: tap anywhere on it. */
-export function Switch({ checked, onChange, label, description, className }: SwitchProps) {
+export function Switch({ checked, onChange, label, description, labelHidden = false, className }: SwitchProps) {
   const labelId = useId();
   const descriptionId = useId();
   return (
@@ -24,9 +26,9 @@ export function Switch({ checked, onChange, label, description, className }: Swi
       aria-labelledby={labelId}
       aria-describedby={description ? descriptionId : undefined}
       onClick={() => onChange(!checked)}
-      className={cn("flex min-h-touch w-full items-center justify-between gap-4 text-left", className)}
+      className={cn("flex min-h-touch items-center justify-between gap-4 text-left", labelHidden ? "min-w-touch justify-center" : "w-full", className)}
     >
-      <span className="flex min-w-0 flex-col">
+      <span className={cn("flex min-w-0 flex-col", labelHidden && "sr-only")}>
         <span id={labelId} className="text-sm font-medium text-fg">
           {label}
         </span>

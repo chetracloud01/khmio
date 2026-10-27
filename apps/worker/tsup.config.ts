@@ -1,6 +1,6 @@
 import { defineConfig } from "tsup";
 
-// One file to run in production. The workspace packages (@khmer-micro-store/*)
+// One file to run in production. The workspace packages (@khmio/*)
 // are TypeScript source, so they're bundled in; everything from npm stays external.
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -10,5 +10,5 @@ export default defineConfig({
   outDir: "dist",
   clean: true,
   sourcemap: true,
-  noExternal: [/^@khmer-micro-store\//],
+  noExternal: [/^@khmio\//],
 });

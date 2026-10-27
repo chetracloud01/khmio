@@ -81,7 +81,7 @@ describe("backup codes and the app link", () => {
 
   it("builds the otpauth link the apps scan", () => {
     expect(otpauthUri("JBSWY3DPEHPK3PXP", "Chetra")).toBe(
-      "otpauth://totp/Khmer%20Micro-Store%20Admin%3AChetra?secret=JBSWY3DPEHPK3PXP&issuer=Khmer%20Micro-Store%20Admin&algorithm=SHA1&digits=6&period=30",
+      "otpauth://totp/Khmio%20Admin%3AChetra?secret=JBSWY3DPEHPK3PXP&issuer=Khmio%20Admin&algorithm=SHA1&digits=6&period=30",
     );
   });
 });

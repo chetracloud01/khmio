@@ -1,5 +1,5 @@
 {
-  "name": "khmer-micro-store",
+  "name": "khmio",
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "engines": {
@@ -13,9 +13,18 @@
     "test": "turbo run test",
     "db:up": "docker compose -f infra/docker-compose.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.yml down",
-    "db:migrate": "pnpm --filter @khmer-micro-store/db migrate:dev",
-    "db:deploy": "pnpm --filter @khmer-micro-store/db migrate:deploy",
-    "admin:add-owner": "pnpm --filter @khmer-micro-store/api admin:add-owner"
+    "db:migrate": "pnpm --filter @khmio/db migrate:dev",
+    "db:deploy": "pnpm --filter @khmio/db migrate:deploy",
+    "admin:add-owner": "pnpm --filter @khmio/api admin:add-owner",
+    "demo:garage": "pnpm --filter @khmio/api demo:garage",
+    "s3:up": "infra\\local-s3.cmd",
+    "files:setup": "pnpm --filter @khmio/api files setup",
+    "files:check": "pnpm --filter @khmio/api files check",
+    "files:copy-to-s3": "pnpm --filter @khmio/api files copy-to-s3",
+    "db:backup": "pnpm --filter @khmio/worker backup",
+    "db:restore": "pnpm --filter @khmio/worker restore",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "rehearsal": "node --env-file-if-exists=.env infra/rehearsal/run.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.15.0",

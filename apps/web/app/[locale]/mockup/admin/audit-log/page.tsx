@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@khmer-micro-store/ui";
-import { BadgeCheck, CalendarPlus, CreditCard, Layers, ReceiptText, ShieldX, UserCog } from "lucide-react";
+import { cn } from "@khmio/ui";
+import { BadgeCheck, CalendarPlus, CreditCard, Globe, History, Layers, ReceiptText, ShieldX, UserCog } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { AdminAuditEntry } from "../../admin-context";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
@@ -20,9 +20,11 @@ const ACTION_ICON: Record<AdminAuditEntry["action"], { icon: typeof Layers; styl
   adminRoleChanged: { icon: UserCog, style: "bg-brand/10 text-brand" },
   adminDisabled: { icon: UserCog, style: "bg-danger/10 text-danger" },
   adminEnabled: { icon: UserCog, style: "bg-success/10 text-success" },
+  websitePublished: { icon: Globe, style: "bg-brand/10 text-brand" },
+  websiteRestored: { icon: History, style: "bg-info/10 text-info" },
 };
 
-type AuditKind = "plan" | "period" | "kyc" | "billing" | "payments" | "admins";
+type AuditKind = "plan" | "period" | "kyc" | "billing" | "payments" | "admins" | "website";
 
 /** The filter chip an entry belongs under. */
 function kindOf(entry: AdminAuditEntry): AuditKind {
@@ -44,6 +46,9 @@ function kindOf(entry: AdminAuditEntry): AuditKind {
     case "adminDisabled":
     case "adminEnabled":
       return "admins";
+    case "websitePublished":
+    case "websiteRestored":
+      return "website";
   }
 }
 
@@ -54,6 +59,7 @@ const KIND_LABEL: Record<AuditKind, string> = {
   billing: "auditFilterBilling",
   payments: "auditFilterPayments",
   admins: "auditFilterAdmins",
+  website: "auditFilterWebsite",
 };
 const KINDS = Object.keys(KIND_LABEL) as AuditKind[];
 

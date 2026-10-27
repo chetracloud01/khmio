@@ -1,7 +1,7 @@
 "use client";
 
-import { SHARE_REQUIREMENTS, type ShareRequirement } from "@khmer-micro-store/shared";
-import { Button, Card, cn } from "@khmer-micro-store/ui";
+import { SHARE_REQUIREMENTS, type ShareRequirement } from "@khmio/shared";
+import { Button, Card, cn } from "@khmio/ui";
 import {
   BadgeCheck,
   Bell,

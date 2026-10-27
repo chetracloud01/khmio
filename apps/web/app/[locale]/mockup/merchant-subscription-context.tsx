@@ -10,7 +10,7 @@ import {
   type AdminOverride,
   type Currency,
   type PlanId,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { mockSubscription, type MockSubscription, type MockSubscriptionInvoice } from "@/mock/mock-data";
@@ -35,7 +35,7 @@ const MerchantSubscriptionContext = createContext<MerchantSubscriptionContextVal
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const STORAGE_KEY = "khmer-micro-store:mockup-merchant-subscription";
+const STORAGE_KEY = "khmio:mockup-merchant-subscription";
 
 let invoiceCounter = 0;
 function newInvoice(

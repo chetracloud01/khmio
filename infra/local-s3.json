@@ -1,0 +1,13 @@
+{
+  "identities": [
+    {
+      "name": "local_dev",
+      "credentials": [{ "accessKey": "localdev", "secretKey": "localdev-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    },
+    {
+      "name": "anonymous",
+      "actions": ["Read:khmio-photos"]
+    }
+  ]
+}

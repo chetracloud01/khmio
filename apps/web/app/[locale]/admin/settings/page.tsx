@@ -1,11 +1,11 @@
 "use client";
 
-import { adminCan, platformSettingsSaveSchema, toFieldErrors, type FormErrorCode } from "@khmer-micro-store/shared";
-import { Card, Input, Switch } from "@khmer-micro-store/ui";
+import { adminCan, platformSettingsSaveSchema, toFieldErrors, type FormErrorCode } from "@khmio/shared";
+import { Card, Input, Notice, Switch } from "@khmio/ui";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
-import type { AdminSettings } from "@/lib/admin-api";
+import { adminSettingsSchema, type AdminSettings } from "@/lib/admin-api";
 import { api, ApiError } from "@/lib/api";
 import { useAdminMe } from "../admin-context";
 import { LoadState, PageHeader } from "../admin-ui";
@@ -28,7 +28,7 @@ export default function AdminSettingsPage() {
   const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
-    api<AdminSettings>("/admin/settings").then(setSettings, () => setFailed(true));
+    api("/admin/settings", adminSettingsSchema).then(setSettings, () => setFailed(true));
   }, []);
   useEffect(load, [load]);
   if (!settings) return <LoadState failed={failed} onRetry={load} />;
@@ -66,7 +66,7 @@ function SettingsForm({ initial }: { initial: AdminSettings }) {
     }
     setStatus("saving");
     try {
-      const next = toDraft(await api<AdminSettings>("/admin/settings", { method: "PUT", body: result.data }));
+      const next = toDraft(await api("/admin/settings", adminSettingsSchema, { method: "PUT", body: result.data }));
       setSaved(next);
       setDraft(next);
       setStatus("saved");
@@ -81,9 +81,9 @@ function SettingsForm({ initial }: { initial: AdminSettings }) {
       <PageHeader title={t("settingsTitle")} description={tAdmin("settingsDescription")} />
       {!canSave && <p className="rounded-DEFAULT border border-border bg-border/10 p-3 text-sm text-muted">{t("settingsReadOnly")}</p>}
       {status === "failed" && (
-        <p role="alert" className="rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+        <Notice tone="danger" role="alert">
           {t("saveFailed")}
-        </p>
+        </Notice>
       )}
       <Card className="flex flex-col p-4 md:p-6">
         <fieldset disabled={!canSave} className="contents">

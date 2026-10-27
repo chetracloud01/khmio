@@ -11,7 +11,7 @@ if not exist %PSQL% (
 )
 
 echo.
-echo  Khmer Micro-Store - local database setup
+echo  Khmio - local database setup
 echo  ----------------------------------------
 echo  Type the password you chose for the "postgres" user when you installed PostgreSQL,
 echo  then press Enter. Nothing shows while you type - that is normal.

@@ -1,11 +1,12 @@
 "use client";
 
-import { getMissingForSharing, SHARE_REQUIREMENTS, type ShareRequirement } from "@khmer-micro-store/shared";
-import { Card, cn } from "@khmer-micro-store/ui";
+import { getMissingForSharing, SHARE_REQUIREMENTS, type ShareRequirement } from "@khmio/shared";
+import { Card, cn, TONE_STYLES } from "@khmio/ui";
 import { Check, ChevronRight, ImagePlus, Lock, PackagePlus, Phone, Share2, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useMerchant } from "./merchant-context";
+import { useShareShop } from "./share-shop";
 
 interface SetupItem {
   key: string;
@@ -14,6 +15,8 @@ interface SetupItem {
   hint?: string;
   /** Where the step is done; none = its page comes in a later roadmap step. */
   href?: string;
+  /** Opens something on the page instead of going to one (the Share sheet). */
+  onClick?: () => void;
   done: boolean;
   locked?: boolean;
 }
@@ -36,16 +39,21 @@ export function SetupChecklist() {
   const tReady = useTranslations("Readiness");
   const locale = useLocale();
   const { store } = useMerchant();
-  const missing = getMissingForSharing({ businessType: store.businessType, shopPhone: store.phone, ...store.readiness });
+  const shareShop = useShareShop();
+  const missing = getMissingForSharing({
+    businessType: store.businessType,
+    shopPhone: store.phone,
+    ...store.readiness,
+  });
   const ready = missing.length === 0;
   const isService = store.businessType === "service";
   const base = `/${locale}/m`;
 
   const requirementHref: Partial<Record<ShareRequirement, string>> = {
     products: `${base}/products/new`,
-    phone: `${base}/settings#details`,
+    phone: `${base}/shop-details#details`,
     delivery: `${base}/delivery`,
-    payment: `${base}/store-settings`,
+    payment: `${base}/shop-details#payments`,
   };
   const requirementHint: Record<ShareRequirement, string | undefined> = {
     products: tReady("hint_products"),
@@ -63,26 +71,46 @@ export function SetupChecklist() {
       done: !missing.includes(requirement),
     })),
     // Unlocks once the four steps above are done; done when the link was copied, shared or its QR downloaded.
-    { key: "share", icon: Share2, title: t("setupShare"), hint: ready ? t("setupShareHint") : tReady("shareLocked"), href: ready ? "#share" : undefined, done: store.linkShared, locked: !ready },
+    {
+      key: "share",
+      icon: Share2,
+      title: t("setupShare"),
+      hint: ready ? t("setupShareHint") : tReady("shareLocked"),
+      onClick: ready ? shareShop.open : undefined,
+      done: store.linkShared,
+      locked: !ready,
+    },
   ];
   const extras: SetupItem[] = [
-    { key: "bakong", icon: Wallet, title: t("setupBakongExtra"), href: `${base}/settings#payments`, done: store.readiness.khqrReady },
-    { key: "logo", icon: ImagePlus, title: t("setupLogo"), href: `${base}/settings#details`, done: !!store.logoUrl },
+    {
+      key: "bakong",
+      icon: Wallet,
+      title: t("setupBakongExtra"),
+      href: `${base}/shop-details#payments`,
+      done: store.readiness.khqrReady,
+    },
+    {
+      key: "logo",
+      icon: ImagePlus,
+      title: t("setupLogo"),
+      href: `${base}/shop-details#details`,
+      done: !!store.logoUrl,
+    },
   ];
   const doneCount = steps.filter((step) => step.done).length;
-  // Every step done: the checklist has done its job and goes away (the share card stays on Home).
+  // Every step done: the checklist has done its job and goes away (Share stays in the header).
   if (doneCount === steps.length) return null;
-  const nextKey = steps.find((step) => !step.done && !step.locked && step.href)?.key;
+  const nextKey = steps.find((step) => !step.done && !step.locked && (step.href || step.onClick))?.key;
 
   function row(item: SetupItem, position: number | null) {
     const isNext = item.key === nextKey;
-    const inactive = item.done || item.locked || !item.href;
+    const inactive = item.done || item.locked || !(item.href || item.onClick);
     const content = (
       <>
         <span
           className={cn(
             "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
-            item.done ? "bg-success/10 text-success" : isNext ? "bg-brand text-on-brand" : "bg-border/30 text-muted",
+            item.done ? TONE_STYLES.success : isNext ? "bg-brand text-on-brand" : TONE_STYLES.muted,
           )}
         >
           {item.done ? (
@@ -115,6 +143,11 @@ export function SetupChecklist() {
           <Link href={item.href} className={className}>
             {content}
           </Link>
+        ) : item.onClick && !inactive ? (
+          // eslint-disable-next-line no-restricted-syntax -- a checklist row: the same row look as the Link beside it, so it can't be a kit Button
+          <button type="button" onClick={item.onClick} className={className}>
+            {content}
+          </button>
         ) : (
           <div className={className}>{content}</div>
         )}

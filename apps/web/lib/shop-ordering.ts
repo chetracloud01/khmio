@@ -1,4 +1,4 @@
-import { getAvailablePaymentMethods, type DeliveryArea, type Fulfilment, type PaymentMethod } from "@khmer-micro-store/shared";
+import { getAvailablePaymentMethods, type DeliveryArea, type Fulfilment, type PaymentMethod } from "@khmio/shared";
 import type { PublicShop } from "./api";
 
 // Whether a shop takes orders, and which ways to pay fit a buyer's choice —

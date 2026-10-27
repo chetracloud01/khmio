@@ -3,6 +3,7 @@
 import {
   deliverySettingsSchema,
   formatKhmerPhoneLocal,
+  khrInputText,
   MAX_DELIVERY_ZONES,
   parseKhrInput,
   parseUsdInput,
@@ -10,17 +11,21 @@ import {
   placeName,
   SUGGESTED_DELIVERY_SETTINGS,
   toFieldErrors,
+  usdInputText,
   type DeliverySettings,
   type FormErrorCode,
-} from "@khmer-micro-store/shared";
-import { Button, Card, cn, Input, Select } from "@khmer-micro-store/ui";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+} from "@khmio/shared";
+import { Button, Card, cn, IconButton, Input, MoneyInput, Notice, Select, Switch } from "@khmio/ui";
+import { Plus, Store, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
-import { api, ApiError, type DeliveryResponse } from "@/lib/api";
+import { MenuList } from "@/components/menu-list";
+import { SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
+import { api, ApiError, type DeliveryResponse, deliveryResponseSchema } from "@/lib/api";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
+import { SubPage } from "@/components/seller-frame/sub-page";
 
 interface ZoneDraft {
   id: string;
@@ -39,27 +44,24 @@ interface DriverDraft {
 
 interface Draft {
   zones: ZoneDraft[];
-  pickup: { enabled: boolean; address: string; hours: string };
   province: { enabled: boolean; feeUsd: string; feeKhr: string; note: string };
   drivers: DriverDraft[];
 }
 
-const usdText = (cents: number | undefined) => (cents !== undefined ? (cents / 100).toFixed(2) : "");
-const khrText = (riel: number | undefined) => (riel !== undefined ? String(riel) : "");
 
 function toDraft(settings: DeliverySettings): Draft {
   return {
-    zones: settings.zones.map((zone) => ({ id: zone.id, name: zone.name, feeUsd: usdText(zone.feeUsdCents), feeKhr: khrText(zone.feeKhr), districtIds: zone.districtIds })),
-    pickup: settings.pickup,
-    province: { enabled: settings.province.enabled, feeUsd: usdText(settings.province.feeUsdCents), feeKhr: khrText(settings.province.feeKhr), note: settings.province.note },
+    zones: settings.zones.map((zone) => ({ id: zone.id, name: zone.name, feeUsd: usdInputText(zone.feeUsdCents), feeKhr: khrInputText(zone.feeKhr), districtIds: zone.districtIds })),
+    province: { enabled: settings.province.enabled, feeUsd: usdInputText(settings.province.feeUsdCents), feeKhr: khrInputText(settings.province.feeKhr), note: settings.province.note },
     drivers: settings.drivers.map((driver) => ({ ...driver, phone: formatKhmerPhoneLocal(driver.phone) })),
   };
 }
 
-function toInput(draft: Draft) {
+/** Pickup is set on Shop details (shop-details#location); a delivery save is checked with it as saved. */
+function toInput(draft: Draft, pickup: DeliverySettings["pickup"]) {
   return {
     zones: draft.zones.map((zone) => ({ id: zone.id, name: zone.name, districtIds: zone.districtIds, feeUsdCents: parseUsdInput(zone.feeUsd), feeKhr: parseKhrInput(zone.feeKhr) })),
-    pickup: draft.pickup,
+    pickup,
     province: { enabled: draft.province.enabled, note: draft.province.note, feeUsdCents: parseUsdInput(draft.province.feeUsd), feeKhr: parseKhrInput(draft.province.feeKhr) },
     drivers: draft.drivers,
   };
@@ -73,26 +75,24 @@ function newId(prefix: string): string {
 
 /**
  * A shop that has never saved its delivery starts from the suggestion
- * (packages/shared SUGGESTED_DELIVERY_SETTINGS). Buyers usually come to a
- * salon or a repair shop, so a service shop starts with pickup on.
+ * (packages/shared SUGGESTED_DELIVERY_SETTINGS), with pickup as set on Shop details.
  */
-function startingSettings(response: DeliveryResponse, isService: boolean): DeliverySettings {
+function startingSettings(response: DeliveryResponse): DeliverySettings {
   if (response.configured) return response.settings;
-  return { ...SUGGESTED_DELIVERY_SETTINGS, pickup: { ...SUGGESTED_DELIVERY_SETTINGS.pickup, enabled: isService } };
+  return { ...SUGGESTED_DELIVERY_SETTINGS, pickup: response.settings.pickup };
 }
 
 export default function DeliveryPage() {
-  const { store } = useMerchant();
   const [response, setResponse] = useState<DeliveryResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const load = useCallback(() => {
     setFailed(false);
-    api<DeliveryResponse>("/delivery").then(setResponse, () => setFailed(true));
+    api("/delivery", deliveryResponseSchema).then(setResponse, () => setFailed(true));
   }, []);
   useEffect(load, [load]);
   if (failed) return <PageOffline onRetry={load} />;
   if (!response) return <PageLoading />;
-  return <DeliveryForm initial={startingSettings(response, store.businessType === "service")} configured={response.configured} />;
+  return <DeliveryForm initial={startingSettings(response)} configured={response.configured} />;
 }
 
 // The standard form (components/form-ui.tsx) over deliverySettingsSchema — the
@@ -106,6 +106,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   const formRef = useRef<HTMLDivElement>(null);
 
   const [saved, setSaved] = useState<Draft>(() => toDraft(initial));
+  const [pickup, setPickup] = useState(initial.pickup);
   const [configured, setConfigured] = useState(initiallyConfigured);
   const [draft, setDraft] = useState<Draft>(saved);
   const [errors, setErrors] = useState<Record<string, FormErrorCode>>({});
@@ -153,7 +154,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   }
 
   async function handleSave() {
-    const result = deliverySettingsSchema.safeParse(toInput(draft));
+    const result = deliverySettingsSchema.safeParse(toInput(draft, pickup));
     if (!result.success) {
       setErrors(toFieldErrors(result.error));
       focusFirstInvalidField(formRef.current);
@@ -162,8 +163,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
     setSaving(true);
     setSaveError(null);
     try {
-      const next = await api<DeliveryResponse>("/delivery", { method: "PUT", body: result.data });
+      const next = await api("/delivery", deliveryResponseSchema, { method: "PUT", body: result.data });
       const nextDraft = toDraft(next.settings);
+      setPickup(next.settings.pickup);
       setSaved(nextDraft);
       setDraft(nextDraft);
       setConfigured(next.configured);
@@ -172,7 +174,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
       await refreshStore().catch(() => undefined);
     } catch (failure) {
       if (failure instanceof ApiError && Object.keys(failure.fields).length > 0) {
-        setErrors(failure.fields as Record<string, FormErrorCode>);
+        setErrors(failure.fields);
         focusFirstInvalidField(formRef.current);
       } else {
         setSaveError(failure instanceof ApiError && failure.code === "store_paused" ? tApp("storePaused") : tApp("saveFailed"));
@@ -187,18 +189,22 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
   const status = dirty ? t("unsavedChanges") : justSaved ? t("saved") : undefined;
 
   const feeInputs = (usd: string, khr: string, onUsd: (value: string) => void, onKhr: (value: string) => void, usdKey: string, khrKey: string) => (
-    <div className="grid grid-cols-2 gap-3">
-      <Input label={t("feeUsd")} inputMode="decimal" placeholder="1.00" value={usd} onChange={(e) => onUsd(e.target.value)} error={error(usdKey)} />
-      <Input label={t("feeKhr")} inputMode="numeric" placeholder="4000" value={khr} onChange={(e) => onKhr(e.target.value)} error={error(khrKey)} />
-    </div>
+    <MoneyInput
+      usd={usd}
+      khr={khr}
+      onUsdChange={onUsd}
+      onKhrChange={onKhr}
+      usdLabel={t("feeUsd")}
+      khrLabel={t("feeKhr")}
+      usdPlaceholder="1.00"
+      khrPlaceholder="4000"
+      usdError={error(usdKey)}
+      khrError={error(khrKey)}
+    />
   );
 
   return (
-    <div ref={formRef} className="flex flex-col gap-5 p-4">
-      <div>
-        <h1 className="text-xl font-bold">{t("title")}</h1>
-        <p className="mt-1 text-sm text-muted">{t("description")}</p>
-      </div>
+    <SubPage ref={formRef} title={t("title")} description={t("description")}>
 
       {!configured && (
         <p role="status" className="rounded-DEFAULT border border-info/40 bg-info/5 p-3 text-sm">
@@ -209,10 +215,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
       <Card className="flex flex-col p-4">
         <FormSection stacked title={t("sectionZones")} description={t("sectionZonesHelp")}>
           {errors.zones && (
-            <p role="alert" className="flex items-start gap-2 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <Notice tone="danger" role="alert">
               {error("zones")}
-            </p>
+            </Notice>
           )}
 
           {draft.zones.map((zone, index) => (
@@ -227,18 +232,16 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     error={error(`zones.${index}.name`)}
                   />
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  icon={Trash2}
+                  tone="danger"
+                  label={t("removeZone")}
                   onClick={() => {
                     // Messages are keyed by position, so they'd point at the wrong zone now.
                     setErrors({});
                     change({ ...draft, zones: draft.zones.filter((_, i) => i !== index) });
                   }}
-                  aria-label={t("removeZone")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-DEFAULT text-danger hover:bg-danger/10"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                />
               </div>
 
               {feeInputs(
@@ -258,6 +261,7 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     const mine = owner === index;
                     const elsewhere = owner !== -1 && !mine;
                     return (
+                      // eslint-disable-next-line no-restricted-syntax -- a district chip that picks several at once and greys out other zones' districts; used only here
                       <button
                         key={place.id}
                         type="button"
@@ -296,47 +300,24 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         <FormSection stacked title={t("sectionPickup")} description={t("sectionPickupHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.pickup.enabled}
-              onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, enabled: e.target.checked } }, "pickup.address", "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("pickupEnabled")}</span>
-          </label>
-          {draft.pickup.enabled && (
-            <>
-              <Input
-                label={t("pickupAddress")}
-                placeholder={t("pickupAddressPlaceholder")}
-                maxLength={200}
-                value={draft.pickup.address}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, address: e.target.value } }, "pickup.address")}
-                error={error("pickup.address")}
-              />
-              <Input
-                label={t("pickupHours")}
-                placeholder={t("pickupHoursPlaceholder")}
-                maxLength={100}
-                value={draft.pickup.hours}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, hours: e.target.value } }, "pickup.hours")}
-                error={error("pickup.hours")}
-              />
-            </>
-          )}
+          {/* Set with the shop's address and map link on Shop details. */}
+          <MenuList
+            rows={[
+              {
+                key: "pickup",
+                href: `/${locale}/m/shop-details#location`,
+                icon: Store,
+                tone: pickup.enabled ? "success" : "muted",
+                title: pickup.enabled ? t("pickupOn") : t("pickupOff"),
+                detail: [pickup.address, pickup.hours].filter(Boolean).join(" · ") || t("pickupChangeHint"),
+                value: t("pickupChange"),
+              },
+            ]}
+          />
         </FormSection>
 
         <FormSection stacked title={t("sectionProvince")} description={t("sectionProvinceHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.province.enabled}
-              onChange={(e) => change({ ...draft, province: { ...draft.province, enabled: e.target.checked } }, "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("provinceEnabled")}</span>
-          </label>
+          <Switch checked={draft.province.enabled} onChange={(enabled) => change({ ...draft, province: { ...draft.province, enabled } }, "zones")} label={t("provinceEnabled")} />
           {draft.province.enabled && (
             <>
               {feeInputs(
@@ -387,17 +368,15 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
                     ]}
                   />
                 </div>
-                <button
-                  type="button"
+                <IconButton
+                  icon={Trash2}
+                  tone="danger"
+                  label={t("removeDriver")}
                   onClick={() => {
                     setErrors({});
                     change({ ...draft, drivers: draft.drivers.filter((_, i) => i !== index) });
                   }}
-                  aria-label={t("removeDriver")}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-DEFAULT text-danger hover:bg-danger/10"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                </button>
+                />
               </div>
             </div>
           ))}
@@ -408,9 +387,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
         </FormSection>
 
         {saveError && (
-          <p role="alert" className="mb-3 rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+          <Notice tone="danger" role="alert" className="mb-3">
             {saveError}
-          </p>
+          </Notice>
         )}
 
         <FormActions
@@ -425,9 +404,9 @@ function DeliveryForm({ initial, configured: initiallyConfigured }: { initial: D
           saveLabel={saving ? tApp("saving") : t("save")}
           cancelLabel={t("cancel")}
           status={status}
-          className="bottom-above-nav -mb-4 rounded-b-DEFAULT"
+          className={SELLER_FORM_BAR}
         />
       </Card>
-    </div>
+    </SubPage>
   );
 }

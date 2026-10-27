@@ -1,7 +1,7 @@
 "use client";
 
-import { formatKhr, formatUsd, getInvoiceView, getPlanPrice, PLAN_ORDER, type SubscriptionStatus } from "@khmer-micro-store/shared";
-import { BottomSheet, Button } from "@khmer-micro-store/ui";
+import { formatKhr, formatUsd, getInvoiceView, getPlanPrice, PLAN_ORDER, type SubscriptionStatus } from "@khmio/shared";
+import { BottomSheet, Button } from "@khmio/ui";
 import { BadgeCheck, ChevronRight, CirclePause, Clock, Wallet } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";

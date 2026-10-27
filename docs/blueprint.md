@@ -1,8 +1,10 @@
-# Khmer Micro-Store — Project Blueprint
+# Khmio — Project Blueprint
 
 As of 2026-10-01 · the one document for the whole project, from the first idea to running the live platform
 
 ## How to read this blueprint
+
+New to the project? Start with `docs/handbook.md`: it maps every document, the whole journey and how to work day to day, and points back here for the details.
 
 This is the only plan document. Everything about the project — why it exists, how each workflow runs, how it is built, the order it is built in, and how it is run after launch — lives here. `CLAUDE.md` holds the short rules for every coding session and points back to sections of this file; `design/screens.md` holds the text spec of each screen. When a decision changes, change it here first.
 
@@ -32,14 +34,16 @@ Updated at the end of every roadmap step.
 | Step 2. Data and login | Done — schema, row-level security with two database users, Telegram login, 2-question onboarding |
 | Step 3. Catalog | Done — products with options and photos, shop details, setup checklist, read-only shop page |
 | Step 4. Shop and checkout | Done — delivery and store settings, cart, one-page checkout, cash orders priced by the API, buyer order page, seller order list (read-only) |
-| Step 5. KHQR | **Postponed** — no Bakong Open API token yet. Built as soon as there is one and gate G3 passes; it must be done before step 8 (go live). Until then shops take cash on delivery only |
+| Step 5. KHQR | **Postponed** — no Bakong Open API token yet. Built as soon as there is one and gate G3 passes. Decided 2026-10-02: the beta may go live with cash on delivery only, and KHQR is switched on when it's ready (its launch-checklist items then apply) |
 | Step 6. Orders and Telegram | Done — order actions (confirm → pack → send by driver, bus or pickup → delivered → cash collected; failed, rebook, cancel), the buyer cancels while allowed and their page refreshes itself, Telegram alerts through an outbox with a Confirm button. Telegram runs in dry run until a bot token is set: send one real alert then |
 | Step 7. Admin, the minimum | Done — admin login with Telegram + authenticator code (2FA, backup codes, lockout), roles enforced by the API, overview, merchants with extend/unblock and change plan, audit log, platform settings, admin alerts to Telegram. First owner by `pnpm admin:add-owner` |
-| **Next: Step 8. Security and go live** | Not started — needs a domain and hosting. Step 5 (KHQR) must be finished before going live |
+| **Now: Step 8. Security and go live** | In progress, done in parts so that buying hosting is the last step. B1 security hardening done: rate limits (PostgreSQL counters), Turnstile on checkout, security headers on API and web, production start-up checks, order tokens kept out of logs, Telegram login in redirect mode (no eval under the CSP). B2 photo storage done: one S3 adapter for Cloudflare R2 (production, required there) and a local SeaweedFS (`pnpm s3:up`; MinIO no longer ships Windows downloads), `pnpm files:setup`, `files:check`, `files:copy-to-s3`. B3 done: nightly backup (worker, 03:00 Phnom Penh, pg_dump into a private bucket, kept 14 days, the newest 3 always; failures alert the admins), `pnpm db:backup` and `pnpm db:restore` (into a new database only; rehearsed: the restored copy ran the API with the same rows, row-level security and migrations), Dockerfiles for the API and worker (`infra/docker`, built and run by CI), `railway.json` for both (migrations before each API release, health check, worker never overlaps itself), `apps/web/vercel.json`, and Kantumruy Pro bundled with the web app. B4a done (from the 2026-10-02 structure review): web functions in Singapore (`sin1`), photo thumbnails (~400 px, made in the browser) for the shop grid, cart and product list, the end-to-end checks moved into the repo (`pnpm test:e2e`, run by CI with a stand-in for Telegram), Dependabot; photo upload fixed under the CSP. B4b in progress (2026-10-24): the v0.4.6 release builds for production and passes every end-to-end check on a fresh database (279 checks, new: grouped shop details, Sell in shop); the go-live smoke test covers the map link, Shop info sheet, back to the shop and Sell in shop. Next: `pnpm rehearsal` on a phone, then CI green on GitHub (Docker images). Built meanwhile (2026-10-24): **Stock, part 1** (Pro, main branch) — see design/screens.md S13; finished 2026-10-27: 301 end-to-end checks pass on a fresh database (new: stock), online orders take stock only when paid in cash (`takesStockWhenPlaced`; KHQR and PayWay orders will reserve it in part 2), Stop tracking asks first, and the go-live smoke test has a Stock step |
 
 ## Overview
 
-Khmer Micro-Store lets a Telegram or Facebook seller open a mobile shop in under 10 minutes, get paid by KHQR or ABA PayWay, and manage every order from Telegram. Money goes straight to the merchant's own account; the platform earns from subscriptions.
+Khmio lets a Telegram or Facebook seller open a mobile shop in under 10 minutes, get paid by KHQR or ABA PayWay, and manage every order from Telegram. Money goes straight to the merchant's own account; the platform earns from subscriptions.
+
+**Brand.** Sellers and buyers know the platform as **Khmio** (`khmio.com`); this store is its first product, **Khmio Shop**. Khmio is also the project's name in the code (`@khmio/*` packages) since 2026-10-06; it was "Khmer Micro-Store" before, and the database names and users still say `khmer_micro_store` on purpose (old migrations are never edited). Brand details and the names to reserve: `docs/platform-launch-plan.md`, Stage 1.
 
 **Problem.** Small sellers take orders in chat, check payment screenshots by hand, and copy addresses to drivers one by one. This wastes hours and invites fake-payment fraud.
 
@@ -167,7 +171,9 @@ New store → Free trial (14 days) → Active (paid plan) → Payment due → Gr
 
 ### Business types
 
-The platform serves any business with **one** product model (categories, variants, unit of measure, brand) — there is no separate code path for a café, a shop or a restaurant. During onboarding the merchant picks a business type (`shop`, `restaurant`, `service`, `other`), stored on `stores.business_type`. It only pre-fills starting defaults — for example, the default unit of measure (Piece for a shop, Cup/Plate for a restaurant) and suggested first categories. The merchant can change any of these afterwards, and every feature works the same way for every business type.
+The platform serves any business with **one** product model (categories, variants, unit of measure, brand) — there is no separate code path for a café, a shop or a restaurant. During onboarding the merchant picks a business type (`shop`, `restaurant`, `service`, `garage`, `other`), stored on `stores.business_type`. It only pre-fills starting defaults — for example, the default unit of measure (Piece for a shop, Cup/Plate for a restaurant) and suggested first categories (a garage starts with Cars, Engine oil, Tyres, Batteries, Parts, Accessories and Workshop services; every store also gets the Litre, Set and Vehicle units). The merchant can change any of these afterwards, and every feature works the same way for every business type.
+
+**Demo garage:** `pnpm demo:garage` (development only) makes a complete made-up garage, Mekong Auto Garage at `/s/mekong-auto-garage`: 29 products across cars, parts and services, delivery set up, and 12 orders at every stage. Log in with "Demo garage" under Development login. `-- --reset` makes it again, `-- --remove` deletes it, `-- --photos <folder>` loads `<product key>.jpg` photos (default `sample/garage`), `-- --telegram-id <id>` gives it to a real Telegram account.
 
 ## Workflows from start to end
 
@@ -284,6 +290,8 @@ The web app, API and worker are three processes from one Git repo. The worker do
 
 **Order flow in one line:** buyer checks out → API reserves stock and creates a payment → buyer pays → worker (KHQR) or PayWay callback confirms → order becomes Paid → Telegram alert → merchant packs and dispatches.
 
+**Growing beyond the store:** how this monolith can later become a platform with one login for several products (and when, if ever, to split into services) is in `docs/platform-roadmap.md`. The order of work for that growth — brand, platform website, social media, and choosing and building the second product — is in `docs/platform-launch-plan.md`.
+
 ## Tech stack and repo structure
 
 TypeScript everywhere, one monorepo. One language for frontend, backend and shared rules keeps the project easy to customize for years, and AI coding tools handle it very well.
@@ -301,7 +309,7 @@ TypeScript everywhere, one monorepo. One language for frontend, backend and shar
 | Errors/logs | Sentry + pino | See problems before merchants do |
 
 ```
-khmer-micro-store/
+khmio/
 ├── apps/
 │   ├── web/        # Next.js: /s/[slug] storefront, /m merchant, /admin
 │   ├── api/        # NestJS: modules below
@@ -311,7 +319,7 @@ khmer-micro-store/
 │   ├── payments/   # provider adapters: bakong-khqr, aba-payway
 │   ├── db/         # Prisma schema, migrations, seed
 │   └── ui/         # shared components + Khmer font setup
-├── infra/          # docker-compose, Caddy/Nginx, backup scripts
+├── infra/          # docker-compose, local database and local S3 (SeaweedFS) scripts, backup scripts
 ├── .github/workflows/ci.yml
 └── CLAUDE.md
 ```
@@ -362,8 +370,8 @@ Design for a cheap Android phone, one thumb, inside the Telegram or Facebook in-
 
 The super-admin area (laptop-first, still usable on a phone) grows by adding pages, so every page follows the same frame:
 
-- **Menu:** defined once in `admin/admin-nav.ts` — grouped sections, each item a label, icon, route and optional badge count. Adding a page = one entry there plus the page folder. Unbuilt entries set `comingSoon` and show a standard placeholder until built. Laptop: a sidebar that collapses to icons; phone/tablet: the same menu in a drawer (a bottom tab bar can't hold 10+ items). Groups fold open/closed (remembered per viewer; the group holding the current page always opens), one highlight slides to the current page, only the menu scrolls (logo and collapse button stay put) and keeps the current page in view, and pages fade in on change. All motion is off for viewers who ask for reduced motion.
-- **Every page** starts with a page header (title, one-line description, actions) and uses the shared blocks in `admin/admin-ui.tsx`: stat cards, status pills, data toolbar (search + filter chips), table on laptop / cards below, empty state, pagination, side detail panel, and a confirm dialog for risky actions.
+- **Menu:** defined once in `apps/web/components/admin-frame/admin-nav.ts` (one frame for the live admin and its mockup) — grouped sections, each item a label, icon, route and optional badge count. Adding a page = one entry there plus the page folder. Unbuilt entries set `comingSoon` and show a standard placeholder until built. Laptop: a sidebar that collapses to icons; phone/tablet: the same menu in a drawer (a bottom tab bar can't hold 10+ items). Groups fold open/closed (remembered per viewer; the group holding the current page always opens), one highlight slides to the current page, only the menu scrolls (logo and collapse button stay put) and keeps the current page in view, and pages fade in on change. All motion is off for viewers who ask for reduced motion.
+- **Every page** starts with a page header (title, one-line description, actions) and uses the shared kit (`packages/ui` blocks, the same for the live admin and its mockup — never a copy in a page folder): stat cards, status pills, data toolbar (search + filter chips), table on laptop / cards below, empty state, pagination, side detail panel, and a confirm dialog for risky actions.
 - **Every form** — admin, merchant and buyer — follows one standard (`apps/web/components/form-ui.tsx`): form sections (title and help beside the fields on laptop, above them on narrow merchant forms), edits kept in a draft until Save, a sticky Save/Cancel bar that's only active once something changed, and a Zod schema from `packages/shared` (`product.ts`, `store.ts`, `checkout.ts`, `stock.ts`, `admin-settings.ts`) — the same schema the API validates with. Schemas report problems as error codes (`form-errors.ts`), never English text; the screen shows each code in the viewer's language from the `FormErrors` messages, and the API returns the same codes per field. Price and quantity boxes are read with `parseUsdInput` / `parseKhrInput` / `parseQuantityInput`, so a typo is rejected, never silently rounded. Values owned by code (like plan rules) are shown read-only, never edited in the UI.
 - **Every admin change** is written to the audit log.
 
@@ -523,7 +531,7 @@ KYC belongs to the person, not the shop: the ID is the owner's. A shop shows "Ve
 
 | Table | Purpose | Columns |
 | --- | --- | --- |
-| stores | A shop | `slug` (unique), `name`, `business_type` (shop, restaurant, service, other), `phone`, `area` (phnom_penh, province), `description`, `logo_key`, `languages`, `default_currency`, `usd_to_khr_rate`, `allow_cod`, `vat_percent` (0–20), `online_stock_location_id` (Advance; empty = main branch), `pickup_enabled`, `pickup_address`, `pickup_hours`, `province_delivery_enabled`, `province_fee_usd_cents`, `province_fee_khr`, `province_note`, `delivery_configured_at`, `link_shared_at` |
+| stores | A shop | `slug` (unique), `name`, `business_type` (shop, restaurant, service, other), `phone`, `area` (phnom_penh, province), `description`, `logo_key`, `languages`, `default_currency`, `usd_to_khr_rate`, `allow_cod`, `vat_percent` (0–20), `online_stock_location_id` (Advance; empty = main branch), `pickup_enabled`, `pickup_address`, `pickup_hours`, `province_delivery_enabled`, `province_fee_usd_cents`, `province_fee_khr`, `province_note`, `delivery_configured_at`, `link_shared_at`, `map_url` (Google Maps link; empty = search the address), `payment_qr_key` (the seller's own KHQR picture for counter sales) |
 | store_payment_configs | Provider settings per store | `store_id`, `provider` (bakong_khqr, aba_payway), `bakong_account_id`, encrypted PayWay keys, `enabled` |
 
 `delivery_configured_at` and `link_shared_at` exist for the setup checklist ("Set your delivery", "Share your shop link"). The plan is **not** on `stores` — see the next table.
@@ -578,7 +586,7 @@ Districts and provinces are fixed lists in `packages/shared/src/locations.ts`, n
 | Table | Purpose | Columns |
 | --- | --- | --- |
 | customers | A buyer, per store | `store_id`, `phone` (855…), `name`, `telegram_id`, last delivery choice (`area`, `district_id`, `province_id`, `landmark`) |
-| orders | An order | `store_id`, `customer_id`, `order_number` (unique per store), `status` (awaiting_payment, paid, cod_pending, confirmed, packing, waiting_for_driver, out_for_delivery, delivered, completed, cancelled, failed_delivery), `payment_method` (khqr, aba_payway, cod), `currency` chosen by the buyer, `subtotal_minor`, `discount_minor`, `delivery_fee_minor`, `vat_percent`, `vat_minor`, `total_minor`, `exchange_rate_used`, `fulfilment` (delivery, pickup), `area`, `district_id`, `province_id`, `landmark`, `pickup_address`, `pickup_hours` (copied at order time), buyer `name` and `phone` (copied), `cancel_reason` (payment_timeout, buyer_cancelled, out_of_stock, cannot_deliver, other), `cancel_note`, `stock_taken`, `idempotency_key` |
+| orders | An order, online or at the counter | `store_id`, `customer_id` (empty for a walk-in at the counter), `order_number` (unique per store, one counter for both), `channel` (online, in_store), `status` (awaiting_payment, paid, cod_pending, confirmed, packing, waiting_for_driver, out_for_delivery, delivered, completed, cancelled, failed_delivery), `payment_method` (khqr, aba_payway, cod; at the counter: cash, shop_qr), `currency` chosen by the buyer, `subtotal_minor`, `discount_minor`, `delivery_fee_minor`, `vat_percent`, `vat_minor`, `total_minor`, `exchange_rate_used`, `fulfilment` (delivery, pickup, in_store), `area`, `district_id`, `province_id`, `landmark`, `pickup_address`, `pickup_hours` (copied at order time), buyer `name` and `phone` (copied), `cancel_reason` (payment_timeout, buyer_cancelled, out_of_stock, cannot_deliver, other, counter_void), `cancel_note`, `stock_taken`, `cash_received_minor` and `change_minor` (cash at the counter), `sold_by_merchant_id`, `idempotency_key` |
 | order_items | Lines | `store_id`, `order_id`, `variant_id`, `title_km`, `title_en`, `variant_label_km`, `variant_label_en`, `unit_price_minor`, `quantity`, `line_total_minor` — a snapshot, so a later rename or price change never alters an old order |
 | order_status_events | The order's history | `store_id`, `order_id`, `status`, `actor` (buyer, merchant, system), `actor_merchant_id`, `at` |
 | payment_attempts | Every try to pay | `order_id`, `store_id`, `provider`, `provider_ref` (MD5 or tran_id), `amount_minor`, `currency`, `status` (pending, paid, expired, failed), `expires_at`, `check_count`, `raw_response`, `issue` (provider_unreachable, amount_mismatch, currency_mismatch, paid_after_expiry), `issue_status` (open, confirmed, closed), `issue_note`, `issue_closed_by` (admin user) |
@@ -633,19 +641,19 @@ The three things that matter most: nobody can fake a payment, no merchant can se
 | Super admin | Separate login with 2FA (TOTP); admin routes on their own path, IP-limited if possible |
 | Roles | Owner and staff per store; staff cannot change payment settings or delete products |
 | Payments | KHQR: trust only your own MD5 poll. PayWay: verify HMAC-SHA512 header, then Check Transaction API. Match amount and currency. Idempotent processing |
-| Telegram webhook | `secret_token` header checked on every request; button presses checked against store membership |
-| Input | Zod on every endpoint; Prisma parameterised queries; image uploads checked by their bytes (JPEG/PNG/WebP only, whatever the file name says), 2 MB at most after the browser shrinks them, stored per shop and served with `nosniff` |
-| Abuse | Cloudflare WAF + Turnstile on checkout; limits per phone and device, not only per IP (mobile users share IPs) |
+| Telegram updates | The worker long-polls getUpdates (one worker, no public URL needed; decided 2026-10-02 for the beta). If it ever moves to a webhook: `secret_token` header checked on every request. Button presses are checked against store membership either way |
+| Input | Zod on every endpoint; Prisma parameterised queries; image uploads checked by their bytes (JPEG/PNG/WebP only, whatever the file name says), 2 MB at most after the browser shrinks them, stored per shop under keys only the API makes (`stores/<store>/<uuid>.jpg`). In production they live in R2: anyone may read them through the bucket's custom domain, nobody may list or write without the API's token (Object Read & Write, that bucket only); a Cloudflare rule adds `nosniff` there. Locally the API's `/files` adds it |
+| Abuse | Cloudflare WAF + Turnstile on checkout (checked by the API; if Cloudflare can't be reached the order goes through and Sentry is told). Rate limits counted in PostgreSQL (`app_rate_limit_hit`, keys hashed): seller login 20 / 10 min and admin login 10 / 10 min per address, admin codes 20 / 10 min, checkout 60 / hour per address and 10 / hour per phone, buyer links and cancels 30 / hour, staff-group links 10 / hour and photo uploads 120 / hour per shop. Address limits are generous because mobile users share addresses; `TRUST_PROXY_HOPS` must match the proxies in front of the API |
 | Secrets | Only in the hosting provider's environment settings; `.env` never in Git; PayWay keys encrypted at rest. Settings are checked at start-up (`packages/shared/env.ts`), and an error names the missing setting, never its value |
 | Development login | A "test merchant" login exists only in development and is refused in production |
-| Headers | HTTPS only, HSTS, CSP, no framing of admin pages |
+| Headers | HTTPS only, HSTS, CSP, no framing. Web: CSP allowing only the API, photos, Telegram's login button and Turnstile (inline scripts allowed for Next.js, no eval); the Telegram button uses redirect mode for that reason. API: `default-src 'none'`, nosniff, no framing, no `X-Powered-By`. Production refuses to start without https origins, the bot token, the admin key and the Turnstile secret, or with rate limits off |
 | Privacy | Buyer phone and address visible only to that store; masked in logs |
-| Backups | Daily automatic backups, kept 14 days, plus a monthly restore test |
-| Dependencies | Dependabot + `pnpm audit` in CI; pin versions |
+| Backups | Nightly `pg_dump` by the worker into a private R2 bucket of its own (never the photos bucket; the settings refuse it), kept 14 days with the newest 3 always kept; a failure alerts the admins' Telegram. Production refuses to start the worker with backups off. Plus Railway's own backups, and a monthly restore test with `pnpm db:restore` into a new database |
+| Dependencies | Dependabot (`.github/dependabot.yml`): weekly grouped library updates, monthly GitHub Actions and Docker base images, each through CI before merging; the lockfile pins versions |
 
 ## Deployment
 
-Recommended: Next.js on Vercel Pro, and the API, worker and PostgreSQL on Railway. Both deploy automatically on every `git push`. Decide this finally after the Bakong test in roadmap gate G3: if Bakong blocks your server's location, use Option B.
+Recommended: Next.js on Vercel Pro, and the API, worker and PostgreSQL on Railway. Both deploy automatically on every `git push`. Ready in the repo: `infra/docker/api.Dockerfile` and `worker.Dockerfile` (CI builds both and starts the API image), `apps/api/railway.json` and `apps/worker/railway.json`, `apps/web/vercel.json`; the click-by-click steps are in `docs/go-live.md`. Decide this finally after the Bakong test in roadmap gate G3: if Bakong blocks your server's location, use Option B.
 
 Vercel alone cannot run the whole system. Its functions start per request and stop, so it cannot keep the job worker running to poll Bakong every few seconds. The worker needs an always-on host.
 
@@ -689,14 +697,14 @@ One feature per branch (`feat/payway-checkout`). CI must pass before merge. Data
 
 ## Budget
 
-Expect about **$45–60 per month** with the recommended setup (Option A), or **$15–35 per month** with one VPS (Option B), during development and beta. Most other tools you need are free at this size. All prices in USD, before tax.
+Expect about **$41–45 per month** with the recommended setup (Option A) from the beta up to about 100 shops, and about **$50–65** at 500 shops; or **$15–35 per month** with one VPS (Option B). Most other tools you need are free at this size. All prices in USD, before tax. How the numbers are worked out is under "How Railway usage adds up" below.
 
 ### Monthly costs (development, beta, up to about 50 merchants)
 
 | Item | Option A: Vercel + Railway | Option B: One VPS + Coolify | Notes |
 | --- | --- | --- | --- |
 | Web hosting (Next.js) | $20 (Vercel Pro, 1 seat) | included in VPS | Vercel Hobby is not allowed for business use |
-| API + worker + PostgreSQL | $20–35 (Railway Pro: $20 fee includes $20 of usage) | $12–30 (one 4 GB VPS) | Railway usage estimate: 3 small always-on services |
+| API + worker + PostgreSQL | $20 up to ~100–200 shops (Railway Pro: the $20 fee includes $20 of usage) | $12–30 (one 4 GB VPS) | 3 small always-on services use ~$7–8; see "How Railway usage adds up" |
 | Staging environment | $5–10 extra Railway usage | $0 (same VPS) | Can turn off staging when not testing |
 | Database backups storage | included in Railway | $0–2 (Cloudflare R2 or similar) | |
 | Cloudflare (DNS, WAF, Turnstile) | $0 (free plan) | $0 | Upgrade to Pro ($25) only if attacked often |
@@ -705,7 +713,7 @@ Expect about **$45–60 per month** with the recommended setup (Option A), or **
 | Error tracking (Sentry) | $0 (free tier) | $0 | |
 | Telegram Bot API | $0 | $0 | Free |
 | Bakong Open API | $0 | $0 | No fee known; confirm when you register |
-| **Total per month** | **~$45–60** | **~$15–35** | |
+| **Total per month** | **~$41–45** (+$5–10 with staging) | **~$15–35** | |
 
 ### One-time and yearly costs
 
@@ -722,16 +730,54 @@ Expect about **$45–60 per month** with the recommended setup (Option A), or **
 - **ABA PayWay fees** are charged by ABA to each merchant per transaction; confirm the rate with ABA.
 - **Buyer KHQR transfers** between Cambodian banks are normally free for the buyer.
 
-### When you grow (100–500 merchants)
+### How Railway usage adds up
 
-| Stage | Option A per month | What changes |
+Railway charges a plan fee that **includes the same amount of usage** ($20 on Pro), then counts usage **per minute each service runs**: memory, CPU, outgoing data and database storage. Our API, worker and database run all day even with no customers (the worker listens to Telegram and makes the 03:00 backup; the API must answer at once), so most of the cost is running time, not visitors. Vercel works the other way: pages run only when visited, inside Pro's large included allowance.
+
+Rates used (Railway, checked 2026-10-02; confirm before signing up): about **$10 per GB of memory per month**, **$20 per CPU per month**, **$0.05 per GB of outgoing data**, **$0.15 per GB of storage per month**.
+
+Most traffic never reaches Railway: **photos come from Cloudflare R2** (free downloads) and **pages from Vercel**. Railway only sends small text answers (shop data, orders).
+
+**Base, with zero customers:**
+
+| Service | Memory | Per month |
 | --- | --- | --- |
-| 100 merchants | ~$60–90 | Bigger database, more worker memory |
-| 500 merchants | ~$120–200 | Second API instance, read replica, Cloudflare Pro |
+| API (NestJS) | ~200 MB | ~$2 |
+| Worker | ~150 MB | ~$1.50 |
+| PostgreSQL | ~250 MB | ~$2.50 |
+| CPU while mostly idle | ~5% of one CPU | ~$1 |
+| Database storage | ~1 GB | ~$0.15 |
+| **Base** | | **~$7–8** |
 
-Plan your subscription price so that **10–15 paying merchants cover all hosting**. For example, at $5 per merchant per month, 12 merchants pay for Option A.
+**Added by shops.** A typical small shop is taken as **100 visits and 5 orders a day** (links from Facebook and TikTok): about 550 small API requests a day and 135 MB of outgoing data a month. 100 such shops average 0.6 requests a second, light work for one server, and add roughly **$3 a month**. A **busy shop** (1,000 visits and 50 orders a day) counts as about ten typical ones. Bursts, such as a live-selling session, briefly use more power and cost cents for those minutes.
 
-Prices checked on 2026-09-23: [Vercel Hobby plan](https://vercel.com/docs/plans/hobby), [Railway pricing plans](https://docs.railway.com/pricing/plans). VPS, domain and growth figures are approximate estimates.
+| Active shops | Railway usage | Railway bill | Platform total* |
+| --- | --- | --- | --- |
+| 10 (beta) | ~$8 | $20 (the plan fee covers it) | ~$41 |
+| 50 | ~$9–10 | $20 | ~$41 |
+| 100 | ~$11–14 | $20 | ~$41–45 |
+| 300 | ~$18–25 | $20–25 | ~$45–50 |
+| 500 | ~$25–40 (a second API copy for busy hours) | $25–40 | ~$50–65 |
+| 100 busy shops | ~$35–40 | $35–40 | ~$60 |
+
+*Vercel Pro $20 + Railway + about $1 a month for the domain. Cloudflare (DNS, Turnstile, R2 up to ~10 GB of photos, about 400 shops at 50 products × 3 photos) and Sentry stay free at these sizes; R2 beyond that is about $0.015 per GB per month.
+
+Not counted: Cloudflare Pro (~$25, only if attacked often), paid Sentry when errors outgrow the free tier, SMS codes if phone login is added (Release 2, charged per message), your time and company costs.
+
+**Keeping the bill safe:** set a spending limit on Railway (e.g. $40 to start) and on Vercel at go-live (docs/go-live.md), and read Railway's usage page monthly: it shows each service's real memory and CPU, which replace these estimates.
+
+### Seller prices against these costs
+
+With the plans in `packages/shared/plans.ts` (Free 14-day trial; Basic $5 / 20,000៛; Pro $12 / 48,000៛; Advance $29 / 116,000៛):
+
+- **Break-even:** ~$45 a month of hosting = **9 Basic sellers**.
+- **Hosting per seller** at 100 shops: about **$0.40–0.50 a month**, so the price is set by the market and the value to sellers, not by hosting.
+- **Example, 100 paying shops** (60% Basic, 30% Pro, 10% Advance): 60 × $5 + 30 × $12 + 10 × $29 = **$950 a month** against **$45–60** of hosting, about 5–6%.
+- Trial shops cost almost nothing, and the trial is once per store.
+
+Plan your subscription price so that **about 10 paying merchants cover all hosting**: at $5 per merchant per month, 9 merchants pay for Option A.
+
+Prices checked on 2026-09-23 (Railway usage rates on 2026-10-02): [Vercel Hobby plan](https://vercel.com/docs/plans/hobby), [Railway pricing plans](https://docs.railway.com/pricing/plans). VPS, domain, usage and growth figures are estimates from the assumptions above; replace them with Railway's usage page once live.
 
 ## Roadmap: zero to live
 
@@ -759,13 +805,13 @@ A seller opens a shop, a buyer orders and pays by KHQR or cash, the seller gets 
 | 2. Data and login | Prisma schema and first migration from "Database schema" (Release 1 tables only), Row-Level Security, Telegram login, 2-question onboarding | A test proves merchant A cannot read merchant B's data; you can sign up and reach the dashboard | Done |
 | 3. Catalog | Categories, products with options, photos, description, show/hide; shop details; the setup checklist; a read-only shop page | On a phone, a product with 3 photos is added in under a minute and appears in the shop | Done: 44 seconds measured at 360 px |
 | 4. Shop and checkout | Shop page, product page, cart, one-page checkout; delivery zones, pickup and province settings; orders created with frozen totals and an idempotency key | A cash order lands with the right total in the buyer's currency; sending the same checkout twice makes one order | Done: three copies sent at once made one order; totals recalculated by the API |
-| 5. KHQR | `BakongKhqrProvider` in `packages/payments`; worker checks the MD5 every 5 seconds, confirms exact amount and currency, expires after 10 minutes; token renewal | Real 100៛ and $0.01 payments confirm by themselves; an unpaid code cancels the order; a wrong amount is not accepted | Postponed until a Bakong token and gate G3; required before step 8 |
+| 5. KHQR | `BakongKhqrProvider` in `packages/payments`; worker checks the MD5 every 5 seconds, confirms exact amount and currency, expires after 10 minutes; token renewal | Real 100៛ and $0.01 payments confirm by themselves; an unpaid code cancels the order; a wrong amount is not accepted | Built except the bank (2026-10-27): payment attempts and held stock (migrations `payments_foundation`, `public_khqr_account`), the provider interface, the worker's checks (exact match, 10-minute expiry, issues alert the admin), the live pay page (B5); runs end to end on a stand-in bank (`KHQR_PROVIDER=fake`, 25 end-to-end checks). Left: `BakongKhqrProvider` and token renewal once the Bakong token and gate G3 are done; required before step 8 |
 | 6. Orders and Telegram | Seller order list and detail with the 11 statuses; buyer order page; Telegram alerts to the seller with Confirm / Open buttons; status messages to the buyer; send by driver, bus or pickup | A seller runs a full day of test orders from their phone; every status change reaches the buyer's page | Done (Telegram in dry run until a bot token is set) |
 | 7. Admin, the minimum | Merchant list, extend a trial, audit log; failed payment checks alert the admin's Telegram | You can see every shop and unblock one without touching the database | Done (2FA built here rather than in step 8) |
 | 8. Security and go live | Cloudflare WAF and Turnstile, rate limits on login and checkout, security headers, backups and one restore test; buy the domain and hosting; staging and preview links; photo storage moves to Cloudflare R2; deploy | The launch checklist below is ticked; a real KHQR order completes on the live site | — |
 | 9. Beta | 5–10 sellers you onboard yourself; a Telegram group; fix the top three complaints each week | Two weeks of real orders, and sellers say they would pay | — |
 
-Every step ends the same way before it is merged: lint, typecheck and all tests pass; a fresh database built from the migrations matches the schema and every `store_id` table has row-level security; the built API passes the step's end-to-end checks; the pages are checked on a 360 px phone in Khmer and English; and logs hold no secrets or phone numbers.
+Every step ends the same way before it is merged: lint, typecheck and all tests pass; a fresh database built from the migrations matches the schema and every `store_id` table has row-level security; the built API passes every end-to-end check (`pnpm test:e2e`, in `tests/e2e`, also run by CI); the pages are checked on a 360 px phone in Khmer and English; and logs hold no secrets or phone numbers.
 
 Left out of Release 1 on purpose, although their screens exist: subscription billing, plan limits, KYC, stock, wholesale prices, ABA PayWay, phone-number login, admin roles.
 
@@ -825,7 +871,7 @@ Going live is the middle of the project, not the end. From step 8 on, the platfo
 | A release broke something | Roll back: Vercel instant rollback, redeploy the previous tag on Railway | Fix on a branch, with a test that would have caught it |
 | Bakong unreachable or token renewal failed | Admin alert fires; orders keep waiting, nothing is marked paid by guesswork | Renew the token by hand; checks resume and catch up, because every pending MD5 is still checked until it expires |
 | A payment was taken but the order says unpaid | Find it in "Failed checks"; ask Bakong again from there | Never set an attempt to paid by hand. If the money truly arrived, Bakong's answer confirms it |
-| Database down or corrupted | Restore the latest backup into a new database and point the API at it | Write down what was lost and tell affected sellers the same day |
+| Database down or corrupted | Restore the latest backup into a new database (`RESTORE_DATABASE_URL=… pnpm db:restore -- --from latest`, which refuses the database in use and prints the restored counts) and point the API and worker at it | Write down what was lost and tell affected sellers the same day |
 | A seller reports someone else's data | Treat as a security incident: take the affected route offline | Find the missing `store_id` / row-level security gap; add a test; tell the seller |
 
 ### Numbers to watch
@@ -839,7 +885,20 @@ Going live is the middle of the project, not the end. From step 8 on, the platfo
 | Paying shops vs hosting cost | 10–15 paying shops cover hosting ("Budget") | Subscriptions |
 | Shops that pay again the next month | Above 80% | Subscriptions |
 
-Scale only when the numbers say so: add PgBouncer or a read replica when database CPU stays high; a second API instance when response times climb (see "When you grow" in Budget).
+Scale only when the numbers say so: add PgBouncer or a read replica when database CPU stays high; a second API instance when response times climb (see "How Railway usage adds up" in Budget).
+
+**Growth path to 1,000+ shops** (from the structure review of 2026-10-02; each when its sign appears, not before):
+
+| Change | Do it when |
+| --- | --- |
+| Telegram webhook instead of long polling, so more than one worker can run | One worker can't keep up with alerts, or the worker needs a second copy for safety |
+| PgBouncer (connection pooling) | API copies multiply and database connections near the limit |
+| Cache public shop data at Cloudflare for a few seconds | Busy shops make the API's CPU climb at peak hours |
+| Live order updates (server-sent events) instead of the buyer page asking every 20 seconds | Order-page requests become a large share of API traffic |
+| Point-in-time recovery (Railway backups or a managed PostgreSQL), so a disaster loses minutes, not up to a day | Real money flows through KHQR, before the public launch |
+| Partner API: versioned (`/v1`), per-shop API keys, signed webhooks sent by the worker from the outbox, OpenAPI docs | The first partner (delivery company, accounting tool, marketplace) asks |
+
+**Running other projects on the same accounts:** one Vercel team, one Railway workspace and one Cloudflare account can host them all (Vercel Pro is paid per person, not per project; Railway projects share the plan's included usage). Give each project its own domain, database, buckets, Telegram bot and secrets, and never put another project on a sub-domain of the shop domain: browsers treat the whole domain as one site, which weakens the login cookie's protection.
 
 ### What "finished" means
 
@@ -904,11 +963,11 @@ Docker Desktop (`pnpm db:up`) works too on a PC that supports it; it isn't neede
 
 ### Part 2: Create the project (Day 1)
 
-The project lives at `D:\PROJECT\khmer-micro-store` and on GitHub at `github.com/chetracloud01/khmer-micro-store`. To set it up on a new PC:
+The project lives on GitHub at `github.com/chetracloud01/khmio` (renamed from `khmer-micro-store` on 2026-10-06; GitHub forwards the old address) and on the PC in `D:\PROJECT\khmio` (renamed from `khmer-micro-store` on 2026-10-07; after moving the folder, run `pnpm install` and `pnpm --filter @khmio/db exec prisma generate` once). To set it up on a new PC:
 
 ```bash
-git clone https://github.com/chetracloud01/khmer-micro-store.git
-cd khmer-micro-store
+git clone https://github.com/chetracloud01/khmio.git
+cd khmio
 pnpm install
 copy .env.example .env      # then fill in the values; never commit .env
 pnpm db:deploy
@@ -1041,9 +1100,11 @@ The steps and their "Done when" checks are in "Roadmap: zero to live" above — 
 
 **Before going live (Release 1)** — ABA PayWay's own checks (production keys, fake and replayed callbacks rejected) join this list when PayWay is built in Release 3.
 
-- [ ] Live Bakong token works from the production host, and renewal job has run once
-- [ ] A real 100៛ and a real $0.10 payment tested end to end with KHQR
-- [ ] A payment for the wrong amount, and the same result delivered twice, both change nothing
+- [ ] When KHQR is switched on (a cash-only beta may start without it): live Bakong token works from the production host, and renewal job has run once
+- [ ] When KHQR is switched on: a real 100៛ and a real $0.10 payment tested end to end
+- [ ] When KHQR is switched on: a payment for the wrong amount, and the same result delivered twice, both change nothing
+- [ ] On the real domain: "Log in with Telegram" works for a seller and an admin (the bot's /setdomain set first)
+- [ ] Rate limits see each phone's own address behind the proxies (`TRUST_PROXY_HOPS` counted, not guessed)
 - [ ] Store isolation test passing in CI
 - [ ] With the production bot token set, a real new-order alert reaches a seller's Telegram and its Confirm button works
 - [ ] Backup restored into a fresh database

@@ -1,19 +1,35 @@
 "use client";
 
-import type { Currency } from "@khmer-micro-store/shared";
-import { Button, Card, cn, DiscountBadge, PriceTag, SearchInput, SegmentedControl } from "@khmer-micro-store/ui";
+import { canAddMore, cartLineKey, type Currency } from "@khmio/shared";
+import { Button, IconButton, PriceTag, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
+import { CartPanel } from "@/components/buyer/cart-panel";
+import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
+import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
+import { ItemPicker, type PickedItem } from "@/components/buyer/item-picker";
+import { CustomValuesList } from "@/components/custom-fields/custom-field-input";
+import { QuantityControl } from "@/components/buyer/quantity-control";
+import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
+import { ShopHero } from "@/components/buyer/shop-hero";
+import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
+import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
 import { formatMoney } from "@/components/order-ui";
+import { useThemeLabels } from "@/components/use-theme-labels";
 import { shareOrCopyLink } from "@/components/share-link";
 import type { Product, ProductVariant, PublicShop } from "@/lib/api";
-import { cartLines, cartTotal, useShopCart } from "@/lib/cart";
-import { discounted, startingVariant } from "@/lib/product-price";
+import { withShop } from "@/lib/buyer-back";
+import { cartLines, cartTotal, useShopCart, variantQuantity } from "@/lib/cart";
+import { discounted, startingVariant, usdValue } from "@/lib/product-price";
 import { isTakingOrders } from "@/lib/shop-ordering";
-import { ShopInfo } from "./shop-info";
+import { productStock, variantStock } from "@/lib/shop-stock";
+import { BuyerOrderLinks } from "@/components/invoice/track-order-card";
+import { LanguageSwitch } from "@/components/language-switch";
+import { PhotoThumb } from "@/components/photo-thumb";
 
 // What a buyer sees at /s/<link>: the shop, its categories and its visible
 // products, a product's own page for photos, description and options, and
@@ -47,12 +63,11 @@ function ShopClosed({ shop }: { shop: PublicShop }) {
 function OpenShop({ shop }: { shop: PublicShop }) {
   const t = useTranslations("Storefront");
   const tCheckout = useTranslations("Checkout");
+  const tCart = useTranslations("Cart");
+  const themeLabels = useThemeLabels();
   const locale = useLocale();
-  const router = useRouter();
   const pathname = usePathname();
   const { store, categories, products } = shop;
-  const [category, setCategory] = useState("all");
-  const [query, setQuery] = useState("");
   // The open product lives in the link (?product=…), so one product can be shared and Back closes it.
   const productParam = useSearchParams().get("product");
   const open = productParam ? (products.find((product) => product.id === productParam) ?? null) : null;
@@ -61,17 +76,24 @@ function OpenShop({ shop }: { shop: PublicShop }) {
   const cart = useShopCart(store.slug);
   const ordering = isTakingOrders(shop);
   const currency: Currency = cart.currency ?? store.defaultCurrency;
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
-  // Only categories with something to buy get a chip.
-  const shownCategories = categories.filter((entry) => products.some((product) => product.categoryId === entry.id));
-  const shown = useMemo(() => {
-    const words = query.trim().toLowerCase();
-    // Both languages: a buyer may type "coffee" on the Khmer page.
-    return products.filter(
-      (product) => (category === "all" || product.categoryId === category) && `${product.titleKm} ${product.titleEn}`.toLowerCase().includes(words),
-    );
-  }, [products, category, query]);
+  // The list's search, category, sort and grid-or-list (shared with the mockup: components/buyer).
+  const browseAccessors = useMemo<BrowseAccessors<Product>>(
+    () => ({
+      text: (product) => `${product.titleKm} ${product.titleEn}`,
+      category: (product) => product.categoryId,
+      price: (product) => {
+        const variant = startingVariant(product, store.usdToKhrRate);
+        return variant ? discounted(usdValue(variant, store.usdToKhrRate), product.discountPercent) : 0;
+      },
+      discount: (product) => product.discountPercent ?? 0,
+    }),
+    [store.usdToKhrRate],
+  );
+  const browse = useProductBrowse(products, browseAccessors, store.slug);
+  const browseCategories = categories.map((entry) => ({ id: entry.id, label: text(entry.nameKm, entry.nameEn) }));
 
   const lines = cart.ready ? cartLines(shop, cart.quantities) : [];
   const goods = lines.length ? cartTotal(shop, lines, currency, null) : null;
@@ -83,73 +105,89 @@ function OpenShop({ shop }: { shop: PublicShop }) {
     store.name.charAt(0).toUpperCase()
   );
 
-  return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1100px] flex-col bg-bg pb-32 md:border-x md:border-border">
-        <header className="flex flex-col gap-3 border-b border-border p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand text-xl font-bold text-on-brand">{logo}</span>
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold leading-normal">{store.name}</h1>
-                {store.description && <p className="text-sm text-muted">{store.description}</p>}
-              </div>
-            </div>
-            <SegmentedControl
-              value={locale}
-              onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
-              options={[
-                { value: "km", label: "ខ្មែរ" },
-                { value: "en", label: "EN" },
-              ]}
-            />
-          </div>
-          <ShopInfo shop={shop} currency={currency} />
-          {!ordering && <p className="rounded-DEFAULT bg-info/5 p-3 text-sm text-muted">{tCheckout("noPaymentMethods")}</p>}
-        </header>
+  const cartHref = `/${locale}/s/${store.slug}/cart`;
+  // Each line's amount from the same shared calculation as the cart and checkout.
+  const lineAmounts = new Map(goods?.lines.map((line) => [line.key, line.lineTotal]) ?? []);
+  const panelLines = lines.map((line) => ({
+    key: line.variant.id,
+    name: line.product.variants.length > 1 ? `${text(line.product.titleKm, line.product.titleEn)} · ${text(line.variant.labelKm, line.variant.labelEn)}` : text(line.product.titleKm, line.product.titleEn),
+    qty: line.quantity,
+    amount: formatMoney(lineAmounts.get(line.variant.id) ?? 0, currency),
+  }));
 
-        <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-border bg-bg py-2">
-          <div className="px-4">
-            <SearchInput
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onClear={() => setQuery("")}
-              clearLabel={t("clearSearch")}
-              placeholder={t("searchPlaceholder")}
-              aria-label={t("searchPlaceholder")}
+  return (
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        aside={
+          ordering ? (
+            <CartPanel
+              title={tCart("yourCart")}
+              lines={panelLines}
+              totalLabel={t("goodsTotal")}
+              total={formatMoney(goods?.goods ?? 0, currency)}
+              checkoutHref={cartHref}
+              checkoutLabel={tCart("checkout")}
+              emptyText={t("panelEmpty")}
             />
-          </div>
-          {shownCategories.length > 1 && (
-            <div className="no-scrollbar flex snap-x gap-2 overflow-x-auto scroll-px-4 px-4">
-              {[{ id: "all", label: t("categoryAll") }, ...shownCategories.map((entry) => ({ id: entry.id, label: text(entry.nameKm, entry.nameEn) }))].map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setCategory(chip.id)}
-                  aria-pressed={category === chip.id}
-                  className={cn(
-                    "min-h-touch shrink-0 snap-start whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors",
-                    category === chip.id ? "border-brand bg-brand text-on-brand" : "border-border bg-bg text-muted hover:text-fg",
-                  )}
-                >
-                  {chip.label}
-                </button>
-              ))}
+          ) : undefined
+        }
+      >
+        <ShopHero
+          name={store.name}
+          logo={logo}
+          openLabel={t("openNow")}
+          controls={
+            <>
+              <LanguageSwitch />
+              <ThemeSwitcher labels={themeLabels} />
+            </>
+          }
+          info={
+            <div className="flex flex-col gap-2">
+              <ShopInfoButton onClick={() => setInfoOpen(true)} />
+              {!ordering && <p className="rounded-DEFAULT bg-info/5 p-3 text-sm text-muted">{tCheckout("noPaymentMethods")}</p>}
             </div>
-          )}
+          }
+        />
+        <ShopInfoSheet
+          open={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          shop={{
+            name: store.name,
+            logo,
+            openLabel: t("openNow"),
+            phone: store.phone,
+            address: shop.delivery.pickup.address,
+            mapUrl: store.mapUrl,
+            telegram: store.telegramLink,
+            facebook: store.facebookLink,
+            delivery: shop.delivery,
+            currency,
+            rate: store.usdToKhrRate,
+            khqrReady: shop.ordering.khqrReady,
+            allowCod: store.allowCod,
+          }}
+        />
+
+        {/* For buyers without Telegram: their tracking code and phone open the order again (design/screens.md B8). */}
+        <div className="px-4 pb-3">
+          <BuyerOrderLinks myOrdersHref={withShop(`/${locale}/orders`, store.slug)} trackHref={withShop(`/${locale}/track`, store.slug)} />
         </div>
 
-        {shown.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
-            {shown.map((product) => (
-              <ProductCard
+        <BrowseToolbar browse={browse} categories={browseCategories} />
+
+        {browse.shown.length > 0 ? (
+          <div className={browse.view === "grid" ? "grid grid-cols-2 gap-3 p-4 sm:grid-cols-3" : "flex flex-col gap-3 p-4"}>
+            {browse.shown.map((product) => (
+              <ShopProductTile
                 key={product.id}
+                view={browse.view}
                 product={product}
                 title={text(product.titleKm, product.titleEn)}
                 shop={shop}
                 currency={currency}
                 ordering={ordering}
-                quantity={product.variants.reduce((sum, variant) => sum + (cart.quantities[variant.id] ?? 0), 0)}
+                quantity={product.variants.reduce((sum, variant) => sum + variantQuantity(cart.quantities, variant.id), 0)}
                 onOpen={() => setOpen(product)}
                 onAdjust={(delta) => {
                   const variant = product.variants[0];
@@ -163,13 +201,13 @@ function OpenShop({ shop }: { shop: PublicShop }) {
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-border/30">
               <SearchX className="h-7 w-7 text-muted" aria-hidden="true" />
             </span>
-            <p className="text-sm text-muted">{query.trim() ? t("noResultsFor", { query: query.trim() }) : t("noProducts")}</p>
-            {(query || category !== "all") && (
+            <p className="text-sm text-muted">{browse.query.trim() ? t("noResultsFor", { query: browse.query.trim() }) : t("noProducts")}</p>
+            {(browse.query || browse.category !== "all") && (
               <Button
                 variant="secondary"
                 onClick={() => {
-                  setQuery("");
-                  setCategory("all");
+                  browse.setQuery("");
+                  browse.setCategory("all");
                 }}
               >
                 {t("showAllProducts")}
@@ -177,7 +215,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
             )}
           </div>
         )}
-      </div>
+      </BuyerColumns>
 
       {open && (
         <ProductSheet
@@ -188,15 +226,19 @@ function OpenShop({ shop }: { shop: PublicShop }) {
           ordering={ordering}
           quantities={cart.quantities}
           onSetQuantity={cart.setQuantity}
+          onAddLine={(item) => {
+            cart.addLine(cartLineKey(item.variantId, item.choiceIds), item.quantity, item.note);
+            setOpen(null);
+          }}
           onClose={() => setOpen(null)}
         />
       )}
 
       {ordering && goods && goods.itemCount > 0 && !open && (
-        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3">
+        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3 lg:hidden">
           <Link
             key={goods.itemCount}
-            href={`/${locale}/s/${store.slug}/cart`}
+            href={cartHref}
             className="pointer-events-auto mx-auto flex min-h-[56px] w-full max-w-[520px] animate-bump items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-2 text-on-brand shadow-raised motion-reduce:animate-none"
           >
             <span className="flex items-center gap-3">
@@ -216,7 +258,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
           </Link>
         </div>
       )}
-    </div>
+    </BuyerShell>
   );
 }
 
@@ -232,35 +274,9 @@ function VariantPrice({ product, variant, currency }: { product: Product; varian
   );
 }
 
-/** − 2 + : the buyer's quantity, 44px buttons. */
-function Stepper({ quantity, title, onAdjust }: { quantity: number; title: string; onAdjust: (delta: number) => void }) {
-  const t = useTranslations("Storefront");
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        aria-label={t("decrease", { title })}
-        onClick={() => onAdjust(-1)}
-        className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-lg font-bold text-muted transition-transform active:scale-95"
-      >
-        −
-      </button>
-      <span className="min-w-6 text-center text-sm font-semibold tabular-nums" aria-live="polite">
-        {quantity}
-      </span>
-      <button
-        type="button"
-        aria-label={t("increase", { title })}
-        onClick={() => onAdjust(1)}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-brand text-lg font-bold text-on-brand transition-transform active:scale-95"
-      >
-        +
-      </button>
-    </div>
-  );
-}
-
-function ProductCard({
+/** One product in the list, as the shared tile draws it (components/buyer/product-tile). */
+function ShopProductTile({
+  view,
   product,
   title,
   shop,
@@ -270,6 +286,7 @@ function ProductCard({
   onOpen,
   onAdjust,
 }: {
+  view: ProductView;
   product: Product;
   title: string;
   shop: PublicShop;
@@ -281,40 +298,40 @@ function ProductCard({
 }) {
   const t = useTranslations("Storefront");
   const variant = startingVariant(product, shop.store.usdToKhrRate);
+  const optionCount = product.hasOptions ? product.variants.length : 0;
+  const stock = productStock(shop, product);
   return (
-    <Card className="flex h-full flex-col gap-2 p-2">
-      <button type="button" onClick={onOpen} className="flex flex-1 flex-col gap-2 text-left">
-        <span className="relative block">
-          {product.photos[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element -- the seller's uploaded photo
-            <img src={product.photos[0].url} alt="" loading="lazy" className="aspect-square w-full rounded-DEFAULT object-cover" />
-          ) : (
-            <span className="flex aspect-square w-full items-center justify-center rounded-DEFAULT bg-border/30">
-              <ImageOff className="h-6 w-6 text-muted" aria-hidden="true" />
-            </span>
-          )}
-          {product.discountPercent ? <DiscountBadge percent={product.discountPercent} className="absolute left-1 top-1" /> : null}
-        </span>
-        <span className="line-clamp-2 text-sm font-medium">{title}</span>
-        {product.hasOptions && <span className="text-xs text-muted">{t("startingFrom")}</span>}
-        {variant && <VariantPrice product={product} variant={variant} currency={currency} />}
-      </button>
-      {ordering &&
-        (product.hasOptions ? (
-          <Button variant={quantity > 0 ? "secondary" : "primary"} className="w-full" onClick={onOpen}>
-            {quantity > 0 ? t("inCart", { count: quantity }) : t("chooseOption")}
-          </Button>
-        ) : quantity > 0 ? (
-          <div className="flex justify-center">
-            <Stepper quantity={quantity} title={title} onAdjust={onAdjust} />
-          </div>
-        ) : (
-          <Button variant="primary" className="w-full" onClick={() => onAdjust(1)}>
-            {t("add")}
-          </Button>
-        ))}
-    </Card>
+    <ProductTile
+      soldOut={stock.soldOut}
+      canAddMore={!stock.single || canAddMore(stock.single, quantity)}
+      note={stock.single?.kind === "low" ? <StockNote state={stock.single} labels={stockLabels(t)} /> : undefined}
+      view={view}
+      title={title}
+      photo={product.photos[0] ? <PhotoThumb photo={product.photos[0]} lazy className="h-full w-full object-cover" /> : null}
+      discountPercent={product.discountPercent}
+      optionCount={optionCount}
+      picksFirst={product.choiceGroups.length > 0}
+      price={variant ? <VariantPrice product={product} variant={variant} currency={currency} /> : null}
+      quantity={quantity}
+      ordering={ordering}
+      labels={{
+        add: t("addTitle", { title }),
+        decrease: t("decrease", { title }),
+        increase: t("increase", { title }),
+        from: t("startingFrom"),
+        options: t("optionCount", { count: optionCount }),
+        inCart: t("inCart", { count: quantity }),
+        soldOut: t("soldOut"),
+      }}
+      onOpen={onOpen}
+      onAdjust={onAdjust}
+    />
   );
+}
+
+/** "Sold out" / "Only 3 left" in the shop page's words. */
+function stockLabels(t: (key: "soldOut" | "onlyLeft", values?: { count: number }) => string): StockLabels {
+  return { soldOut: t("soldOut"), onlyLeft: (count) => t("onlyLeft", { count }) };
 }
 
 /** The product's own page, as a sheet over the shop: photos, description, and each option with its own quantity. */
@@ -326,6 +343,7 @@ function ProductSheet({
   ordering,
   quantities,
   onSetQuantity,
+  onAddLine,
   onClose,
 }: {
   product: Product;
@@ -335,6 +353,8 @@ function ProductSheet({
   ordering: boolean;
   quantities: Record<string, number>;
   onSetQuantity: (variantId: string, quantity: number) => void;
+  /** With option groups or choices: one picked item at a time. */
+  onAddLine: (item: PickedItem) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("Storefront");
@@ -342,6 +362,8 @@ function ProductSheet({
   const [photo, setPhoto] = useState(0);
   const count = product.photos.length;
   const currency = shop.store.defaultCurrency;
+  // Groups or choices: pick them first, then add. Otherwise each option has its own + and −.
+  const picks = product.variantGroups.length > 0 || product.choiceGroups.length > 0;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -367,17 +389,11 @@ function ProductSheet({
               <ImageOff className="h-8 w-8 text-muted" aria-hidden="true" />
             </span>
           )}
-          <button type="button" onClick={onClose} aria-label={t("close")} className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-bg/85 shadow-card">
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          <IconButton icon={X} look="floating" label={t("close")} onClick={onClose} className="absolute right-2 top-2" />
           {count > 1 && (
             <>
-              <button type="button" onClick={() => setPhoto((photo + count - 1) % count)} aria-label={t("previousPhoto")} className="absolute left-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 shadow-card">
-                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => setPhoto((photo + 1) % count)} aria-label={t("nextPhoto")} className="absolute right-2 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-bg/85 shadow-card">
-                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-              </button>
+              <IconButton icon={ChevronLeft} look="floating" label={t("previousPhoto")} onClick={() => setPhoto((photo + count - 1) % count)} className="absolute left-2 top-1/2 -translate-y-1/2" />
+              <IconButton icon={ChevronRight} look="floating" label={t("nextPhoto")} onClick={() => setPhoto((photo + 1) % count)} className="absolute right-2 top-1/2 -translate-y-1/2" />
               <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-fg/70 px-2 py-0.5 text-xs text-bg">{t("photoPosition", { current: photo + 1, total: count })}</span>
             </>
           )}
@@ -388,29 +404,50 @@ function ProductSheet({
             <ShareProduct title={title} />
           </div>
           {description && <p className="whitespace-pre-line text-sm text-muted">{description}</p>}
+          {/* The shop's own public fields: warranty, material… */}
+          <CustomValuesList fields={shop.customFields} values={product.customValues} />
+          {picks ? (
+            ordering && (
+              <ItemPicker
+                product={product}
+                currency={currency}
+                usdToKhrRate={shop.store.usdToKhrRate}
+                stockOf={(variantId) => variantStock(shop, variantId)}
+                inCartOf={(variantId) => variantQuantity(quantities, variantId)}
+                stockLabels={stockLabels(t)}
+                onAdd={onAddLine}
+              />
+            )
+          ) : (
           <ul className="flex flex-col gap-2">
             {product.variants.map((variant) => {
               const label = product.hasOptions ? (locale === "km" ? variant.labelKm || variant.labelEn : variant.labelEn || variant.labelKm) : title;
               const quantity = quantities[variant.id] ?? 0;
+              const stock = variantStock(shop, variant.id);
               return (
                 <li key={variant.id} className="flex min-h-touch items-center justify-between gap-3 rounded-DEFAULT border border-border px-3 py-2">
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{label}</span>
                     <VariantPrice product={product} variant={variant} currency={currency} />
+                    <StockNote state={stock} labels={stockLabels(t)} />
                   </span>
-                  {ordering &&
-                    (quantity > 0 ? (
-                      <Stepper quantity={quantity} title={label} onAdjust={(delta) => onSetQuantity(variant.id, quantity + delta)} />
-                    ) : (
-                      <Button variant="primary" onClick={() => onSetQuantity(variant.id, 1)}>
-                        {t("add")}
-                      </Button>
-                    ))}
+                  {ordering && (
+                    <QuantityControl
+                      quantity={quantity}
+                      canAddMore={canAddMore(stock, quantity)}
+                      addLabel={t("addTitle", { title: label })}
+                      decreaseLabel={t("decrease", { title: label })}
+                      increaseLabel={t("increase", { title: label })}
+                      onChange={(next) => onSetQuantity(variant.id, next)}
+                      className="shrink-0"
+                    />
+                  )}
                 </li>
               );
             })}
           </ul>
-          {ordering && product.variants.some((variant) => (quantities[variant.id] ?? 0) > 0) && (
+          )}
+          {ordering && !picks && product.variants.some((variant) => (quantities[variant.id] ?? 0) > 0) && (
             <Button variant="secondary" className="w-full" onClick={onClose}>
               {t("close")}
             </Button>
@@ -430,9 +467,9 @@ function ShareProduct({ title }: { title: string }) {
     if (outcome === "shared" || outcome === "copied") setDone(true);
   }
   return (
-    <button type="button" onClick={() => void share()} aria-label={t("share")} className="flex h-11 shrink-0 items-center gap-1 rounded-full border border-border px-3 text-sm font-medium hover:bg-border/10">
+    <Button variant="secondary" size="sm" onClick={() => void share()} className="shrink-0 gap-1 rounded-full">
       {done ? <Check className="h-4 w-4 text-success" aria-hidden="true" /> : <Share2 className="h-4 w-4" aria-hidden="true" />}
       {done ? t("linkCopied") : t("share")}
-    </button>
+    </Button>
   );
 }

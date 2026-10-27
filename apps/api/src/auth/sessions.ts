@@ -1,9 +1,8 @@
-import type { SystemDb } from "@khmer-micro-store/db";
-import { SESSION_TTL_DAYS } from "@khmer-micro-store/shared";
+import type { SystemDb } from "@khmio/db";
+import { DAY_MS, SESSION_TTL_DAYS } from "@khmio/shared";
 import { createHash, randomBytes } from "node:crypto";
 
-export const SESSION_COOKIE = "kms_session";
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const SESSION_COOKIE = "khmio_session";
 
 /** Only this is stored: a stolen database backup can't be turned back into a working cookie. */
 export function hashToken(token: string): string {

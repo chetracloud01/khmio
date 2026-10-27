@@ -1,5 +1,5 @@
 {
-  "name": "@khmer-micro-store/payments",
+  "name": "@khmio/payments",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,9 +14,11 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@khmer-micro-store/shared": "workspace:*"
+    "@khmio/shared": "workspace:*",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/node": "^22.9.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }

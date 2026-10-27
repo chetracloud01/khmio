@@ -13,3 +13,7 @@ coverage/
 
 # Photos uploaded while developing (apps/api FILES_DIR)
 .uploads/
+
+# Local S3 (SeaweedFS, pnpm s3:up): the downloaded server and its data
+infra/bin/
+.s3-data/

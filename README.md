@@ -1,4 +1,4 @@
-# Khmer Micro-Store
+# Khmio
 
 Micro-merchant e-commerce PWA for Cambodia (Bakong KHQR, ABA PayWay, Telegram).
 

@@ -35,10 +35,10 @@ const MerchantProductsContext = createContext<MerchantProductsContextValue | nul
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const PRODUCTS_STORAGE_KEY = "khmer-micro-store:mockup-merchant-products";
-const CATEGORIES_STORAGE_KEY = "khmer-micro-store:mockup-merchant-categories";
-const BRANDS_STORAGE_KEY = "khmer-micro-store:mockup-merchant-brands";
-const UOMS_STORAGE_KEY = "khmer-micro-store:mockup-merchant-uoms";
+const PRODUCTS_STORAGE_KEY = "khmio:mockup-merchant-products";
+const CATEGORIES_STORAGE_KEY = "khmio:mockup-merchant-categories";
+const BRANDS_STORAGE_KEY = "khmio:mockup-merchant-brands";
+const UOMS_STORAGE_KEY = "khmio:mockup-merchant-uoms";
 
 export function MerchantProductsProvider({ children }: { children: ReactNode }) {
   // Starts from the catalog mock data so server and client render the same

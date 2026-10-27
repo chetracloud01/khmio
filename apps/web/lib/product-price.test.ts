@@ -7,6 +7,7 @@ const variant = (id: string, priceUsdCents: number | null, priceKhr: number | nu
   sku: id.toUpperCase(),
   labelKm: id,
   labelEn: id,
+  valueIds: [],
   priceUsdCents,
   priceKhr,
 });
@@ -25,6 +26,10 @@ const product = (variants: ProductVariant[], discountPercent: number | null = nu
   photos: [],
   hasOptions: variants.length > 1,
   variants,
+  variantGroups: [],
+  choiceGroups: [],
+  customValues: {},
+  kind: "item",
 });
 
 describe("discounted", () => {

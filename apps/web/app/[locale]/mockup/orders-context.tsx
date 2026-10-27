@@ -6,7 +6,7 @@ import {
   orderStatusSchema,
   type OrderAction,
   type OrderCancellation,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { generateOrderNumber, mockStore, parseLineKey } from "@/mock/mock-data";
@@ -34,7 +34,7 @@ interface OrdersContextValue {
 
 const OrdersContext = createContext<OrdersContextValue | null>(null);
 
-const STORAGE_KEY = "khmer-micro-store:mockup-orders";
+const STORAGE_KEY = "khmio:mockup-orders";
 
 function isOrderRecord(value: unknown): value is OrderRecord {
   if (typeof value !== "object" || value === null) return false;

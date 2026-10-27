@@ -1,7 +1,7 @@
 "use client";
 
-import { formatKhr, formatUsd, maxOrderQuantity } from "@khmer-micro-store/shared";
-import { BottomSheet, Button, cn, DiscountBadge, PriceTag } from "@khmer-micro-store/ui";
+import { formatKhr, formatUsd, maxOrderQuantity } from "@khmio/shared";
+import { BottomSheet, Button, cn, DiscountBadge, PriceTag } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
@@ -9,7 +9,8 @@ import { getDiscountedUnitAmount, getUnitKhr, getUnitUsdCents, lineKey, type Moc
 import { useCart } from "../cart-context";
 import { useOnlineStock } from "../online-stock";
 import { shareOrCopyLink } from "@/components/share-link";
-import { Stepper, StockNote } from "../shared-ui";
+import { StockNote } from "@/components/buyer/stock-note";
+import { Stepper } from "../shared-ui";
 import { useStoreSettings } from "../store-settings-context";
 
 /** Swipe on a phone, arrows with a mouse. Products without photos show their colour block. */

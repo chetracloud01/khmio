@@ -1,157 +1,262 @@
 "use client";
 
-import { formatKhmerPhoneLocal, getOrderTab, getSellerActions, ORDER_TABS, type OrderTab, type SellerOrderAction } from "@khmer-micro-store/shared";
-import { Button, Card, cn } from "@khmer-micro-store/ui";
-import { ChevronRight, Phone, ShoppingBag } from "lucide-react";
+import { DAY_MS, formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, phnomPenhDay, type ListQuery } from "@khmio/shared";
+import { cn, Mio, Notice, PageHeader } from "@khmio/ui";
+import { AlertTriangle, Phone, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
-import { api, ApiError, type SellerOrder } from "@/lib/api";
-import { PageLoading, PageOffline } from "../page-states";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
+import { formatMoney, ORDER_STATUS_TONE, ORDER_TAB_ICON, ORDER_TAB_TONE, orderStatusIcon, TONE_TEXT, useOrderText } from "@/components/order-ui";
+import { OrderStatusCircle } from "@/components/seller-cards";
+import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
+import { api, listPageSchema, type SellerOrder, sellerOrderSchema } from "@/lib/api";
+import { useDateText } from "@/components/use-date-text";
+import { OrderNextStep } from "../order-next-step";
 
-/** Steps that need nothing more than one tap. Sending and cancelling ask for details, so they open the order. */
-const ONE_TAP: readonly SellerOrderAction[] = ["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "rebook"];
+/** An order still to confirm this long gets a "Waiting 25 min" warning. */
+const LATE_AFTER_MINUTES = 15;
 
-/** The order's next step, or null when there's nothing to do but look. */
-function nextAction(order: SellerOrder): SellerOrderAction | null {
-  const action = getSellerActions(order)[0];
-  return action && action !== "cancel" ? (action as SellerOrderAction) : null;
-}
-
-// The seller's orders (design/screens.md S4): tabs follow the order rules in
-// packages/shared orders.ts, and each order carries its one next step.
+// The seller's orders (design/screens.md S4), in the shared data grid: a table
+// on a laptop, compact rows on a phone (2026-10-22 review), grouped by day
+// while sorted by date. Each order carries its one next step — a one-tap pill,
+// or a link into the order when the step needs details — and an order still
+// waiting to be confirmed after 15 minutes says so. Read page by page from
+// the server (GET /orders/page), so a shop with thousands of orders still
+// finds any of them.
 export default function OrdersPage() {
   const t = useTranslations("Orders");
-  const tStore = useTranslations("Storefront");
-  const tApp = useTranslations("App");
+  const { day: dayText } = useDateText();
   const locale = useLocale();
-  const { paymentLabel, placeLabel, timeAgo, actionLabel } = useOrderText();
-  const [orders, setOrders] = useState<SellerOrder[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [tab, setTab] = useState<OrderTab | "all">("all");
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const router = useRouter();
+  const { paymentLabel, placeLabel, timeAgo, statusLabel } = useOrderText();
   const [problem, setProblem] = useState<string | null>(null);
+  /** Bumped after an order moves on, so the list reads its page again. */
+  const [reloadKey, setReloadKey] = useState(0);
+  const load = useCallback(() => setReloadKey((key) => key + 1), []);
+  const loadPage = useCallback((query: ListQuery) => api(`/orders/page?${listQueryToSearchParams(query)}`, listPageSchema(sellerOrderSchema)), []);
 
-  const load = useCallback(() => {
-    setFailed(false);
-    api<SellerOrder[]>("/orders").then(setOrders, () => setFailed(true));
-  }, []);
-  useEffect(load, [load]);
-
-  async function doStep(order: SellerOrder, action: SellerOrderAction) {
-    setBusyId(order.id);
-    setProblem(null);
-    try {
-      await api(`/orders/${order.id}/actions`, { method: "POST", body: { action } });
-    } catch (failure) {
-      setProblem(failure instanceof ApiError && failure.code === "store_paused" ? tApp("storePaused") : failure instanceof ApiError && failure.code === "action_not_allowed" ? tApp("orderMovedOn") : tApp("saveFailed"));
-    } finally {
-      setBusyId(null);
-      load();
-    }
-  }
-
-  if (failed) return <PageOffline onRetry={load} />;
-  if (!orders) return <PageLoading />;
-
-  const counts = new Map<OrderTab, number>();
-  for (const order of orders) counts.set(getOrderTab(order.status), (counts.get(getOrderTab(order.status)) ?? 0) + 1);
-  const shown = tab === "all" ? orders : orders.filter((order) => getOrderTab(order.status) === tab);
-  const chip = (value: OrderTab | "all", label: string, count: number) => (
-    <button
-      key={value}
-      type="button"
-      aria-pressed={tab === value}
-      onClick={() => setTab(value)}
-      className={cn(
-        "flex min-h-touch shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm font-medium",
-        tab === value ? "border-brand bg-brand text-on-brand" : "border-border bg-bg text-muted hover:text-fg",
-      )}
-    >
-      {label}
-      <span className={cn("rounded-full px-1.5 text-xs", tab === value ? "bg-on-brand/20" : "bg-border/40")}>{count}</span>
-    </button>
-  );
-
-  return (
-    <div className="flex flex-col gap-4 p-4">
-      <div>
-        <h1 className="text-xl font-semibold">{t("title")}</h1>
-        <p className="mt-1 text-sm text-muted">{t("description")}</p>
-      </div>
-
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
-        {chip("all", tStore("categoryAll"), orders.length)}
-        {ORDER_TABS.map((value) => chip(value, t(`tab_${value}`), counts.get(value) ?? 0))}
-      </div>
-
-      {problem && (
-        <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-          {problem}
-        </p>
-      )}
-
-      {shown.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-border/30">
-            <ShoppingBag className="h-7 w-7 text-muted" aria-hidden="true" />
-          </span>
-          <p className="text-sm text-muted">{t("noOrders")}</p>
-        </div>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {shown.map((order) => {
-            const action = nextAction(order);
-            const href = `/${locale}/m/orders/${order.id}`;
-            return (
-              <li key={order.id}>
-                <Card className="flex flex-col gap-3 p-4">
-                  <Link href={href} className="flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold">
-                          {t("orderNumber")} #{order.orderNumber}
-                        </p>
-                        <p className="text-xs text-muted">{timeAgo(order.createdAt)}</p>
-                      </div>
-                      <OrderStatusPill order={order} />
-                    </div>
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="min-w-0 text-sm">
-                        <p className="truncate font-medium">{order.buyerName}</p>
-                        <p className="truncate text-muted">{placeLabel(order)}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-lg font-bold tabular-nums">{formatMoney(order.totalMinor, order.currency)}</p>
-                        <p className="text-xs text-muted">
-                          {t("items")}: {order.itemCount} · {paymentLabel(order)}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                  <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
-                    <a href={`tel:+${order.buyerPhone}`} className="flex min-h-touch items-center gap-1 text-sm text-brand">
-                      <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-                      {formatKhmerPhoneLocal(order.buyerPhone)}
-                    </a>
-                    {action && ONE_TAP.includes(action) ? (
-                      <Button variant="primary" className="whitespace-nowrap px-3 text-sm" loading={busyId === order.id} onClick={() => void doStep(order, action)}>
-                        {actionLabel(order, action)}
-                      </Button>
-                    ) : (
-                      <Link href={href} className="flex min-h-touch items-center gap-1 text-sm font-medium text-brand">
-                        {action ? actionLabel(order, action) : t("view")}
-                        <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                      </Link>
-                    )}
-                  </div>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+  const href = (order: SellerOrder) => `/${locale}/m/orders/${order.id}`;
+  /** The one next step as a compact pill: a button when it's one tap, otherwise a link into the order (shared with the home page). */
+  const nextStep = (order: SellerOrder) => (
+    <div className="[&_a]:rounded-full [&_button]:min-h-touch [&_button]:rounded-full [&_button]:px-4 [&_button]:text-sm" onClick={(event) => event.stopPropagation()}>
+      <OrderNextStep order={order} onDone={load} onProblem={setProblem} />
     </div>
   );
+  const callButton = (order: SellerOrder) => (
+    <a
+      href={`tel:+${order.buyerPhone}`}
+      onClick={(event) => event.stopPropagation()}
+      aria-label={t("callBuyer", { name: order.buyerName })}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand hover:bg-brand/15"
+    >
+      <Phone className="h-4 w-4" aria-hidden="true" />
+    </a>
+  );
+  /** Minutes an order has waited to be confirmed, when that's too long; null otherwise. */
+  const lateBy = (order: SellerOrder): number | null => {
+    if (getOrderTab(order.status) !== "to_confirm") return null;
+    const minutes = Math.floor((Date.now() - Date.parse(order.createdAt)) / 60_000);
+    return minutes >= LATE_AFTER_MINUTES ? minutes : null;
+  };
+  const lateChip = (order: SellerOrder) => {
+    const minutes = lateBy(order);
+    if (minutes === null) return null;
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning">
+        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+        {minutes < 60 ? t("waitingFor", { minutes }) : t("waitingForHours", { hours: Math.floor(minutes / 60) })}
+      </span>
+    );
+  };
+  const today = phnomPenhDay(new Date());
+  const yesterday = phnomPenhDay(new Date(Date.now() - DAY_MS));
+  /** "Today", "Yesterday" or "20 Oct" (our own month names, the same on every phone). */
+  const dayLabel = (order: SellerOrder) => {
+    const day = phnomPenhDay(order.createdAt);
+    if (day === today) return t("groupToday");
+    if (day === yesterday) return t("groupYesterday");
+    return dayText(day);
+  };
+
+  const stepRank = (order: SellerOrder) => {
+    const tab = getOrderTab(order.status);
+    return tab === "awaiting" ? ORDER_TABS.length : ORDER_TABS.indexOf(tab);
+  };
+  const statusGroups: DataGridGroup<SellerOrder> = {
+    // Grouped by step while sorted by date (the server walks the steps in this order across pages).
+    sortKey: "order",
+    key: (order) => getOrderTab(order.status),
+    label: (order) => {
+      const tab = getOrderTab(order.status);
+      return tab === "awaiting" ? t("tab_awaiting") : t(`tab_${tab}`);
+    },
+    rank: stepRank,
+    icon: (order) => {
+      const tab = getOrderTab(order.status);
+      const Icon = ORDER_TAB_ICON[tab];
+      return <Icon className={cn("h-4 w-4", TONE_TEXT[ORDER_TAB_TONE[tab]])} aria-hidden="true" />;
+    },
+    labelClass: (order) => TONE_TEXT[ORDER_TAB_TONE[getOrderTab(order.status)]],
+  };
+
+  const columns: DataGridColumn<SellerOrder>[] = [
+    {
+      key: "order",
+      header: t("colOrder"),
+      hideable: false,
+      pin: "start",
+      sortable: true,
+      value: (order) => Date.parse(order.createdAt),
+      exportValue: (order) => order.orderNumber,
+      cell: (order) => (
+        <div className="flex flex-col items-start gap-1">
+          <p className="font-semibold"><DataGridHighlight text={`#${order.orderNumber}`} /></p>
+          <p className="text-xs text-muted">{timeAgo(order.createdAt)}</p>
+          {lateChip(order)}
+        </div>
+      ),
+    },
+    {
+      key: "buyer",
+      header: t("colBuyer"),
+      sortable: true,
+      value: (order) => order.buyerName,
+      cell: (order) => (
+        <div className="flex min-w-0 items-center gap-2">
+          {callButton(order)}
+          <div className="min-w-0">
+            <p className="truncate font-medium"><DataGridHighlight text={order.buyerName} /></p>
+            <p className="text-xs text-muted tabular-nums">{formatKhmerPhoneLocal(order.buyerPhone)}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "delivery",
+      header: t("colDelivery"),
+      value: (order) => `${placeLabel(order)} · ${paymentLabel(order)}`,
+      cell: (order) => (
+        <div className="flex items-start gap-2">
+          {order.fulfilment === "delivery" ? <Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" /> : <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />}
+          <div className="min-w-0">
+            <p className="truncate">{placeLabel(order)}</p>
+            <p className="truncate text-xs text-muted">{paymentLabel(order)}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "total",
+      header: t("colTotal"),
+      align: "right",
+      sortable: true,
+      // Orders can be in either currency, so this sorts within a currency, not across them.
+      value: (order) => order.totalMinor,
+      exportValue: (order) => formatMoney(order.totalMinor, order.currency),
+      cell: (order) => (
+        <div>
+          <p className="font-semibold tabular-nums">{formatMoney(order.totalMinor, order.currency)}</p>
+          <p className="text-xs text-muted">{t("itemCount", { count: order.itemCount })}</p>
+        </div>
+      ),
+    },
+    {
+      key: "status",
+      header: t("colStatus"),
+      sortable: true,
+      value: (order) => statusLabel(order),
+      cell: (order) => (
+        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+          <StatusIcon order={order} />
+          {statusLabel(order)}
+        </span>
+      ),
+    },
+    { key: "next", header: t("colNext"), align: "right", hideable: false, pin: "end", exportValue: () => "", cell: (order) => <div className="flex justify-end">{nextStep(order)}</div> },
+  ];
+
+
+  return (
+    <div className={`${SELLER_PAGE} gap-4`}>
+      <PageHeader title={t("title")} description={t("description")} />
+
+      {problem && (
+        <Notice tone="warning" role="alert">
+          {problem}
+        </Notice>
+      )}
+
+      <DataGrid
+        rowNumbers
+        syncUrl
+        server={{ load: loadPage, reloadKey }}
+        getRowId={(order) => order.id}
+        columns={columns}
+        searchPlaceholder={t("searchPlaceholder")}
+        chips={ORDER_TABS.map((tab) => ({ value: tab, label: t(`tab_${tab}`), icon: ORDER_TAB_ICON[tab], iconClass: TONE_TEXT[ORDER_TAB_TONE[tab]] }))}
+        // Open on what needs the seller first; everything when nothing does.
+        initialChip="to_confirm"
+        initialChipFallback="all"
+        filters={[
+          {
+            key: "payment",
+            label: t("colPayment"),
+            options: [
+              { value: "online", label: t("filterOnline") },
+              { value: "cod", label: t("filterCash") },
+            ],
+          },
+          {
+            key: "fulfilment",
+            label: t("filterFulfilment"),
+            options: [
+              { value: "delivery", label: t("filterDelivery") },
+              { value: "pickup", label: t("filterPickup") },
+              { value: "in_store", label: t("filterInStore") },
+            ],
+          },
+        ]}
+        onRowClick={(order) => router.push(href(order))}
+        initialSort={{ key: "order", direction: "desc" }}
+        // "All": grouped by step, in the order work happens; one step's tab: grouped by day.
+        groupBy={(chip) => (chip === "all" ? statusGroups : { sortKey: "order", key: (order) => phnomPenhDay(order.createdAt), label: dayLabel })}
+        defaultPageSize={20}
+        renderCard={(order) => (
+          <div className="flex items-center gap-3">
+            <OrderStatusCircle status={order.status} fulfilment={order.fulfilment} label={statusLabel(order)} />
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+              {/* The buyer leads (whole name), the order number goes with the details. */}
+              <p className="flex w-full items-baseline justify-between gap-2">
+                <span className="min-w-0 truncate font-semibold"><DataGridHighlight text={order.buyerName} /></span>
+                <span className="shrink-0 font-semibold tabular-nums">{formatMoney(order.totalMinor, order.currency)}</span>
+              </p>
+              <p className="w-full truncate text-xs text-muted">
+                <span className="sr-only">{statusLabel(order)} · </span>
+                <span className="font-semibold text-fg"><DataGridHighlight text={`#${order.orderNumber}`} /></span> · {placeLabel(order)} · {t("itemCount", { count: order.itemCount })} · {timeAgo(order.createdAt)}
+              </p>
+              {lateChip(order)}
+            </div>
+          </div>
+        )}
+        renderCardAction={(order) => (
+          // Call and the next step, lined up on the right under the order.
+          <div className="flex items-center justify-end gap-2 pb-3 pl-[68px] pr-4">
+            {callButton(order)}
+            {nextStep(order)}
+          </div>
+        )}
+        exportFileName="orders"
+        storageKey="seller-orders"
+        emptyTitle={t("noOrders")}
+        emptyArt={<Mio size={80} />}
+      />
+    </div>
+  );
+}
+
+/** The status's own icon in its colour, for the laptop table. */
+function StatusIcon({ order }: { order: SellerOrder }) {
+  const Icon = orderStatusIcon(order);
+  return <Icon className={cn("h-4 w-4 shrink-0", TONE_TEXT[ORDER_STATUS_TONE[order.status]])} aria-hidden="true" />;
 }

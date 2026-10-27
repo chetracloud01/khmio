@@ -1,19 +1,25 @@
 "use client";
 
-import type { TelegramLoginPayload } from "@khmer-micro-store/shared";
-import { Button, Card } from "@khmer-micro-store/ui";
-import { FlaskConical, Send } from "lucide-react";
+import type { TelegramLoginPayload } from "@khmio/shared";
+import { Button, Card, Mio, ThemeSwitcher } from "@khmio/ui";
+import { Car, FlaskConical, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
+import { SignUpFrame } from "@/components/sign-up-frame";
 import { BOT_USERNAME, SHOW_DEV_LOGIN, TelegramButton } from "@/components/telegram-button";
-import { api, ApiError, getMe } from "@/lib/api";
-import { AppFrame, AppLoading, AppOffline } from "../app-frame";
+import { useThemeLabels } from "@/components/use-theme-labels";
+import { ApiError, apiSend, getMe } from "@/lib/api";
+import { AppLoading, AppOffline } from "../app-frame";
 
 // Real merchant login (roadmap step 2). Sign-up and log-in are one flow:
 // the first login creates the account, then onboarding asks two questions.
 export default function LoginPage() {
   const t = useTranslations("App");
+  const tMascot = useTranslations("Mascot");
+  const tLogin = useTranslations("MerchantLogin");
+  const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
   const [state, setState] = useState<"checking" | "ready" | "offline">("checking");
@@ -32,10 +38,10 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await api(path, { method: "POST", body });
+      await apiSend(path, { method: "POST", body });
       router.replace(`/${locale}/m`);
     } catch (caught) {
-      setError(caught instanceof ApiError && caught.status === 0 ? t("offlineBody") : t("loginFailed"));
+      setError(caught instanceof ApiError && caught.status === 0 ? t("offlineBody") : caught instanceof ApiError && caught.code === "too_many_requests" ? t("tooManyTries") : t("loginFailed"));
       setBusy(false);
     }
   }
@@ -46,27 +52,43 @@ export default function LoginPage() {
   if (state === "offline") return <AppOffline onRetry={check} />;
 
   return (
-    <AppFrame>
-      <div className="flex flex-col gap-2 pt-6 text-center">
-        <h1 className="text-2xl font-bold">{t("loginTitle")}</h1>
-        <p className="text-sm text-muted">{t("loginSubtitle")}</p>
-      </div>
+    <SignUpFrame
+      controls={
+        <>
+          <LanguageSwitch />
+          <ThemeSwitcher labels={themeLabels} />
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5 rounded-2xl border border-border bg-bg p-5 shadow-raised sm:p-8">
+        <div className="flex flex-col items-center gap-3 text-center">
+          {/* On a laptop Mio is on the teal side already. */}
+          <span className="lg:hidden">
+            <Mio size={88} label={tMascot("label")} />
+          </span>
+          <h1 className="text-2xl font-bold leading-normal">{t("loginTitle")}</h1>
+          <p className="text-sm text-muted">{t("loginSubtitle")}</p>
+        </div>
 
-      <Card className="flex flex-col gap-3 p-4">
-        {BOT_USERNAME ? (
-          <TelegramButton onLogin={onTelegram} />
-        ) : (
-          <p className="flex items-start gap-2 text-sm text-muted">
-            <Send className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            {t("telegramNotSetUp")}
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-danger">
-            {error}
-          </p>
-        )}
-      </Card>
+        <div className="flex flex-col gap-3">
+          {BOT_USERNAME ? (
+            <>
+              <TelegramButton onLogin={onTelegram} />
+              <p className="text-center text-xs text-muted">{tLogin("telegramPerk")}</p>
+            </>
+          ) : (
+            <p className="flex items-start gap-2 text-sm text-muted">
+              <Send className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {t("telegramNotSetUp")}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
 
       {SHOW_DEV_LOGIN && (
         <Card className="flex flex-col gap-3 border-dashed p-4">
@@ -83,9 +105,13 @@ export default function LoginPage() {
                 {t("devLoginAs", { name: who.toUpperCase() })}
               </Button>
             ))}
+            <Button variant="secondary" className="col-span-2" disabled={busy} onClick={() => void signIn("/auth/dev-login", { as: "garage" })}>
+              <Car className="h-4 w-4" aria-hidden="true" />
+              {t("devLoginGarage")}
+            </Button>
           </div>
         </Card>
       )}
-    </AppFrame>
+    </SignUpFrame>
   );
 }

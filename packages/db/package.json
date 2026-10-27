@@ -1,5 +1,5 @@
 {
-  "name": "@khmer-micro-store/db",
+  "name": "@khmio/db",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -19,6 +19,7 @@
     "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run --passWithNoTests"
   },
   "dependencies": {
+    "@khmio/shared": "workspace:*",
     "@prisma/client": "^5.22.0"
   },
   "devDependencies": {

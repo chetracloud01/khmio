@@ -6,7 +6,7 @@ import {
   storeSettingsSchema,
   type ExchangeRateBand,
   type StoreSettings,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { mockStoreSettings } from "@/mock/mock-data";
@@ -27,7 +27,7 @@ const StoreSettingsContext = createContext<StoreSettingsContextValue | null>(nul
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const STORAGE_KEY = "khmer-micro-store:mockup-store-settings";
+const STORAGE_KEY = "khmio:mockup-store-settings";
 
 /** Wide enough for any real rate; the admin's own band is applied on save and at checkout. */
 const STORED_RATE_BAND: ExchangeRateBand = { min: 1000, max: 10000 };

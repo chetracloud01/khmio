@@ -1,5 +1,5 @@
-import type { Tx } from "@khmer-micro-store/db";
-import { effectivePlan, type PlanId } from "@khmer-micro-store/shared";
+import type { Tx } from "@khmio/db";
+import { effectivePlan, planHasFeature, type PlanFeature, type PlanId, type SubscriptionStatus } from "@khmio/shared";
 import { AppException } from "../errors";
 
 /**
@@ -12,6 +12,11 @@ export async function storePlan(tx: Tx, storeId: string): Promise<{ plan: PlanId
     tx.subscription.findUnique({ where: { storeId }, select: { plan: true, status: true } }),
     tx.platformSettings.findUnique({ where: { id: 1 }, select: { betaAllBasic: true } }),
   ]);
+  return planInForce(subscription, settings);
+}
+
+/** No subscription row counts as Free; the beta switch lifts Free to Basic; only a paused subscription locks the store. */
+export function planInForce(subscription: { plan: PlanId; status: SubscriptionStatus } | null, settings: { betaAllBasic: boolean } | null): { plan: PlanId; paused: boolean } {
   return {
     plan: effectivePlan(subscription?.plan ?? "free", settings?.betaAllBasic ?? false),
     paused: subscription?.status === "paused",
@@ -23,4 +28,9 @@ export async function assertStoreWritable(tx: Tx, storeId: string): Promise<Plan
   const { plan, paused } = await storePlan(tx, storeId);
   if (paused) throw new AppException(403, "store_paused");
   return plan;
+}
+
+/** A feature the plan in force doesn't include (packages/shared plans.ts) is refused here, not only hidden on screen. */
+export function assertPlanFeature(plan: PlanId, feature: PlanFeature): void {
+  if (!planHasFeature(plan, feature)) throw new AppException(403, "plan_limit");
 }

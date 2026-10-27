@@ -1,5 +1,5 @@
-import type { Prisma, Tx } from "@khmer-micro-store/db";
-import type { DeliveryFee, DeliverySettings } from "@khmer-micro-store/shared";
+import type { Prisma, Tx } from "@khmio/db";
+import type { DeliveryFee, DeliverySettings } from "@khmio/shared";
 
 // A store's delivery as packages/shared delivery.ts sees it, read from its
 // rows: zones with their districts, pickup and provinces (columns on stores),
@@ -36,7 +36,7 @@ export async function readDeliverySettings(tx: Tx, storeId: string): Promise<{ s
   return { settings: toDeliverySettings(store, zones, drivers), configured: store.deliveryConfiguredAt !== null };
 }
 
-function toDeliverySettings(
+export function toDeliverySettings(
   store: DeliveryStoreRow,
   zones: Prisma.DeliveryZoneGetPayload<{ include: { districts: { select: { districtId: true } } } }>[],
   drivers: Prisma.StoreDriverGetPayload<object>[],
@@ -54,14 +54,15 @@ function toDeliverySettings(
   };
 }
 
-/** Saves the whole delivery page at once, inside the seller's withContext. Zones are replaced; drivers keep their ids. */
-export async function saveDeliverySettings(tx: Tx, storeId: string, settings: DeliverySettings): Promise<void> {
+/**
+ * Saves the whole delivery page at once, inside the seller's withContext.
+ * Zones are replaced; drivers keep their ids. Pickup is left as it is: it's
+ * set with the shop address on Shop details (design/screens.md S10).
+ */
+export async function saveDeliverySettings(tx: Tx, storeId: string, settings: Omit<DeliverySettings, "pickup">): Promise<void> {
   await tx.store.update({
     where: { id: storeId },
     data: {
-      pickupEnabled: settings.pickup.enabled,
-      pickupAddress: settings.pickup.address,
-      pickupHours: settings.pickup.hours,
       provinceDeliveryEnabled: settings.province.enabled,
       provinceNote: settings.province.note,
       provinceFeeUsdCents: settings.province.feeUsdCents ?? null,

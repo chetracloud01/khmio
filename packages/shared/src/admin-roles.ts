@@ -17,18 +17,22 @@ export const ADMIN_PERMISSIONS = [
   "audit_view",
   "settings_manage",
   "admins_manage",
+  "backups_view",
+  "backups_run",
+  "shop_restore",
 ] as const;
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
 
 /**
  * - owner: everything, including who else is an admin.
- * - support: helps merchants (plans, periods, KYC); sees money, can't change it.
- * - finance: invoices and payment checks; sees merchants, can't change them or review KYC.
+ * - support: helps merchants (plans, periods, KYC); sees money, can't change it; can start a backup.
+ * - finance: invoices and payment checks; sees merchants, can't change them or review KYC; sees backups.
+ * Restoring a shop's catalog from a backup (shop_restore) is the owner's alone.
  */
 export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
   owner: ADMIN_PERMISSIONS,
-  support: ["merchants_manage", "kyc_review", "billing_view", "payments_view", "audit_view"],
-  finance: ["billing_view", "billing_manage", "payments_view", "payments_manage", "audit_view"],
+  support: ["merchants_manage", "kyc_review", "billing_view", "payments_view", "audit_view", "backups_view", "backups_run"],
+  finance: ["billing_view", "billing_manage", "payments_view", "payments_manage", "audit_view", "backups_view"],
 };
 
 export function adminCan(role: AdminRole, permission: AdminPermission): boolean {

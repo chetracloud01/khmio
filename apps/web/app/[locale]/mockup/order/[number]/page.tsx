@@ -4,16 +4,19 @@ import {
   BUYER_ORDER_STEPS,
   canBuyerCancel,
   formatKhmerPhoneLocal,
+  formatTrackingCode,
   getBuyerProgress,
+  getInvoiceState,
   type OrderStatus,
-} from "@khmer-micro-store/shared";
-import { Button, cn } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { Button, cn, ConfirmDialog, TONE_STYLES } from "@khmio/ui";
 import {
   AlertTriangle,
   Bus,
   Check,
   CircleCheck,
   Clock,
+  FileText,
   MapPin,
   PackageCheck,
   Phone,
@@ -28,10 +31,10 @@ import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { mockStore } from "@/mock/mock-data";
+import { mockStore, mockTrackingCode } from "@/mock/mock-data";
+import { TrackingCodeCard } from "@/components/invoice/tracking-code-card";
 import { orderLineLabel, type OrderRecord } from "@/mock/mock-orders";
-import { BuyerBottomBar, BuyerShell } from "@/components/buyer-shell";
-import { ConfirmDialog } from "@/components/confirm-dialog";
+import { BuyerBottomBar, BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { useMerchantProducts } from "../../merchant-products-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
 import { formatMoney, ORDER_STATUS_TONE, useOrderText } from "@/components/order-ui";
@@ -86,6 +89,9 @@ function OrderStatus({ order }: { order: OrderRecord }) {
   const profile = useMerchantProfile();
   const { placeLabel, clockTime, paymentLabel } = useOrderText();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const tInvoice = useTranslations("Invoice");
+  const trackingCode = formatTrackingCode(mockStore.slug, mockTrackingCode(order.orderNumber));
+  const invoiceHref = `/${locale}/mockup/order/${encodeURIComponent(order.orderNumber)}/invoice`;
 
   const isPickup = order.fulfilment === "pickup";
   const progress = getBuyerProgress(order.status);
@@ -120,10 +126,101 @@ function OrderStatus({ order }: { order: OrderRecord }) {
   const payHref = `/${locale}/mockup/khqr?order=${encodeURIComponent(order.orderNumber)}`;
   const shopHref = `/${locale}/mockup/storefront`;
 
+  const deliveryCard = (
+      <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{isPickup ? t("pickupInfo") : t("deliveryInfo")}</h2>
+        <ul className="flex flex-col gap-2 text-sm">
+          <li className="flex items-center gap-2">
+            <User className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+            {order.name}
+          </li>
+          <li className="flex items-center gap-2">
+            <Phone className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+            <span className="tabular-nums">{formatKhmerPhoneLocal(order.phone)}</span>
+          </li>
+          <li className="flex items-start gap-2">
+            {isPickup ? (
+              <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+            ) : (
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+            )}
+            {isPickup ? (
+              <span>
+                <span className="block font-medium">{tCheckout("pickupAt")}</span>
+                {order.pickupAddress}
+                {order.pickupHours && <span className="block text-muted">{order.pickupHours}</span>}
+              </span>
+            ) : (
+              <span>
+                {placeLabel(order)}
+                {order.landmark && <span className="block text-muted">{order.landmark}</span>}
+              </span>
+            )}
+          </li>
+        </ul>
+      </section>
+  );
+  const shopCard = (
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-bg p-4">
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("buyerOrderedFrom")}</h2>
+          <p className="font-semibold">{storeName}</p>
+        </div>
+        {shopPhone && (
+          <a
+            href={`tel:+${profile.phone}`}
+            className="flex min-h-touch items-center justify-center gap-2 rounded-DEFAULT border border-border text-sm font-medium"
+          >
+            <Phone className="h-4 w-4" aria-hidden="true" />
+            {t("callShop", { phone: shopPhone })}
+          </a>
+        )}
+        {/* Inert until the Telegram bot integration exists (blueprint Stage G). */}
+        <Button variant="secondary" className="w-full">
+          <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
+          {t("telegramUpdates")}
+        </Button>
+        {canBuyerCancel(order) && (
+          <button
+            type="button"
+            onClick={() => setConfirmingCancel(true)}
+            className="flex min-h-touch items-center justify-center text-sm font-medium text-danger"
+          >
+            {t("cancelOrder")}
+          </button>
+        )}
+        {order.status === "paid" && <p className="text-center text-sm text-muted">{t("cancelAfterPaid")}</p>}
+      </section>
+  );
+  const mainAction = awaitingPayment ? (
+    <Link href={payHref} className="block">
+      <Button variant="primary" className="w-full">
+        {t("payNow")} · {formatMoney(order.total, order.currency)}
+      </Button>
+    </Link>
+  ) : (
+    <Link href={shopHref} className="block">
+      <Button variant={delivered || order.status === "cancelled" ? "primary" : "secondary"} className="w-full">
+        {delivered || order.status === "cancelled" ? t("orderAgain") : t("backToShop")}
+      </Button>
+    </Link>
+  );
+
   return (
-    <BuyerShell className="gap-4 p-4 pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        plain
+        aside={
+          <>
+            {shopCard}
+            {deliveryCard}
+            {mainAction}
+          </>
+        }
+      >
+      <div className="flex flex-col gap-4 p-4 lg:p-0">
       <header className="flex flex-col items-center gap-2 pt-4 text-center">
-        <span className={cn("flex h-16 w-16 items-center justify-center rounded-full", ORDER_STATUS_TONE[order.status])}>
+        <span className={cn("flex h-16 w-16 items-center justify-center rounded-full", TONE_STYLES[ORDER_STATUS_TONE[order.status]])}>
           <Icon className="h-8 w-8" aria-hidden="true" />
         </span>
         <h1 className="text-xl font-bold leading-normal" role="status">
@@ -147,8 +244,10 @@ function OrderStatus({ order }: { order: OrderRecord }) {
         </p>
       )}
 
+      <TrackingCodeCard code={trackingCode} />
+
       {progress !== null && (
-        <section className="rounded-2xl border border-border p-4" aria-label={t("progressLabel")}>
+        <section className="rounded-2xl border border-border bg-bg p-4" aria-label={t("progressLabel")}>
           <ol className="flex flex-col">
             {BUYER_ORDER_STEPS.map((step, index) => {
               const done = index < doneCount;
@@ -190,7 +289,7 @@ function OrderStatus({ order }: { order: OrderRecord }) {
       )}
 
       {order.dispatch && order.dispatch.route !== "pickup" && order.status !== "cancelled" && (
-        <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("onTheWay")}</h2>
           {order.dispatch.route === "driver" ? (
             <div className="flex items-center gap-3">
@@ -223,7 +322,7 @@ function OrderStatus({ order }: { order: OrderRecord }) {
         </section>
       )}
 
-      <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
+      <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{t("items")}</h2>
         {order.lines.map((line) => (
           <div key={line.key} className="flex items-start justify-between gap-3 text-sm">
@@ -248,83 +347,27 @@ function OrderStatus({ order }: { order: OrderRecord }) {
           <span className="text-lg tabular-nums">{formatMoney(order.total, order.currency)}</span>
         </div>
         <p className="text-sm text-muted">{paymentLabel(order)}</p>
+        <Link href={invoiceHref} className="block">
+          <Button variant="secondary" className="w-full">
+            <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {getInvoiceState(order) === "paid" ? tInvoice("viewReceipt") : tInvoice("viewInvoice")}
+          </Button>
+        </Link>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted">{isPickup ? t("pickupInfo") : t("deliveryInfo")}</h2>
-        <ul className="flex flex-col gap-2 text-sm">
-          <li className="flex items-center gap-2">
-            <User className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-            {order.name}
-          </li>
-          <li className="flex items-center gap-2">
-            <Phone className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-            <span className="tabular-nums">{formatKhmerPhoneLocal(order.phone)}</span>
-          </li>
-          <li className="flex items-start gap-2">
-            {isPickup ? (
-              <Store className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-            ) : (
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
-            )}
-            {isPickup ? (
-              <span>
-                <span className="block font-medium">{tCheckout("pickupAt")}</span>
-                {order.pickupAddress}
-                {order.pickupHours && <span className="block text-muted">{order.pickupHours}</span>}
-              </span>
-            ) : (
-              <span>
-                {placeLabel(order)}
-                {order.landmark && <span className="block text-muted">{order.landmark}</span>}
-              </span>
-            )}
-          </li>
-        </ul>
-      </section>
+      {/* Phone and tablet: the delivery and shop cards follow; from 1024 px they're in the side column. */}
+      <div className="flex flex-col gap-4 lg:hidden">
+        {deliveryCard}
+        {shopCard}
+      </div>
+      </div>
+      </BuyerColumns>
 
-      <section className="flex flex-col gap-3">
-        {shopPhone && (
-          <a
-            href={`tel:+${profile.phone}`}
-            className="flex min-h-touch items-center justify-center gap-2 rounded-DEFAULT border border-border text-sm font-medium"
-          >
-            <Phone className="h-4 w-4" aria-hidden="true" />
-            {t("callShop", { phone: shopPhone })}
-          </a>
-        )}
-        {/* Inert until the Telegram bot integration exists (blueprint Stage G). */}
-        <Button variant="secondary" className="w-full">
-          <Send className="h-4 w-4 shrink-0" aria-hidden="true" />
-          {t("telegramUpdates")}
-        </Button>
-        {canBuyerCancel(order) && (
-          <button
-            type="button"
-            onClick={() => setConfirmingCancel(true)}
-            className="flex min-h-touch items-center justify-center text-sm font-medium text-danger"
-          >
-            {t("cancelOrder")}
-          </button>
-        )}
-        {order.status === "paid" && <p className="text-center text-sm text-muted">{t("cancelAfterPaid")}</p>}
-      </section>
 
-      <BuyerBottomBar>
-        {awaitingPayment ? (
-          <Link href={payHref} className="block">
-            <Button variant="primary" className="w-full">
-              {t("payNow")} · {formatMoney(order.total, order.currency)}
-            </Button>
-          </Link>
-        ) : (
-          <Link href={shopHref} className="block">
-            <Button variant={delivered || order.status === "cancelled" ? "primary" : "secondary"} className="w-full">
-              {delivered || order.status === "cancelled" ? t("orderAgain") : t("backToShop")}
-            </Button>
-          </Link>
-        )}
-      </BuyerBottomBar>
+
+
+
+      <BuyerBottomBar wide>{mainAction}</BuyerBottomBar>
 
       <ConfirmDialog
         open={confirmingCancel}

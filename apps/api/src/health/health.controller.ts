@@ -1,4 +1,4 @@
-import type { AppDb } from "@khmer-micro-store/db";
+import type { AppDb } from "@khmio/db";
 import { Controller, Get, Inject, Res } from "@nestjs/common";
 import { APP_DB } from "../db";
 

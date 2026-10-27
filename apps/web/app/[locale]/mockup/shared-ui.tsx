@@ -1,8 +1,12 @@
 "use client";
 
-import { maxOrderQuantity, type BuyerStockState, type Currency } from "@khmer-micro-store/shared";
-import { Card, cn, DiscountBadge, PriceTag } from "@khmer-micro-store/ui";
+import { canAddMore, type BuyerStockState, type Currency } from "@khmio/shared";
+import { cn, PriceTag } from "@khmio/ui";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
+import { QuantityStepper } from "@/components/buyer/quantity-control";
+import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import {
   getStartingVariant,
   getUnitKhr,
@@ -10,42 +14,6 @@ import {
   lineKey,
   type MockProduct,
 } from "@/mock/mock-data";
-
-export function CategoryChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "min-h-touch shrink-0 snap-start whitespace-nowrap rounded-full border px-4 text-sm font-medium transition-colors",
-        active ? "border-brand bg-brand text-on-brand" : "border-border bg-bg text-muted hover:text-fg",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** Buyer-facing stock text, already translated. */
-export interface StockLabels {
-  soldOut: string;
-  onlyLeft: (count: number) => string;
-}
-
-/** "Sold out" or "Only 3 left" under an item; nothing when stock isn't tracked or there's plenty. */
-export function StockNote({ state, labels }: { state: BuyerStockState; labels: StockLabels }) {
-  if (state.kind === "sold_out") return <span className="text-xs font-semibold text-danger">{labels.soldOut}</span>;
-  if (state.kind === "low") return <span className="text-xs font-medium text-warning">{labels.onlyLeft(state.available)}</span>;
-  return null;
-}
 
 export function Stepper({
   qty,
@@ -65,42 +33,18 @@ export function Stepper({
   increaseDisabled?: boolean;
   className?: string;
 }) {
+  // The same − n + as the live shop (components/buyer/quantity-control).
   return (
-    <div
-      className={cn(
-        "flex items-center justify-between gap-1 rounded-full border border-brand bg-brand/5 p-1",
-        className,
-      )}
-    >
-      {/* shrink-0 keeps both buttons a full 44px even in a 320px-wide phone's narrow card. */}
-      <button
-        type="button"
-        aria-label={decreaseLabel}
-        onClick={onDecrease}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-bold text-on-brand transition-transform active:scale-95"
-      >
-        −
-      </button>
-      <span className="min-w-6 text-center text-sm font-semibold tabular-nums" aria-live="polite">
-        {qty}
-      </span>
-      <button
-        type="button"
-        aria-label={increaseLabel}
-        onClick={onIncrease}
-        disabled={increaseDisabled}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-bold text-on-brand transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        +
-      </button>
-    </div>
+    <QuantityStepper
+      quantity={qty}
+      decreaseLabel={decreaseLabel}
+      increaseLabel={increaseLabel}
+      onDecrease={onDecrease}
+      onIncrease={onIncrease}
+      increaseDisabled={increaseDisabled}
+      className={className}
+    />
   );
-}
-
-/** Whether one more of this item can go in the cart. */
-export function canAddMore(state: BuyerStockState, inCart: number): boolean {
-  const max = maxOrderQuantity(state);
-  return max === null || inCart < max;
 }
 
 export function ProductCard({
@@ -117,7 +61,10 @@ export function ProductCard({
   decreaseLabelFor,
   increaseLabelFor,
   className,
+  view = "grid",
 }: {
+  /** Grid card or list row (the buyer's choice above the list). */
+  view?: ProductView;
   product: MockProduct;
   locale: string;
   /** The buyer's currency: shown first, the other one small underneath. */
@@ -134,6 +81,7 @@ export function ProductCard({
   increaseLabelFor: (title: string) => string;
   className?: string;
 }) {
+  const t = useTranslations("Storefront");
   const title = locale === "km" ? product.titleKm : product.titleEn;
   const hasVariants = !!product.variants?.length;
   const startingVariant = getStartingVariant(product);
@@ -161,52 +109,22 @@ export function ProductCard({
     : stockFor(product.id);
   const soldOut = stock.kind === "sold_out";
 
+  const optionCount = product.variants?.length ?? 0;
   return (
-    <Card className={cn("flex h-full flex-col gap-2 p-2", className)}>
-      <div className="relative">
-        {/* The photo opens the product too; the title below is the one a keyboard or screen reader uses. */}
-        <button type="button" tabIndex={-1} aria-hidden="true" onClick={() => onOpen(product)} className="block w-full">
-          {product.photoDataUrls?.[0] ? (
-            // eslint-disable-next-line @next/next/no-img-element -- merchant's own upload preview, not a remote image
-            <img
-              src={product.photoDataUrls[0]}
-              alt=""
-              className={cn("aspect-square w-full rounded-DEFAULT object-cover", soldOut && "opacity-40 grayscale")}
-            />
-          ) : (
-            <div className={cn("aspect-square w-full rounded-DEFAULT", product.photoColor, soldOut && "opacity-40 grayscale")} />
-          )}
-        </button>
-        {soldOut && (
-          <span className="pointer-events-none absolute inset-x-0 top-1/2 mx-auto w-fit -translate-y-1/2 rounded-full bg-fg/80 px-3 py-1 text-xs font-semibold text-bg">
-            {stockLabels.soldOut}
-          </span>
-        )}
-        {product.discountPercent && !soldOut && (
-          <DiscountBadge percent={product.discountPercent} className="absolute left-1 top-1" />
-        )}
-        {hasVariants && productCartCount > 0 && (
-          <span className="absolute right-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-1 text-xs font-bold text-on-brand">
-            {productCartCount}
-          </span>
-        )}
-        {!soldOut && (hasVariants || baseQty === 0) && (
-          <button
-            type="button"
-            aria-label={addLabel}
-            onClick={() => (hasVariants ? onOpen(product) : onAdjustQuantity(baseKey, 1))}
-            className="absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full bg-brand text-2xl font-bold text-on-brand shadow-md transition-transform active:scale-95"
-          >
-            +
-          </button>
-        )}
-      </div>
-      {/* Two lines reserved (Khmer needs line-height 1.5), so every card in a row lines up. */}
-      <button type="button" onClick={() => onOpen(product)} className="line-clamp-2 min-h-[3em] text-left text-sm font-medium leading-normal">
-        {title}
-      </button>
-      <div className="flex flex-col">
-        {hasVariants && <span className="text-xs text-muted">{startingFromLabel}</span>}
+    <ProductTile
+      view={view}
+      title={title}
+      photo={
+        product.photoDataUrls?.[0] ? (
+          // eslint-disable-next-line @next/next/no-img-element -- merchant's own upload preview, not a remote image
+          <img src={product.photoDataUrls[0]} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className={cn("block h-full w-full", product.photoColor)} />
+        )
+      }
+      discountPercent={product.discountPercent}
+      optionCount={optionCount}
+      price={
         <PriceTag
           usdCents={displayUnitUsd}
           khr={displayUnitKhr}
@@ -215,19 +133,24 @@ export function ProductCard({
           primary={currency}
           className="text-sm"
         />
-        {!hasVariants && stock.kind === "low" && <StockNote state={stock} labels={stockLabels} />}
-      </div>
-      {!hasVariants && baseQty > 0 && (
-        <Stepper
-          qty={baseQty}
-          onDecrease={() => onAdjustQuantity(baseKey, -1)}
-          onIncrease={() => onAdjustQuantity(baseKey, 1)}
-          decreaseLabel={decreaseLabelFor(title)}
-          increaseLabel={increaseLabelFor(title)}
-          increaseDisabled={!canAddMore(stock, baseQty)}
-          className="mt-auto"
-        />
-      )}
-    </Card>
+      }
+      note={!hasVariants && stock.kind === "low" ? <StockNote state={stock} labels={stockLabels} /> : undefined}
+      quantity={hasVariants ? productCartCount : baseQty}
+      ordering
+      soldOut={soldOut}
+      canAddMore={canAddMore(stock, baseQty)}
+      labels={{
+        add: addLabel,
+        decrease: decreaseLabelFor(title),
+        increase: increaseLabelFor(title),
+        from: startingFromLabel,
+        options: t("optionCount", { count: optionCount }),
+        inCart: t("inCart", { count: hasVariants ? productCartCount : baseQty }),
+        soldOut: stockLabels.soldOut,
+      }}
+      onOpen={() => onOpen(product)}
+      onAdjust={(delta) => onAdjustQuantity(baseKey, delta)}
+      className={className}
+    />
   );
 }

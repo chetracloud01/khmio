@@ -1,4 +1,4 @@
-import { createSystemDb } from "@khmer-micro-store/db";
+import { createSystemDb, writeAudit } from "@khmio/db";
 import { parseArgs } from "node:util";
 
 // pnpm admin:add-owner -- --telegram-id <id> --name "<name>" [--username <telegram username>]
@@ -45,9 +45,7 @@ async function main() {
       const settings = await tx.platformSettings.findUniqueOrThrow({ where: { id: 1 }, select: { alertChatId: true } });
       const alertsHere = settings.alertChatId === "";
       if (alertsHere) await tx.platformSettings.update({ where: { id: 1 }, data: { alertChatId: telegramId } });
-      await tx.auditLog.create({
-        data: { actorType: "system", action: existing ? "admin.owner_reset" : "admin.owner_added", entity: "admin_user", entityId: admin.id, after: { name, role: "owner" } },
-      });
+      await writeAudit(tx, { actorType: "system" }, { action: existing ? "admin.owner_reset" : "admin.owner_added", entity: "admin_user", entityId: admin.id, after: { name, role: "owner" } });
       return { created: !existing, alertsHere };
     });
     // The Telegram id is shown only by its last digits.

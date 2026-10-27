@@ -11,8 +11,8 @@ import {
   toFieldErrors,
   type FormErrorCode,
   type LoginMethod,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Card, Input } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { BottomSheet, Button, Card, Input } from "@khmio/ui";
 import { KeyRound, Phone, Plus, Send } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";

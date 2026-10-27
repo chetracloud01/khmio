@@ -1,5 +1,5 @@
-import type { SystemDb } from "@khmer-micro-store/db";
-import { LINK_REPLIES, parseStopButton, TELEGRAM_LINK_CODE_PATTERN } from "@khmer-micro-store/shared";
+import { merchantActor, type SystemDb, writeAudit } from "@khmio/db";
+import { LINK_REPLIES, parseStopButton, TELEGRAM_LINK_CODE_PATTERN } from "@khmio/shared";
 import { createHash } from "node:crypto";
 import type { IncomingMessage, MembershipChange } from "../telegram/client";
 
@@ -53,8 +53,13 @@ export async function handleMessage(db: SystemDb, message: IncomingMessage, now 
       create: { storeId: link.storeId, chatId: message.chatId, title: message.chatTitle.slice(0, 120), linkedBy: link.createdBy },
       update: { title: message.chatTitle.slice(0, 120) },
     });
-    await db.auditLog.create({
-      data: { actorType: "merchant", actorId: link.createdBy, storeId: link.storeId, action: "store.telegram_group_linked", entity: "store", entityId: link.storeId, after: { title: message.chatTitle.slice(0, 120) } },
+    // A staff-group code is always made by a merchant (only a buyer's follow link has no maker).
+    const actor = link.createdBy ? merchantActor({ merchantId: link.createdBy, storeId: link.storeId }) : ({ actorType: "system", storeId: link.storeId } as const);
+    await writeAudit(db, actor, {
+      action: "store.telegram_group_linked",
+      entity: "store",
+      entityId: link.storeId,
+      after: { title: message.chatTitle.slice(0, 120) },
     });
     return { reply: LINK_REPLIES.groupLinked(store.name), result: "group_linked" };
   }

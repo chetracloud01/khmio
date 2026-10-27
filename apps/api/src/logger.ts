@@ -23,9 +23,13 @@ export function createLogger(level: string): Logger {
   return pino({ level, redact: { paths: REDACTED_PATHS, censor: "[redacted]" } });
 }
 
-/** The request line without its query string — a query can carry a phone number or a token. */
+/**
+ * The request line without its query string — a query can carry a phone
+ * number or a token — and without a buyer's order token: that token alone
+ * opens the order page (name, phone, address), so it never reaches a log.
+ */
 export function requestPath(url: string | undefined): string {
-  return (url ?? "").split("?")[0] ?? "";
+  return ((url ?? "").split("?")[0] ?? "").replace(/\/public\/orders\/[^/]+/, "/public/orders/:token");
 }
 
 /** One log line per request: method, path, status and time — no headers, body or query. */

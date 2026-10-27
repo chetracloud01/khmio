@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Skeleton } from "@khmer-micro-store/ui";
+import { Button, Skeleton } from "@khmio/ui";
 import { Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";

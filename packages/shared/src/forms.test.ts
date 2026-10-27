@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canUnlinkLoginMethod, otpCodeSchema, phoneLoginSchema } from "./auth";
 import { checkoutInputSchema, getAvailablePaymentMethods } from "./checkout";
-import { deliveryFeeIn, deliverySettingsSchema, getDeliveryQuote, type DeliverySettings } from "./delivery";
+import { deliveryFeeIn, deliverySettingsSchema, deliverySettingsShape, getDeliveryQuote, type DeliverySettings } from "./delivery";
 import { toFieldErrors } from "./form-errors";
 import { parseKhrInput, parseUsdInput } from "./money";
 import { formatKhmerPhoneLocal } from "./phone";
@@ -9,11 +9,14 @@ import { MAX_PRODUCT_DESCRIPTION_LENGTH, productInputSchema, type ProductFormInp
 import { kycRejectionSchema, kycSubmissionSchema } from "./kyc";
 import {
   getBuyerStockState,
+  stockChangeInputSchema,
+  stockTrackInputSchema,
   maxOrderQuantity,
   parseQuantityInput,
   stockMovementInputSchema,
   stockMovementSign,
   stockTransferInputSchema,
+  takesStockWhenPlaced,
 } from "./stock";
 import { clampExchangeRate, storeProfileSchema, storeSettingsSchema } from "./store";
 
@@ -210,6 +213,12 @@ describe("delivery settings and quotes", () => {
     const nothing = { zones: [], pickup: { enabled: false, address: "", hours: "" }, province: { enabled: false, note: "" }, drivers: [] };
     expect(errorsOf(deliverySettingsSchema.safeParse(nothing))).toEqual({ zones: "delivery_required" });
   });
+
+  it("reads a shop's saved settings by their shape alone, even before delivery is set up", () => {
+    const notSetUp = { zones: [], pickup: { enabled: false, address: "", hours: "" }, province: { enabled: false, note: "" }, drivers: [] };
+    expect(deliverySettingsShape.safeParse(notSetUp).success).toBe(true);
+    expect(deliverySettingsShape.safeParse({ ...notSetUp, pickup: { enabled: "yes" } }).success).toBe(false);
+  });
 });
 
 describe("store settings", () => {
@@ -345,5 +354,34 @@ describe("stock movement", () => {
     expect(errorsOf(stockMovementInputSchema.safeParse({ ...movement, quantity: parseQuantityInput("2.5") }))).toEqual({
       quantity: "quantity_invalid",
     });
+  });
+});
+
+describe("a stock change on the Stock page", () => {
+  const variantId = "0b5e5f3e-8f6c-4c2a-9d7e-1a2b3c4d5e6f";
+  it("takes stock arriving without a reason", () => {
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 12 }).success).toBe(true);
+  });
+  it("asks a correction why, and \"other\" for a note", () => {
+    const noReason = stockChangeInputSchema.safeParse({ variantId, type: "adjust_out", quantity: 1 });
+    expect(noReason.success ? null : noReason.error.issues[0]?.message).toBe("reason_required");
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_out", quantity: 1, reason: "other" }).success).toBe(false);
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_out", quantity: 1, reason: "damaged" }).success).toBe(true);
+  });
+  it("refuses zero, negative or partial quantities, and a sale typed by hand", () => {
+    for (const quantity of [0, -1, 1.5]) expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity }).success).toBe(false);
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "sale", quantity: 1 }).success).toBe(false);
+  });
+  it("starts tracking from any whole count, zero included", () => {
+    expect(stockTrackInputSchema.safeParse({ variantId, onHand: 0 }).success).toBe(true);
+    expect(stockTrackInputSchema.safeParse({ variantId, onHand: -1 }).success).toBe(false);
+  });
+});
+
+describe("when an online order takes its stock", () => {
+  it("takes it at once for cash on delivery, never for an order still waiting to be paid online", () => {
+    expect(takesStockWhenPlaced("cod")).toBe(true);
+    expect(takesStockWhenPlaced("khqr")).toBe(false);
+    expect(takesStockWhenPlaced("aba_payway")).toBe(false);
   });
 });

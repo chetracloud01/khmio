@@ -1,29 +1,19 @@
 "use client";
 
-import { Button, SegmentedControl } from "@khmer-micro-store/ui";
+import { Button } from "@khmio/ui";
 import { CloudOff } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
-import { usePathname, useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
+import { LanguageSwitch } from "@/components/language-switch";
 
 /** The narrow, phone-first column every real merchant page sits in, with the language switch. */
 export function AppFrame({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
-  const locale = useLocale();
-  const router = useRouter();
-  const pathname = usePathname();
   return (
     <div className="min-h-dvh bg-canvas text-fg">
       <div className="mx-auto flex min-h-dvh w-full max-w-[480px] flex-col gap-6 bg-bg p-4 pb-10 md:border-x md:border-border">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">{aside}</div>
-          <SegmentedControl
-            value={locale}
-            onChange={(next) => router.replace(pathname.replace(/^\/(km|en)/, `/${next}`))}
-            options={[
-              { value: "km", label: "ខ្មែរ" },
-              { value: "en", label: "EN" },
-            ]}
-          />
+          <LanguageSwitch />
         </div>
         {children}
       </div>

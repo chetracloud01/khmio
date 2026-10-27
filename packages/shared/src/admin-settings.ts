@@ -20,8 +20,8 @@ export const adminSettingsSchema = z.object(settingsFields).refine((settings) =>
 export type AdminSettings = z.infer<typeof adminSettingsSchema>;
 
 export const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
-  platformName: "Khmer Micro-Store",
-  supportTelegram: "@kms_support",
+  platformName: "Khmio",
+  supportTelegram: "@khmio_support",
   usdToKhrMin: 3900,
   usdToKhrMax: 4300,
   alertChatId: "",

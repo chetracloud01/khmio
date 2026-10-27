@@ -1,5 +1,5 @@
 {
-  "name": "@khmer-micro-store/web",
+  "name": "@khmio/web",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -11,15 +11,18 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@khmer-micro-store/shared": "workspace:*",
-    "@khmer-micro-store/ui": "workspace:*",
+    "@khmio/shared": "workspace:*",
+    "@khmio/ui": "workspace:*",
+    "html-to-image": "1.11.11",
+    "jspdf": "3.0.1",
     "lucide-react": "^0.462.0",
     "next": "^14.2.15",
     "next-intl": "^3.25.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^3.10.1"
+    "recharts": "^3.10.1",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

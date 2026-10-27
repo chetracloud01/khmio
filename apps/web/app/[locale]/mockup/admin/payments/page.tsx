@@ -1,7 +1,7 @@
 "use client";
 
-import { paymentAttemptStatusSchema, paymentProviderSchema, type PaymentAttemptStatus } from "@khmer-micro-store/shared";
-import { BottomSheet } from "@khmer-micro-store/ui";
+import { paymentAttemptStatusSchema, paymentProviderSchema, type PaymentAttemptStatus } from "@khmio/shared";
+import { BottomSheet } from "@khmio/ui";
 import { AlertTriangle, ChevronRight, CircleCheck, Hourglass, Wallet } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";

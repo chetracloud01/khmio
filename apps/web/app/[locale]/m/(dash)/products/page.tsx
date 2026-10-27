@@ -1,23 +1,27 @@
 "use client";
 
-import { canAddProduct } from "@khmer-micro-store/shared";
-import { Button } from "@khmer-micro-store/ui";
-import { ChevronRight, EyeOff, ImageOff, Plus } from "lucide-react";
+import { canAddProduct } from "@khmio/shared";
+import { Button, ConfirmDialog, Notice, PageHeader, Switch } from "@khmio/ui";
+import { Boxes, EyeOff, ImageOff, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ConfirmDialog } from "@/components/confirm-dialog";
-import { DataGrid, type DataGridColumn } from "@/components/data-grid";
-import { api, ApiError, type Catalog, type Product } from "@/lib/api";
+import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
+import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
+import { api, ApiError, apiSend, type Catalog, catalogSchema, type Product, productSchema } from "@/lib/api";
 import { priceText, startingVariant, usdValue } from "@/lib/product-price";
 import { useMerchant } from "../merchant-context";
+import { PhotoThumb } from "@/components/photo-thumb";
+import { z } from "zod";
 
 // The seller's products, from the API: search, filters, Hidden badge, and
 // delete (soft — old orders keep pointing at the product).
 export default function ProductsPage() {
   const t = useTranslations("ProductsList");
+  const tStock = useTranslations("Stock");
   const tApp = useTranslations("App");
+  const tStore = useTranslations("Storefront");
   const locale = useLocale();
   const router = useRouter();
   const { store, refreshStore } = useMerchant();
@@ -29,7 +33,7 @@ export default function ProductsPage() {
 
   const load = useCallback(() => {
     setFailed(false);
-    Promise.all([api<Product[]>("/products"), api<Catalog>("/catalog")])
+    Promise.all([api("/products", z.array(productSchema)), api("/catalog", catalogSchema)])
       .then(([list, names]) => {
         setProducts(list);
         setCatalog(names);
@@ -75,12 +79,12 @@ export default function ProductsPage() {
     return variant ? usdValue(variant, rate) : 0;
   };
 
+  // Round, with a thin ring so light photos keep their edge.
   const thumbnail = (product: Product, size: string) =>
     product.photos[0] ? (
-      // eslint-disable-next-line @next/next/no-img-element -- the seller's own uploaded photo
-      <img src={product.photos[0].url} alt="" className={`${size} shrink-0 rounded-DEFAULT object-cover`} />
+      <PhotoThumb photo={product.photos[0]} className={`${size} shrink-0 rounded-full object-cover ring-1 ring-border`} />
     ) : (
-      <div className={`${size} flex shrink-0 items-center justify-center rounded-DEFAULT bg-border/30`} aria-hidden="true">
+      <div className={`${size} flex shrink-0 items-center justify-center rounded-full bg-border/30 ring-1 ring-border`} aria-hidden="true">
         <ImageOff className="h-5 w-5 text-muted" />
       </div>
     );
@@ -91,11 +95,24 @@ export default function ProductsPage() {
     </span>
   );
 
+  const visibilitySwitch = (product: Product) => (
+    <Switch checked={product.isVisible} onChange={(visible) => void setVisible(product, visible)} label={product.isVisible ? t("shownInShop") : t("hiddenInShop")} labelHidden />
+  );
+  // Categories in the shop's own order; only those with products get a pill.
+  const categoryOrder = new Map(catalog.categories.map((category, index) => [category.id, index]));
+  const usedCategories = catalog.categories.filter((category) => products.some((product) => product.categoryId === category.id));
+  const categoryGroups: DataGridGroup<Product> = {
+    key: (product) => product.categoryId,
+    label: (product) => categoryName.get(product.categoryId) ?? "—",
+    rank: (product) => categoryOrder.get(product.categoryId) ?? catalog.categories.length,
+  };
+
   const columns: DataGridColumn<Product>[] = [
     {
       key: "product",
       header: t("colProduct"),
       hideable: false,
+      pin: "start",
       sortable: true,
       value: title,
       cell: (product) => (
@@ -103,7 +120,7 @@ export default function ProductsPage() {
           {thumbnail(product, "h-10 w-10")}
           <div className="min-w-0">
             <p className="flex items-center gap-2">
-              <span className="truncate font-medium">{title(product)}</span>
+              <span className="truncate font-medium"><DataGridHighlight text={title(product)} /></span>
               {!product.isVisible && hiddenBadge}
             </p>
             {product.hasOptions && <p className="text-xs text-muted">{t("variantsCount", { count: product.variants.length })}</p>}
@@ -129,6 +146,7 @@ export default function ProductsPage() {
     {
       key: "unit",
       header: t("colUnit"),
+      defaultHidden: true,
       value: (product) => (product.unitId ? (unitName.get(product.unitId) ?? "") : ""),
       cell: (product) => (product.unitId ? (unitName.get(product.unitId) ?? "—") : "—"),
     },
@@ -147,23 +165,44 @@ export default function ProductsPage() {
         ),
     },
     {
-      key: "actions",
-      header: t("edit"),
+      key: "shown",
+      header: t("colShown"),
       align: "right",
-      hideable: false,
-      cell: () => (
-        <span className="inline-flex items-center gap-1 font-medium text-brand">
-          {t("edit")}
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
-        </span>
+      pin: "end",
+      value: (product) => (product.isVisible ? 1 : 0),
+      exportValue: (product) => (product.isVisible ? t("shownInShop") : t("hiddenInShop")),
+      // The row opens the product; the switch must not.
+      cell: (product) => (
+        <div className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+          {visibilitySwitch(product)}
+        </div>
       ),
     },
   ];
 
+  /** Shown or hidden in the shop, straight from the list: changes at once, and goes back if the save fails. */
+  async function setVisible(product: Product, isVisible: boolean) {
+    setDeleteError(null);
+    const apply = (visible: boolean) => setProducts((list) => list && list.map((entry) => (entry.id === product.id ? { ...entry, isVisible: visible } : entry)));
+    apply(isVisible);
+    try {
+      await apiSend(`/products/${product.id}/visibility`, { method: "PATCH", body: { isVisible } });
+      void refreshStore();
+    } catch (error) {
+      apply(!isVisible);
+      setDeleteError(error instanceof ApiError && error.code === "store_paused" ? tApp("storePaused") : tApp("saveFailed"));
+    }
+  }
+
+  /** Hide or show several selected products at once. */
+  async function setManyVisible(rows: Product[], isVisible: boolean) {
+    for (const product of rows) await setVisible(product, isVisible);
+  }
+
   async function deleteProducts(rows: Product[]) {
     setDeleteError(null);
     try {
-      for (const product of rows) await api(`/products/${product.id}`, { method: "DELETE" });
+      for (const product of rows) await apiSend(`/products/${product.id}`, { method: "DELETE" });
     } catch (error) {
       setDeleteError(error instanceof ApiError && error.code === "store_paused" ? tApp("storePaused") : tApp("saveFailed"));
     }
@@ -173,73 +212,106 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{t("title")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("description")}</p>
-        </div>
-        {atLimit ? (
-          <Button variant="primary" disabled>
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {t("addProduct")}
-          </Button>
-        ) : (
-          <Link href={`/${locale}/m/products/new`}>
-            <Button variant="primary">
+    <div className={`${SELLER_PAGE} gap-4 pb-24 md:pb-6`}>
+      <PageHeader
+        title={t("title")}
+        description={t("description")}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Counts at the main branch (Pro, Advance); lower plans see them locked. */}
+            <Link href={`/${locale}/m/stock`}>
+              <Button variant="secondary">
+                <Boxes className="h-4 w-4" aria-hidden="true" />
+                {tStock("title")}
+              </Button>
+            </Link>
+          {atLimit ? (
+            <Button variant="primary" disabled>
               <Plus className="h-4 w-4" aria-hidden="true" />
               {t("addProduct")}
             </Button>
-          </Link>
-        )}
-      </div>
+          ) : (
+            // On a phone the round + at the bottom adds a product.
+            <Link href={`/${locale}/m/products/new`} className="hidden md:block">
+              <Button variant="primary">
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                {t("addProduct")}
+              </Button>
+            </Link>
+          )}
+          </div>
+        }
+      />
 
-      {atLimit && <p className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">{tApp("productLimit", { count: products.length })}</p>}
+      {atLimit && <Notice tone="warning">{tApp("productLimit", { count: products.length })}</Notice>}
       {deleteError && (
-        <p role="alert" className="rounded-DEFAULT border border-danger/40 bg-danger/5 p-3 text-sm text-danger">
+        <Notice tone="danger" role="alert">
           {deleteError}
-        </p>
+        </Notice>
       )}
 
       <DataGrid
+        syncUrl
+        rowNumbers
         rows={products}
         getRowId={(product) => product.id}
         columns={columns}
         searchText={(product) => `${product.titleKm} ${product.titleEn} ${product.variants.map((v) => v.sku).join(" ")}`}
         searchPlaceholder={t("searchPlaceholder")}
         chips={[
-          { value: "options", label: t("chipWithOptions"), predicate: (product) => product.hasOptions },
-          { value: "simple", label: t("chipSimple"), predicate: (product) => !product.hasOptions },
-          { value: "discounted", label: t("chipDiscounted"), predicate: (product) => !!product.discountPercent },
-          { value: "hidden", label: t("chipHidden"), predicate: (product) => !product.isVisible },
+          ...usedCategories.map((category) => ({ value: `category:${category.id}`, label: name(category), predicate: (product: Product) => product.categoryId === category.id })),
+          { value: "discounted", label: t("chipDiscounted"), predicate: (product: Product) => !!product.discountPercent },
+          { value: "hidden", label: t("chipHidden"), predicate: (product: Product) => !product.isVisible },
         ]}
+        // "All": grouped by category, in the shop's category order.
+        groupBy={(chip) => (chip === "all" ? categoryGroups : null)}
+        defaultPageSize={20}
+        selectOnDemand
         filters={[
           { key: "category", label: t("colCategory"), options: catalog.categories.map((c) => ({ value: c.id, label: name(c) })), predicate: (product, value) => product.categoryId === value },
           { key: "brand", label: t("colBrand"), options: catalog.brands.map((b) => ({ value: b.id, label: name(b) })), predicate: (product, value) => product.brandId === value },
           { key: "unit", label: t("colUnit"), options: catalog.units.map((u) => ({ value: u.id, label: name(u) })), predicate: (product, value) => product.unitId === value },
         ]}
-        bulkActions={[{ key: "delete", label: t("deleteSelected"), variant: "danger", run: setPendingDelete }]}
+        bulkActions={[
+          { key: "hide", label: t("hideSelected"), applies: (product) => product.isVisible, run: (rows) => void setManyVisible(rows, false) },
+          { key: "show", label: t("showSelected"), applies: (product) => !product.isVisible, run: (rows) => void setManyVisible(rows, true) },
+          { key: "delete", label: t("deleteSelected"), variant: "danger", run: setPendingDelete },
+        ]}
         onRowClick={(product) => router.push(`/${locale}/m/products/${product.id}`)}
         renderCard={(product) => (
           <div className="flex items-center gap-3">
-            {thumbnail(product, "h-14 w-14")}
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2">
-                <span className="truncate font-medium">{title(product)}</span>
+            {thumbnail(product, "h-16 w-16")}
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <p className="line-clamp-2 font-medium leading-snug"><DataGridHighlight text={title(product)} /></p>
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                {categoryName.get(product.categoryId)}
+                {product.hasOptions && <span className="rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand">{tStore("optionCount", { count: product.variants.length })}</span>}
                 {!product.isVisible && hiddenBadge}
               </p>
-              <p className="truncate text-xs text-muted">{categoryName.get(product.categoryId)}</p>
-              <p className="mt-1 text-sm font-semibold">
+              <p className="flex items-center gap-2 text-sm font-semibold tabular-nums">
                 {price(product)}
-                {product.discountPercent ? <span className="ml-2 text-xs font-semibold text-danger">−{product.discountPercent}%</span> : null}
+                {product.discountPercent ? <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-semibold text-danger">−{product.discountPercent}%</span> : null}
               </p>
             </div>
           </div>
         )}
+        renderCardAside={visibilitySwitch}
         exportFileName="products"
-        storageKey="products"
+        // "-v2": the 2026-10-22 columns (Shown added, Unit hidden) replace earlier saved choices.
+        storageKey="products-v2"
         emptyTitle={t("noProducts")}
       />
+
+      {/* Phone: always within reach, above the bottom tabs. */}
+      {!atLimit && (
+        <Link
+          href={`/${locale}/m/products/new`}
+          aria-label={t("addProduct")}
+          className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-on-brand shadow-raised transition-transform active:scale-95 md:hidden"
+        >
+          <Plus className="h-6 w-6" strokeWidth={2.5} aria-hidden="true" />
+        </Link>
+      )}
 
       <ConfirmDialog
         open={pendingDelete.length > 0}

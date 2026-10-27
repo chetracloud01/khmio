@@ -1,7 +1,7 @@
 "use client";
 
-import { failedCheckCloseSchema, paymentCheckIssueSchema, toFieldErrors, type FormErrorCode } from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Textarea } from "@khmer-micro-store/ui";
+import { failedCheckCloseSchema, paymentCheckIssueSchema, toFieldErrors, type FormErrorCode } from "@khmio/shared";
+import { BottomSheet, Button, Textarea } from "@khmio/ui";
 import { CircleCheck, RefreshCw, ShieldAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";

@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Run by hand on any branch (Actions tab, or: gh workflow run ci.yml --ref <branch>).
+  workflow_dispatch:
 
 jobs:
   build:
@@ -34,9 +36,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm's version comes from package.json "packageManager" (naming it here too fails the step).
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -76,3 +77,58 @@ jobs:
             sleep 1
           done
           echo "API did not become healthy" && exit 1
+
+      # Every end-to-end check (tests/e2e) through the built API, on a fresh database of their own.
+      - name: End-to-end checks
+        env:
+          DATABASE_OWNER_URL: postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/kms_e2e
+          DATABASE_URL: postgresql://khmer_micro_store_app:khmer_micro_store_app@localhost:5432/kms_e2e
+        run: |
+          psql "postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/khmer_micro_store" -c "CREATE DATABASE kms_e2e"
+          pnpm db:deploy
+          pnpm test:e2e
+
+  # The production images (infra/docker): they build, the API starts and
+  # reaches a database, and the worker has pg_dump 17 for backups.
+  docker:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: khmer_micro_store
+          POSTGRES_PASSWORD: khmer_micro_store
+          POSTGRES_DB: khmer_micro_store
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U khmer_micro_store"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the API image
+        run: docker build -f infra/docker/api.Dockerfile -t khmio-api .
+
+      - name: Build the worker image
+        run: docker build -f infra/docker/worker.Dockerfile -t khmio-worker .
+
+      - name: The worker image has pg_dump 17
+        run: docker run --rm khmio-worker pg_dump --version | grep -E "pg_dump \(PostgreSQL\) 17"
+
+      - name: Migrations run from the API image, then the API starts and is healthy
+        run: |
+          psql "postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/khmer_micro_store" -c "CREATE ROLE khmer_micro_store_app LOGIN PASSWORD 'khmer_micro_store_app' NOSUPERUSER NOBYPASSRLS"
+          OWNER=postgresql://khmer_micro_store:khmer_micro_store@localhost:5432/khmer_micro_store
+          APP=postgresql://khmer_micro_store_app:khmer_micro_store_app@localhost:5432/khmer_micro_store
+          # Both URLs, as on Railway: Prisma's schema names DATABASE_URL even though migrations run as the owner.
+          docker run --rm --network host -e DATABASE_OWNER_URL=$OWNER -e DATABASE_URL=$APP khmio-api pnpm db:deploy
+          docker run -d --name api --network host -e DATABASE_OWNER_URL=$OWNER -e DATABASE_URL=$APP -e NODE_ENV=development -e PORT=4000 khmio-api
+          for i in $(seq 1 30); do
+            if curl -fs http://localhost:4000/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs api
+          echo "API image did not become healthy" && exit 1

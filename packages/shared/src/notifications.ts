@@ -1,5 +1,9 @@
+import type { OrderPaymentMethod } from "./checkout";
+import type { OrderFulfilment } from "./delivery";
+import { z } from "zod";
 import { formatKhr, formatUsd, type Currency } from "./money";
 import { PHNOM_PENH_DISTRICTS, PROVINCES } from "./locations";
+import { paymentCheckIssueSchema, type PaymentCheckIssue } from "./payment-attempts";
 
 // The Telegram messages the worker sends (docs/blueprint.md "Workflows from
 // start to end", workflow 4). Khmer first, then English, in one message: the
@@ -10,17 +14,20 @@ export interface OrderAlertFacts {
   orderNumber: number;
   totalMinor: number;
   currency: Currency;
-  paymentMethod: "khqr" | "aba_payway" | "cod";
-  fulfilment: "delivery" | "pickup";
+  paymentMethod: OrderPaymentMethod;
+  fulfilment: OrderFulfilment;
   districtId: string | null;
   provinceId: string | null;
   itemCount: number;
+  /** As printed, MEK-7K4P-9QXR: the seller can search the orders list by it. */
+  trackingCode?: string;
 }
 
 const money = (amount: number, currency: Currency) => (currency === "USD" ? formatUsd(amount) : formatKhr(amount));
 
 function place(facts: OrderAlertFacts): { km: string; en: string } {
   if (facts.fulfilment === "pickup") return { km: "មកយកផ្ទាល់", en: "Pickup" };
+  if (facts.fulfilment === "in_store") return { km: "លក់នៅហាង", en: "In shop" };
   const district = PHNOM_PENH_DISTRICTS.find((entry) => entry.id === facts.districtId);
   if (district) return { km: district.nameKm, en: district.nameEn };
   const province = PROVINCES.find((entry) => entry.id === facts.provinceId);
@@ -30,6 +37,11 @@ function place(facts: OrderAlertFacts): { km: string; en: string } {
 function payment(facts: OrderAlertFacts): { km: string; en: string } {
   if (facts.paymentMethod === "cod") return { km: "បង់ពេលទទួល", en: "Cash on delivery" };
   return { km: "បានបង់តាម KHQR", en: "Paid by KHQR" };
+}
+
+/** The tracking code in a message: with the buyer's phone it opens the order on "Track my order", no Telegram needed. */
+function trackingLine(code: string): string {
+  return `🔎 លេខកូដតាមដាន · Tracking code: ${code}`;
 }
 
 /** "New order #12" for the seller, with the total, how it's paid, where it goes and how many items. */
@@ -43,6 +55,7 @@ export function newOrderAlert(facts: OrderAlertFacts): string {
     "",
     `New order #${facts.orderNumber} · ${total}`,
     `${pay.en} · ${where.en} · ${facts.itemCount} item${facts.itemCount === 1 ? "" : "s"}`,
+    ...(facts.trackingCode ? ["", trackingLine(facts.trackingCode)] : []),
   ].join("\n");
 }
 
@@ -72,10 +85,22 @@ export function parseButtonData(data: string): { action: "confirm"; orderId: str
 }
 
 /** Something only a person can fix, for the platform's alert chat (admin Settings). */
-export type AdminAlert =
-  | { reason: "message_gave_up"; kind: string; orderNumber: number | null; attempts: number }
-  | { reason: "worker_failing"; detail: string }
-  | { reason: "admin_locked"; adminName: string };
+export const adminAlertSchema = z.discriminatedUnion("reason", [
+  z.object({ reason: z.literal("message_gave_up"), kind: z.string(), orderNumber: z.number().nullable(), attempts: z.number() }),
+  z.object({ reason: z.literal("worker_failing"), detail: z.string() }),
+  z.object({ reason: z.literal("admin_locked"), adminName: z.string() }),
+  z.object({ reason: z.literal("backup_failed"), detail: z.string() }),
+  z.object({ reason: z.literal("payment_issue"), issue: paymentCheckIssueSchema, orderNumber: z.number(), storeSlug: z.string() }),
+]);
+export type AdminAlert = z.infer<typeof adminAlertSchema>;
+
+/** A payment issue in the admin alert's words (admins read English; the heading is in both). */
+const PAYMENT_ISSUE_TEXT: Record<PaymentCheckIssue, string> = {
+  provider_unreachable: "the bank never answered before the code expired",
+  amount_mismatch: "paid a different amount",
+  currency_mismatch: "paid in the other currency",
+  paid_after_expiry: "paid after the order was cancelled",
+};
 
 export function adminAlertText(alert: AdminAlert): string {
   switch (alert.reason) {
@@ -89,6 +114,14 @@ export function adminAlertText(alert: AdminAlert): string {
       return ["🔥 Worker មានបញ្ហា", "", `The worker is failing: ${alert.detail}`].join("\n");
     case "admin_locked":
       return ["🔒 គណនីអ្នកគ្រប់គ្រងត្រូវបានចាក់សោ ១៥ នាទី", "", `Admin login locked for 15 minutes after 5 wrong codes: ${alert.adminName}`].join("\n");
+    case "backup_failed":
+      return ["💾 ការបម្រុងទុកទិន្នន័យប្រចាំថ្ងៃមិនបានសម្រេច", "", `Tonight's database backup failed: ${alert.detail}. The earlier backups are kept; check the worker's log and the backup bucket.`].join("\n");
+    case "payment_issue":
+      return [
+        `💳 ការបង់ប្រាក់ត្រូវការពិនិត្យ — ការបញ្ជាទិញ #${alert.orderNumber}`,
+        "",
+        `A payment needs a look (${PAYMENT_ISSUE_TEXT[alert.issue]}): order #${alert.orderNumber} of /s/${alert.storeSlug}. The order was not marked paid. Open Admin › Failed checks.`,
+      ].join("\n");
   }
 }
 
@@ -109,9 +142,11 @@ export interface BuyerUpdateFacts {
   orderNumber: number;
   shopName: string;
   status: string;
-  fulfilment: "delivery" | "pickup";
+  fulfilment: OrderFulfilment;
   /** How it was sent, once sent: the driver's name or the bus ticket — never a phone number. */
   dispatch: { route: "driver" | "bus" | "pickup"; driverName: string; busCompany: string; ticketNumber: string } | null;
+  /** As printed, MEK-7K4P-9QXR. */
+  trackingCode?: string;
 }
 
 /** A buyer's status message, or null when this status isn't worth a message (e.g. waiting for a driver). */
@@ -125,7 +160,8 @@ export function buyerUpdateText(facts: BuyerUpdateFacts): string | null {
       : facts.status === "out_for_delivery" && facts.dispatch?.route === "bus"
         ? [`🚌 ${facts.dispatch.busCompany} · ${facts.dispatch.ticketNumber}`]
         : [];
-  return [`📦 ${facts.shopName} · #${facts.orderNumber}`, line.km, line.en, ...extra].join("\n");
+  const tracking = facts.trackingCode ? [trackingLine(facts.trackingCode)] : [];
+  return [`📦 ${facts.shopName} · #${facts.orderNumber}`, line.km, line.en, ...extra, ...tracking].join("\n");
 }
 
 /** "Stop updates" under each buyer message; carries only the order id. */
@@ -159,5 +195,5 @@ export const LINK_REPLIES = {
     `✅ អ្នកនឹងទទួលព័ត៌មានថ្មីៗសម្រាប់ការបញ្ជាទិញ #${orderNumber} ពី ${shopName}\n\nYou'll get updates for order #${orderNumber} from ${shopName}.`,
   stopped: "🔕 បានឈប់ផ្ញើព័ត៌មានថ្មីៗ។\n\nUpdates stopped.",
   badCode: "⚠️ តំណនេះផុតកំណត់ ឬបានប្រើរួចហើយ។ សូមយកតំណថ្មីពីគេហទំព័រ។\n\nThis link has expired or was already used. Get a new one from the website.",
-  hello: "👋 សួស្តី! បូតនេះផ្ញើការជូនដំណឹងពី Khmer Micro-Store។\n\nHello! This bot sends Khmer Micro-Store notifications.",
+  hello: "👋 សួស្តី! បូតនេះផ្ញើការជូនដំណឹងពី Khmio។\n\nHello! This bot sends Khmio notifications.",
 } as const;

@@ -1,4 +1,4 @@
-import type { SystemDb } from "@khmer-micro-store/db";
+import type { SystemDb } from "@khmio/db";
 import { createParamDecorator, Inject, Injectable, UnauthorizedException, type CanActivate, type ExecutionContext } from "@nestjs/common";
 import { SYSTEM_DB } from "../db";
 import { readCookie, resolveSession, SESSION_COOKIE } from "./sessions";

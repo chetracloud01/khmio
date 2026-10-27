@@ -1,4 +1,4 @@
-import { TELEGRAM_LOGIN_MAX_AGE_SECONDS, type TelegramLoginPayload } from "@khmer-micro-store/shared";
+import { TELEGRAM_LOGIN_MAX_AGE_SECONDS, type TelegramLoginPayload } from "@khmio/shared";
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export type TelegramCheck = { ok: true } | { ok: false; reason: "bad_signature" | "expired" };

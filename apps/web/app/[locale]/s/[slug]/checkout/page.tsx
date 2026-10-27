@@ -2,10 +2,13 @@
 
 import {
   approximateIn,
+  bookingProblem,
   checkoutInputSchema,
   deliveryFeeIn,
   getDeliverableDistrictIds,
   getDeliveryQuote,
+  getOrderQuote,
+  isServiceOnly,
   PHNOM_PENH_DISTRICTS,
   placeName,
   PROVINCES,
@@ -16,29 +19,34 @@ import {
   type FormErrorCode,
   type Fulfilment,
   type PaymentMethod,
-} from "@khmer-micro-store/shared";
-import { Button, cn, Input, Select } from "@khmer-micro-store/ui";
-import { AlertTriangle, Check, Clock, MapPin, Store, Truck } from "lucide-react";
+} from "@khmio/shared";
+import { Button, Checkbox, ChoiceCards, Input, Notice, SegmentedControl, Select } from "@khmio/ui";
+import { Clock, History, MapPin, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BuyerBottomBar, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
+import { BotCheck, TURNSTILE_SITE_KEY } from "@/components/bot-check";
+import { BuyerBottomBar, BuyerColumns, BuyerSection, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { formatMoney } from "@/components/order-ui";
-import { api, ApiError, type PlacedOrder, type PublicShop } from "@/lib/api";
-import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, useShopCart, type BuyerDetails } from "@/lib/cart";
+import { api, ApiError, placedOrderSchema, type PublicShop } from "@/lib/api";
+import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, type BuyerDetails, useCartFitsShop, useShopCart } from "@/lib/cart";
+import { newId } from "@/lib/new-id";
 import { isTakingOrders, paymentMethodsFor } from "@/lib/shop-ordering";
 import { usePublicShop } from "@/lib/use-public-shop";
 import { BuyerLoading, BuyerProblem } from "../buyer-states";
 
-type Field = "name" | "phone" | "districtId" | "provinceId" | "paymentMethod" | "fulfilment";
-const FIELDS: readonly Field[] = ["name", "phone", "districtId", "provinceId", "paymentMethod", "fulfilment"];
+type Field = "name" | "phone" | "districtId" | "provinceId" | "paymentMethod" | "fulfilment" | "preferredAt";
+const FIELDS: readonly Field[] = ["name", "phone", "districtId", "provinceId", "paymentMethod", "fulfilment", "preferredAt"];
 
 export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
   const { shop, state, reload } = usePublicShop(slug);
   const cart = useShopCart(slug);
+  // Stock ran low or something stopped being sold while the buyer was away: the cart follows (the order is checked again by the API).
+  useCartFitsShop(shop, cart);
   if (state === "loading" || !cart.ready) return <BuyerLoading />;
   if (state !== "ready" || !shop) return <BuyerProblem kind={state === "not_found" ? "not_found" : "offline"} onRetry={reload} />;
   return <CheckoutForm shop={shop} cart={cart} onShopChanged={reload} />;
@@ -62,6 +70,8 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   const [details, setDetails] = useState<BuyerDetails>(initialDetails);
   // Ticked only if the buyer chose it last time: keeping their details needs their own consent.
   const [remember, setRemember] = useState(remembered);
+  // "Filled in from your last order": shown until the buyer clears it (someone else ordering on this phone).
+  const [prefilled, setPrefilled] = useState(remembered && initialDetails.name !== "");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [errors, setErrors] = useState<Partial<Record<Field, FormErrorCode>>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -69,7 +79,10 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   // Set once the order exists, so the emptied cart doesn't flash "your cart is empty" before the order page opens.
   const [placed, setPlaced] = useState(false);
   // One key per checkout: a double tap or a retry on bad signal gives back the same order (packages/shared placeOrderRequestSchema).
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(newId);
+  // Cloudflare Turnstile: a fresh token for each attempt (each works once).
+  const [botToken, setBotToken] = useState<string | null>(null);
+  const [botReset, setBotReset] = useState(0);
 
   const currency: Currency = cart.currency ?? shop.store.defaultCurrency;
   const rate = shop.store.usdToKhrRate;
@@ -77,7 +90,13 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   const deliversInPhnomPenh = delivery.zones.length > 0;
   const deliversToProvinces = delivery.province.enabled;
   const canDeliver = deliversInPhnomPenh || deliversToProvinces;
-  const canPickup = delivery.pickup.enabled;
+  const lines = cartLines(shop, cart.quantities, cart.notes);
+  // Only services (packages/shared services.ts): a booking — a preferred time, done at the shop or at the buyer's place.
+  const booking = isServiceOnly(lines.map((line) => line.product.kind));
+  const canPickup = delivery.pickup.enabled || booking;
+  const [preferredAt, setPreferredAt] = useState("");
+  // The browser's datetime box gives local time; the API gets it with its offset.
+  const preferredAtIso = preferredAt && Number.isFinite(Date.parse(preferredAt)) ? new Date(preferredAt).toISOString() : undefined;
 
   const set = useCallback(<K extends keyof BuyerDetails>(field: K, value: BuyerDetails[K]) => setDetails((previous) => ({ ...previous, [field]: value })), []);
 
@@ -105,13 +124,16 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   });
   const cheapestZoneFee = delivery.zones.length ? Math.min(...delivery.zones.map((zone) => deliveryFeeIn(zone, currency, rate))) : null;
 
-  const quote = getDeliveryQuote(delivery, {
-    fulfilment: details.fulfilment,
-    area: details.area,
-    districtId: details.districtId || undefined,
-    provinceId: details.provinceId || undefined,
-  });
-  const lines = cartLines(shop, cart.quantities);
+  const quote = getOrderQuote(
+    delivery,
+    {
+      fulfilment: details.fulfilment,
+      area: details.area,
+      districtId: details.districtId || undefined,
+      provinceId: details.provinceId || undefined,
+    },
+    booking,
+  );
   const total = lines.length ? cartTotal(shop, lines, currency, quote.status === "ok" ? quote.fee : null) : null;
   const canTakeOrder = isTakingOrders(shop) && methods.length > 0 && (canDeliver || canPickup) && quote.status !== "unavailable";
 
@@ -127,12 +149,15 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
       provinceId: details.provinceId || undefined,
       landmark: details.fulfilment === "pickup" ? "" : details.landmark,
       paymentMethod,
+      ...(booking && preferredAtIso ? { preferredAt: preferredAtIso } : {}),
     };
   }
   function formErrors(): Partial<Record<Field, FormErrorCode>> {
     const result = checkoutInputSchema.safeParse({ ...checkoutForm(), storeAllowsCod: shop.store.allowCod });
-    if (result.success) return {};
-    const found = toFieldErrors(result.error);
+    const found: Record<string, FormErrorCode> = result.success ? {} : toFieldErrors(result.error);
+    // A booking's time: the same rule the API checks it with.
+    const bookingError = booking ? bookingProblem(preferredAtIso, new Date()) : null;
+    if (bookingError) found.preferredAt = bookingError;
     return Object.fromEntries(FIELDS.flatMap((field) => (found[field] ? [[field, found[field]]] : [])));
   }
   const checkField = (field: Field) => setErrors((previous) => ({ ...previous, [field]: formErrors()[field] }));
@@ -147,18 +172,37 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
       focusFirstInvalidField(formRef.current);
       return;
     }
+    if (TURNSTILE_SITE_KEY && !botToken) {
+      setProblem(t("botCheckWait"));
+      return;
+    }
     setPlacing(true);
     try {
-      const order = await api<PlacedOrder>(`/public/stores/${encodeURIComponent(slug)}/orders`, {
+      const order = await api(`/public/stores/${encodeURIComponent(slug)}/orders`, placedOrderSchema, {
         method: "POST",
-        body: { idempotencyKey, lines: lines.map((line) => ({ variantId: line.variant.id, quantity: line.quantity })), checkout: checkoutForm() },
+        body: {
+          idempotencyKey,
+          lines: lines.map((line) => ({ variantId: line.variant.id, quantity: line.quantity, choiceIds: line.choiceIds, note: line.note })),
+          checkout: checkoutForm(),
+          ...(botToken ? { botCheck: botToken } : {}),
+        },
       });
       saveBuyerDetails(details, remember);
       setPlaced(true);
       cart.clear();
-      router.replace(`/${locale}/o/${order.token}`);
+      // A KHQR order is paid next; any other goes to its order page.
+      router.replace(`/${locale}/o/${order.token}${paymentMethod === "khqr" ? "/pay" : ""}`);
     } catch (failure) {
       setPlacing(false);
+      setBotReset((count) => count + 1);
+      if (failure instanceof ApiError && failure.code === "bot_check_failed") {
+        setProblem(t("botCheckFailed"));
+        return;
+      }
+      if (failure instanceof ApiError && failure.code === "too_many_requests") {
+        setProblem(tApp("tooManyTries"));
+        return;
+      }
       if (failure instanceof ApiError && Object.keys(failure.fields).length > 0) {
         const fields = failure.fields;
         if (Object.keys(fields).some((key) => key.startsWith("lines"))) {
@@ -203,31 +247,105 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
     {
       value: "delivery",
       icon: Truck,
-      title: t("delivery"),
+      // A booking is done at the buyer's place rather than delivered.
+      title: booking ? t("atMyPlace") : t("delivery"),
       detail: cheapestZoneFee === null ? feeText(delivery.province) : cheapestZoneFee === 0 ? t("free") : t("feeFrom", { fee: formatMoney(cheapestZoneFee, currency) }),
       show: canDeliver,
     },
-    { value: "pickup", icon: Store, title: t("pickup"), detail: t("free"), show: canPickup },
+    { value: "pickup", icon: Store, title: booking ? t("atTheShop") : t("pickup"), detail: t("free"), show: canPickup },
   ];
-  const segment = (active: boolean) => cn("min-h-touch rounded-full px-4 text-sm font-medium transition-colors", active ? "bg-brand text-on-brand" : "text-muted hover:text-fg");
   const methodLabel = (method: PaymentMethod) => (method === "cod" ? (details.fulfilment === "pickup" ? t("payAtPickup") : tApp("payCashOnDelivery")) : method === "khqr" ? "KHQR" : "ABA PayWay");
 
+  const summary = (
+        <section className="flex flex-col gap-2 rounded-2xl border border-border bg-bg p-4">
+          <h2 className="font-semibold">{t("sectionSummary")}</h2>
+          <dl className="flex flex-col gap-1 text-sm">
+            <div className="flex items-center justify-between text-muted">
+              <dt>{tStore("subtotal")}</dt>
+              <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
+            </div>
+            {total.discount > 0 && (
+              <div className="flex items-center justify-between text-success">
+                <dt>{tStore("itemDiscount")}</dt>
+                <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-muted">
+              <dt>{details.fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
+              <dd className="tabular-nums">
+                {quote.status === "ok" ? (total.deliveryFee === 0 ? t("free") : formatMoney(total.deliveryFee, currency)) : quote.status === "incomplete" ? t("feeAfterChoice") : "—"}
+              </dd>
+            </div>
+            {shop.store.vatPercent > 0 && (
+              <div className="flex items-center justify-between text-muted">
+                <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
+                <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
+              </div>
+            )}
+          </dl>
+          <div className="flex items-center justify-between border-t border-border pt-2">
+            <span className="font-semibold">{tStore("totalToPay")}</span>
+            <span className="text-right">
+              <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
+              <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, rate), currency === "USD" ? "KHR" : "USD")}</span>
+            </span>
+          </div>
+        </section>
+  );
+  const placeOrderButton = (
+    <Button variant="primary" className="w-full" onClick={() => void handleSubmit()} disabled={!canTakeOrder} loading={placing}>
+      {t("placeOrder")} · {formatMoney(total.total, currency)}
+    </Button>
+  );
+  // What a buyer may wonder before pressing the button.
+  const trust = (
+    <ul className="flex flex-col gap-1 text-sm text-muted">
+      {paymentMethod === "cod" && <li>{t("trustCod")}</li>}
+      <li>{t("trustDetails")}</li>
+    </ul>
+  );
+
   return (
-    <BuyerShell className="pb-32">
+    <BuyerShell wide className="pb-32 lg:pb-0">
       <BuyerTopBar backHref={`/${locale}/s/${slug}/cart`} backLabel={t("backToCart")} title={t("title")} subtitle={shop.store.name}>
         <BuyerSteps steps={[tCart("stepCart"), tCart("stepCheckout"), tCart("stepPay")]} current={1} />
       </BuyerTopBar>
 
-      <div ref={formRef} className="flex flex-col gap-6 p-4">
+      <BuyerColumns
+        plain
+        aside={
+          <>
+            {summary}
+            {placeOrderButton}
+            {trust}
+          </>
+        }
+      >
+      <div ref={formRef} className="flex flex-col gap-4 p-4 lg:p-0">
         {problem && (
-          <p role="alert" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          <Notice tone="warning" role="alert">
             {problem}
-          </p>
+          </Notice>
         )}
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionYou")}</h2>
+        <BuyerSection number={1} title={t("sectionYou")}>
+          {prefilled && (
+            <div className="flex items-center gap-3 rounded-2xl bg-brand/5 p-3 text-sm">
+              <History className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+              <span className="min-w-0 flex-1">{t("prefilledNote")}</span>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setDetails({ ...details, name: "", phone: "", landmark: "", districtId: "", provinceId: "" });
+                  setRemember(false);
+                  setPrefilled(false);
+                }}
+                className="-my-2 shrink-0 px-2 font-semibold"
+              >
+                {t("prefilledClear")}
+              </Button>
+            </div>
+          )}
           <Input
             label={t("name")}
             placeholder={t("namePlaceholder")}
@@ -254,37 +372,34 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             onBlur={() => checkField("phone")}
             error={errorText(errors.phone)}
           />
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionHow")}</h2>
-          <div role="radiogroup" aria-label={t("sectionHow")} className="grid grid-cols-2 gap-3" data-invalid={errors.fulfilment ? "true" : undefined}>
-            {fulfilmentCards
-              .filter((card) => card.show)
-              .map((card) => {
-                const selected = details.fulfilment === card.value;
-                return (
-                  <button
-                    key={card.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => {
-                      set("fulfilment", card.value);
-                      clearError("fulfilment");
-                    }}
-                    className={cn(
-                      "flex min-h-touch flex-col items-start gap-1 rounded-2xl border-2 p-3 text-left transition-colors",
-                      selected ? "border-brand bg-brand/5" : "border-border hover:bg-border/10",
-                    )}
-                  >
-                    <card.icon className={cn("h-5 w-5", selected ? "text-brand" : "text-muted")} aria-hidden="true" />
-                    <span className="text-sm font-semibold">{card.title}</span>
-                    <span className="text-sm text-muted">{card.detail}</span>
-                  </button>
-                );
-              })}
-          </div>
+        <BuyerSection number={2} title={booking ? t("sectionWhen") : t("sectionHow")}>
+          {booking && (
+            <Input
+              label={t("preferredAt")}
+              type="datetime-local"
+              value={preferredAt}
+              onChange={(e) => {
+                setPreferredAt(e.target.value);
+                clearError("preferredAt");
+              }}
+              onBlur={() => checkField("preferredAt")}
+              error={errorText(errors.preferredAt)}
+            />
+          )}
+          <ChoiceCards
+            label={t("sectionHow")}
+            value={details.fulfilment}
+            invalid={Boolean(errors.fulfilment)}
+            onChange={(value) => {
+              const card = fulfilmentCards.find((entry) => entry.value === value);
+              if (!card) return;
+              set("fulfilment", card.value);
+              clearError("fulfilment");
+            }}
+            options={fulfilmentCards.filter((card) => card.show).map(({ value, icon, title, detail }) => ({ value, icon, title, detail }))}
+          />
           {errors.fulfilment && <p className="text-sm text-danger">{errorText(errors.fulfilment)}</p>}
 
           {details.fulfilment === "pickup" && canPickup && (
@@ -310,14 +425,17 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
               {deliversInPhnomPenh && deliversToProvinces && (
                 <div className="flex flex-col gap-2">
                   <span className="text-sm font-medium">{t("area")}</span>
-                  <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
-                    <button type="button" aria-pressed={details.area === "phnom_penh"} onClick={() => set("area", "phnom_penh")} className={segment(details.area === "phnom_penh")}>
-                      {t("phnomPenh")}
-                    </button>
-                    <button type="button" aria-pressed={details.area === "province"} onClick={() => set("area", "province")} className={segment(details.area === "province")}>
-                      {t("otherProvince")}
-                    </button>
-                  </div>
+                  <SegmentedControl
+                    mode="choice"
+                    label={t("area")}
+                    value={details.area}
+                    onChange={(value) => set("area", value === "province" ? "province" : "phnom_penh")}
+                    options={[
+                      { value: "phnom_penh", label: t("phnomPenh") },
+                      { value: "province", label: t("otherProvince") },
+                    ]}
+                    className="w-fit"
+                  />
                 </div>
               )}
 
@@ -370,93 +488,53 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
             </>
           )}
 
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 shrink-0 accent-brand" />
-            <span className="text-sm">{t("rememberDetails")}</span>
-          </label>
-        </section>
+          <Checkbox checked={remember} onChange={(e) => setRemember(e.target.checked)} label={t("rememberDetails")} />
+        </BuyerSection>
 
-        <section className="flex flex-col gap-4">
-          <h2 className="font-semibold">{t("sectionPay")}</h2>
+        <BuyerSection number={3} title={t("sectionPay")}>
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">{t("payIn")}</span>
-            <div className="inline-flex w-fit items-center gap-1 rounded-full border border-border bg-border/10 p-1">
-              {(["USD", "KHR"] as const).map((option) => (
-                <button key={option} type="button" aria-pressed={currency === option} onClick={() => cart.setCurrency(option)} className={segment(currency === option)}>
-                  {option === "USD" ? "$" : "៛"} {option}
-                </button>
-              ))}
-            </div>
+            <CurrencyChoice label={t("payIn")} value={currency} onChange={cart.setCurrency} />
           </div>
 
-          <div className="flex flex-col gap-2" data-invalid={errors.paymentMethod ? "true" : undefined}>
+          {/* With no method to pick, the group itself carries the error mark; otherwise ChoiceCards does. */}
+          <div className="flex flex-col gap-2" data-invalid={errors.paymentMethod && methods.length === 0 ? "true" : undefined}>
             <span className="text-sm font-medium">{t("paymentMethod")}</span>
             {methods.length === 0 && (
-              <p role="status" className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+              <Notice tone="warning" role="status">
                 {details.area === "province" && details.fulfilment === "delivery" ? t("provinceCodNote") : t("noPaymentMethods")}
-              </p>
+              </Notice>
             )}
-            {methods.map((method) => (
-              <button
-                key={method}
-                type="button"
-                onClick={() => {
+            {methods.length > 0 && (
+              <ChoiceCards
+                variant="rows"
+                label={t("paymentMethod")}
+                value={paymentMethod}
+                invalid={Boolean(errors.paymentMethod)}
+                onChange={(value) => {
+                  const method = methods.find((entry) => entry === value);
+                  if (!method) return;
                   setPaymentMethod(method);
                   clearError("paymentMethod");
                 }}
-                aria-pressed={paymentMethod === method}
-                className={cn("flex min-h-touch items-center justify-between rounded-DEFAULT border-2 px-4 text-left transition-colors", paymentMethod === method ? "border-brand bg-brand/5" : "border-border")}
-              >
-                <span className="font-medium">{methodLabel(method)}</span>
-                {paymentMethod === method && <Check className="h-4 w-4 text-brand" aria-hidden="true" />}
-              </button>
-            ))}
+                options={methods.map((method) => ({ value: method, title: methodLabel(method) }))}
+              />
+            )}
             {errors.paymentMethod && <p className="text-sm text-danger">{errorText(errors.paymentMethod)}</p>}
           </div>
-        </section>
+        </BuyerSection>
 
-        <section className="flex flex-col gap-2 rounded-2xl border border-border p-4">
-          <h2 className="font-semibold">{t("sectionSummary")}</h2>
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex items-center justify-between text-muted">
-              <dt>{tStore("subtotal")}</dt>
-              <dd className="tabular-nums">{formatMoney(total.subtotal, currency)}</dd>
-            </div>
-            {total.discount > 0 && (
-              <div className="flex items-center justify-between text-success">
-                <dt>{tStore("itemDiscount")}</dt>
-                <dd className="tabular-nums">-{formatMoney(total.discount, currency)}</dd>
-              </div>
-            )}
-            <div className="flex items-center justify-between text-muted">
-              <dt>{details.fulfilment === "pickup" ? t("pickup") : t("deliveryFee")}</dt>
-              <dd className="tabular-nums">
-                {quote.status === "ok" ? (total.deliveryFee === 0 ? t("free") : formatMoney(total.deliveryFee, currency)) : quote.status === "incomplete" ? t("feeAfterChoice") : "—"}
-              </dd>
-            </div>
-            {shop.store.vatPercent > 0 && (
-              <div className="flex items-center justify-between text-muted">
-                <dt>{tStore("vat", { percent: shop.store.vatPercent })}</dt>
-                <dd className="tabular-nums">{formatMoney(total.vat, currency)}</dd>
-              </div>
-            )}
-          </dl>
-          <div className="flex items-center justify-between border-t border-border pt-2">
-            <span className="font-semibold">{tStore("totalToPay")}</span>
-            <span className="text-right">
-              <span className="block text-lg font-bold tabular-nums">{formatMoney(total.total, currency)}</span>
-              <span className="block text-xs text-muted">≈ {formatMoney(approximateIn(total.total, currency, rate), currency === "USD" ? "KHR" : "USD")}</span>
-            </span>
-          </div>
-        </section>
+        {/* Phone and tablet: the summary ends the form; from 1024 px it's in the side column. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {summary}
+          {trust}
+        </div>
+        {/* Once only, whatever the width: the bot check gives one token per attempt. */}
+        <BotCheck onToken={setBotToken} resetKey={botReset} />
       </div>
+      </BuyerColumns>
 
-      <BuyerBottomBar>
-        <Button variant="primary" className="w-full" onClick={() => void handleSubmit()} disabled={!canTakeOrder} loading={placing}>
-          {t("placeOrder")} · {formatMoney(total.total, currency)}
-        </Button>
-      </BuyerBottomBar>
+      <BuyerBottomBar wide>{placeOrderButton}</BuyerBottomBar>
     </BuyerShell>
   );
 }

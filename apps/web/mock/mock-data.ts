@@ -10,9 +10,12 @@ import {
   convertUsdCentsToKhr,
   DEFAULT_UNITS,
   stockMovementSign,
+  TRACKING_CODE_ALPHABET,
+  TRACKING_CODE_LENGTH,
   type BusinessType,
   type Currency,
   type DeliverySettings,
+  type InvoiceDetails,
   type KycIdType,
   type KycRejectReason,
   type KycStatus,
@@ -21,18 +24,13 @@ import {
   type StockMovementType,
   type StoreSettings,
   type SubscriptionStatus,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 
 export interface MockStore {
   slug: string;
   nameKm: string;
   nameEn: string;
   bannerColor: string;
-  ratingValue: number;
-  ratingCountLabelKm: string;
-  ratingCountLabelEn: string;
-  deliveryEtaMinMinutes: number;
-  deliveryEtaMaxMinutes: number;
   /** 855XXXXXXXX — buyers tap it to call the shop. */
   phone: string;
 }
@@ -512,8 +510,9 @@ export interface MockDailyStat {
 // A deterministic 30-day trend (no Math.random — that would render
 // differently on the server vs. the client and break hydration) for the
 // dashboard's date-filtered chart — stands in for a real daily rollup query.
-export const mockDailyStats: MockDailyStat[] = Array.from({ length: 30 }, (_, i) => {
-  const daysAgo = 29 - i;
+// 60 days, so "last 30 days" can be compared with the 30 before (the sales overview).
+export const mockDailyStats: MockDailyStat[] = Array.from({ length: 60 }, (_, i) => {
+  const daysAgo = 59 - i;
   const wave = 6 + Math.round(3 * Math.sin(daysAgo / 3));
   const weekendBoost = daysAgo % 7 < 2 ? 2 : 0;
   const orders = Math.max(1, wave + weekendBoost);
@@ -534,13 +533,30 @@ export const mockStore: MockStore = {
   nameKm: "កាហ្វេសុខា",
   nameEn: "Sokha Coffee",
   bannerColor: "bg-gradient-to-br from-amber-300 to-orange-400",
-  ratingValue: 4.9,
-  ratingCountLabelKm: "ការវាយតម្លៃ ១k+",
-  ratingCountLabelEn: "1k+ ratings",
-  deliveryEtaMinMinutes: 15,
-  deliveryEtaMaxMinutes: 30,
   phone: "85512345678",
 };
+
+/**
+ * What the sample seller wrote under "On your invoices" (design/screens.md
+ * S10), shown on the invoice mockup (B7).
+ */
+export const mockInvoiceDetails: InvoiceDetails = {
+  taxNumber: "K009-901234567",
+  telegramLink: "t.me/sokhacoffee",
+  facebookLink: "fb.com/sokhacoffee",
+  invoiceNote: "សូមអរគុណ! អាចប្តូរទំនិញបានក្នុងរយៈពេល 3 ថ្ងៃ ដោយភ្ជាប់បង្កាន់ដៃនេះ។",
+};
+
+/** A stand-in tracking code: 8 characters made from the order number, the same every time for one order. */
+export function mockTrackingCode(orderNumber: string): string {
+  let hash = 2166136261;
+  let code = "";
+  for (let i = 0; i < TRACKING_CODE_LENGTH; i++) {
+    for (const char of `${orderNumber}:${i}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+    code += TRACKING_CODE_ALPHABET[hash % TRACKING_CODE_ALPHABET.length];
+  }
+  return code;
+}
 
 export const mockProducts: MockProduct[] = [
   {

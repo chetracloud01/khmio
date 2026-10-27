@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { DeliveryFee } from "./delivery";
 import { deliveryFeeIn } from "./delivery";
 import { convertKhrToUsdCents, convertUsdCentsToKhr, type Currency } from "./money";
+import { cartLineKey, MAX_CHOICE_GROUPS, MAX_ITEM_NOTE_LENGTH, MAX_VALUES_PER_GROUP } from "./product-options";
 
 // The money of an order (docs/blueprint.md "Multi-currency pricing and
 // totals"). One function, used by the cart and checkout in the browser and
@@ -46,6 +47,13 @@ export interface OrderLineInput extends VariantPrices {
   key: string;
   quantity: number;
   discountPercent: number | null;
+  /** Picked choices' extra prices per unit (product-options.ts); a free choice has neither price. */
+  extras?: VariantPrices[];
+}
+
+/** One choice's extra in the order currency: converted and rounded on its own, like a line; free = 0. */
+export function extraPriceIn(extra: VariantPrices, currency: Currency, usdToKhrRate: number): number {
+  return unitPriceIn(extra, currency, usdToKhrRate) ?? 0;
 }
 
 export interface OrderTotalInput {
@@ -93,8 +101,10 @@ export class UnpricedLineError extends Error {
 /** The order's money, all in `currency`, all whole cents or riel. Throws UnpricedLineError for a line with no price. */
 export function computeOrderTotal(input: OrderTotalInput): OrderTotal {
   const lines = input.lines.map((line): OrderTotalLine => {
-    const baseUnitPrice = unitPriceIn(line, input.currency, input.usdToKhrRate);
-    if (baseUnitPrice === undefined) throw new UnpricedLineError(line.key);
+    const variantPrice = unitPriceIn(line, input.currency, input.usdToKhrRate);
+    if (variantPrice === undefined) throw new UnpricedLineError(line.key);
+    // The product's discount covers the whole unit, its choices included.
+    const baseUnitPrice = variantPrice + (line.extras ?? []).reduce((sum, extra) => sum + extraPriceIn(extra, input.currency, input.usdToKhrRate), 0);
     const unitPrice = applyDiscount(baseUnitPrice, line.discountPercent);
     return { key: line.key, quantity: line.quantity, baseUnitPrice, unitPrice, lineTotal: unitPrice * line.quantity };
   });
@@ -126,7 +136,18 @@ export const orderLineRequestSchema = z.object({
     .int("quantity_invalid")
     .min(1, "quantity_invalid")
     .max(MAX_LINE_QUANTITY, "quantity_invalid"),
+  /** The choice values picked (product-options.ts); the API checks them against the product. */
+  choiceIds: z.array(z.string().uuid("choice_invalid")).max(MAX_CHOICE_GROUPS * MAX_VALUES_PER_GROUP, "choice_invalid").default([]),
+  note: z.string().trim().max(MAX_ITEM_NOTE_LENGTH, "too_long").default(""),
 });
+export type OrderLineRequest = z.infer<typeof orderLineRequestSchema>;
+
+/** The lines of an order or a counter sale: each product option with the same choices once. */
+export const orderLinesRequestSchema = z
+  .array(orderLineRequestSchema)
+  .min(1, "cart_empty")
+  .max(MAX_ORDER_LINES, "too_long")
+  .refine((lines) => new Set(lines.map((line) => cartLineKey(line.variantId, line.choiceIds))).size === lines.length, "product_unavailable");
 
 /**
  * What the shop page sends to place an order. `checkout` is the buyer's form,
@@ -136,11 +157,9 @@ export const orderLineRequestSchema = z.object({
  */
 export const placeOrderRequestSchema = z.object({
   idempotencyKey: z.string().uuid("required"),
-  lines: z
-    .array(orderLineRequestSchema)
-    .min(1, "cart_empty")
-    .max(MAX_ORDER_LINES, "too_long")
-    .refine((lines) => new Set(lines.map((line) => line.variantId)).size === lines.length, "product_unavailable"),
+  lines: orderLinesRequestSchema,
   checkout: z.record(z.unknown()),
+  /** Cloudflare Turnstile's token from the checkout page; the API checks it when Turnstile is set up. */
+  botCheck: z.string().max(4096).optional(),
 });
 export type PlaceOrderRequest = z.infer<typeof placeOrderRequestSchema>;

@@ -1,6 +1,7 @@
 import { z } from "zod";
-import type { PaymentMethod } from "./checkout";
-import type { Fulfilment } from "./delivery";
+import type { OrderPaymentMethod, PaymentMethod } from "./checkout";
+import type { OrderFulfilment } from "./delivery";
+import type { ListSpec } from "./list-query";
 import { khmerPhoneSchema } from "./phone";
 
 // The life of an order (docs/blueprint.md "Workflows from start to end", workflow 4). One fixed set
@@ -42,8 +43,8 @@ export type DispatchRoute = "driver" | "pickup" | "bus";
 /** The parts of an order the rules below need. */
 export interface OrderFacts {
   status: OrderStatus;
-  paymentMethod: PaymentMethod;
-  fulfilment: Fulfilment;
+  paymentMethod: OrderPaymentMethod;
+  fulfilment: OrderFulfilment;
   area: "phnom_penh" | "province";
 }
 
@@ -58,7 +59,8 @@ export function getInitialOrderStatus(paymentMethod: PaymentMethod): OrderStatus
 
 /** How this order must be sent: the buyer chose it at checkout, the seller doesn't pick. */
 export function getDispatchRoute(order: Pick<OrderFacts, "fulfilment" | "area">): DispatchRoute {
-  if (order.fulfilment === "pickup") return "pickup";
+  // Collected at the shop, or handed over at the counter.
+  if (order.fulfilment !== "delivery") return "pickup";
   return order.area === "province" ? "bus" : "driver";
 }
 
@@ -159,6 +161,19 @@ export function getOrderTab(status: OrderStatus): OrderTab {
   }
 }
 
+/** The statuses under each tab, in the order work happens ("awaiting" last). */
+export function orderStatusesForTab(tab: OrderTab): OrderStatus[] {
+  return orderStatusSchema.options.filter((status) => getOrderTab(status) === tab);
+}
+
+/** The seller's order list read page by page (the data grid's server mode): what it may be searched, filtered and sorted by. */
+export const ORDER_LIST_SPEC = {
+  sorts: ["order", "buyer", "total", "status"],
+  chips: ORDER_TABS,
+  filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup", "in_store"] },
+  defaultSort: { key: "order", dir: "desc" },
+} as const satisfies ListSpec;
+
 /** Whether the seller still has to act on it (the dashboard's "needs action" list). */
 export function needsSellerAction(status: OrderStatus): boolean {
   return status !== "awaiting_payment" && status !== "completed" && status !== "cancelled";
@@ -211,7 +226,11 @@ export const dispatchInputSchema = z.discriminatedUnion("route", [
 ]);
 export type DispatchInput = z.infer<typeof dispatchInputSchema>;
 
-export const orderCancelReasonSchema = z.enum(["payment_timeout", "buyer_cancelled", "out_of_stock", "cannot_deliver", "other"]);
+export const orderCancelReasonSchema = z.enum(["payment_timeout", "buyer_cancelled", "out_of_stock", "cannot_deliver", "other", "counter_void"]);
+
+/** Where an order was made: the shop page, or the counter (design/screens.md P1). */
+export const orderChannelSchema = z.enum(["online", "in_store"]);
+export type OrderChannel = z.infer<typeof orderChannelSchema>;
 export type OrderCancelReason = z.infer<typeof orderCancelReasonSchema>;
 
 /** Reasons a seller can pick (the other two are set by the system and the buyer). */
@@ -243,12 +262,20 @@ export const SELLER_ORDER_ACTIONS = [
 ] as const satisfies readonly OrderAction[];
 export type SellerOrderAction = (typeof SELLER_ORDER_ACTIONS)[number];
 
+const sellerOrderActions: readonly string[] = SELLER_ORDER_ACTIONS;
+export const isSellerOrderAction = (action: OrderAction): action is SellerOrderAction => sellerOrderActions.includes(action);
+
+/** The steps a request carries nothing else for: no driver, ticket or reason. */
+const plainOrderActionSchema = z.enum(["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "fail_delivery", "rebook"]);
+export type PlainOrderAction = z.infer<typeof plainOrderActionSchema>;
+export const isPlainOrderAction = (action: OrderAction): action is PlainOrderAction => plainOrderActionSchema.safeParse(action).success;
+
 /**
  * What the dashboard sends to move an order on. Sending needs how it went
  * (driver, bus or pickup); cancelling needs a reason the seller may give.
  */
 export const orderActionRequestSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.enum(["confirm", "start_packing", "driver_picked_up", "mark_delivered", "settle_cash", "fail_delivery", "rebook"]) }),
+  z.object({ action: plainOrderActionSchema }),
   z.object({ action: z.literal("dispatch"), dispatch: dispatchInputSchema }),
   z.object({
     action: z.literal("cancel"),

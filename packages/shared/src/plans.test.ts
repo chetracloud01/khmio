@@ -18,6 +18,7 @@ describe("minimum plan for a feature", () => {
     expect(getMinimumPlanFor("stock")).toBe("pro");
     expect(getMinimumPlanFor("wholesalePrice")).toBe("pro");
     expect(getMinimumPlanFor("warehouses")).toBe("advance");
+    expect(getMinimumPlanFor("counterSales")).toBe("basic");
   });
 });
 

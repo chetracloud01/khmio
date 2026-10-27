@@ -1,24 +1,32 @@
 import { randomBytes } from "node:crypto";
-import { asOrderBuyer, Prisma, withPublicStore, type AppDb, type Tx } from "@khmer-micro-store/db";
+import { asOrderBuyer, Prisma, withPublicStore, type AppDb, type Tx } from "@khmio/db";
+import type { PaymentProvider } from "@khmio/payments";
 import {
   checkoutInputSchema,
   computeOrderTotal,
+  bookingProblem,
   getAvailablePaymentMethods,
-  getDeliveryQuote,
   getInitialOrderStatus,
+  getOrderQuote,
   placeOrderRequestSchema,
+  takesStockWhenPlaced,
+  hasModule,
   toFieldErrors,
   type CheckoutInput,
   type FormErrorCode,
   type PlaceOrderRequest,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { readDeliverySettings } from "../delivery/delivery";
 import { AppException, InvalidInputException } from "../errors";
+import { orderItemRows, orderTotalLines, readOrderLines } from "./order-lines";
+import { publicKhqrAccount, startKhqrPayment } from "../payments/khqr";
+import { publicStorePlan, reserveOrderStock, takeOrderStock, tracksStock } from "../stock/stock";
 
 // Placing an order (roadmap step 4), as the buyer of one shop — no login.
 // The API recalculates every amount from the database; it never trusts a
 // total from the browser. The same checkout key twice gives back the same
-// order. Until step 5, cash on delivery is the only way to pay.
+// order. Cash on delivery, or KHQR when it's on (KHQR_PROVIDER) and the shop
+// set its Bakong account: the order then waits for payment with its stock held.
 
 export interface PlacedOrder {
   token: string;
@@ -42,9 +50,9 @@ export function parsePlaceOrder(body: unknown): PlaceOrderRequest {
 }
 
 /** Places the order, or returns null when no shop has this link. */
-export async function placeOrder(db: AppDb, slug: string, request: PlaceOrderRequest): Promise<PlacedOrder | null> {
+export async function placeOrder(db: AppDb, slug: string, request: PlaceOrderRequest, khqr: PaymentProvider | null): Promise<PlacedOrder | null> {
   try {
-    return await withPublicStore(db, slug, (tx, storeId) => placeInStore(tx, storeId, request));
+    return await withPublicStore(db, slug, (tx, storeId) => placeInStore(tx, storeId, request, khqr));
   } catch (error) {
     // Two copies of the same checkout arrived together and the other one won: answer with its order.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -63,27 +71,31 @@ async function findByKey(tx: Tx, key: string): Promise<PlacedOrder | null> {
   return order ? { token: row.token, orderNumber: order.orderNumber, created: false } : null;
 }
 
-async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest): Promise<PlacedOrder> {
+async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest, khqr: PaymentProvider | null): Promise<PlacedOrder> {
   const existing = await findByKey(tx, request.idempotencyKey);
   if (existing) return existing;
 
   const store = await tx.store.findUniqueOrThrow({
     where: { id: storeId },
-    select: { allowCod: true, usdToKhrRate: true, vatPercent: true, pickupAddress: true, pickupHours: true },
+    select: { allowCod: true, usdToKhrRate: true, vatPercent: true, pickupAddress: true, pickupHours: true, modules: true },
   });
   // A paused shop keeps its page but takes no orders (blueprint "Subscription life cycle").
   const [openRow] = await tx.$queryRaw<{ open: boolean }[]>`SELECT app_public_store_open() AS open`;
   if (!openRow?.open) throw new AppException(409, "store_closed");
   const { settings: delivery, configured } = await readDeliverySettings(tx, storeId);
-  // No delivery saved, or no way at all to pay (cash off, and KHQR only arrives in step 5): the shop isn't open for orders.
-  if (!configured || !store.allowCod) throw new AppException(409, "not_accepting_orders");
+  const bakongAccountId = await publicKhqrAccount(tx, khqr);
+  // The buyer can only see visible, not-deleted products (step 3 public read), so anything else is simply missing.
+  const lines = await readOrderLines(tx, request.lines, hasModule(store.modules, "choices"));
+  // Only services (Features › services): a booking, done at the shop or at the buyer's place.
+  const serviceOnly = hasModule(store.modules, "services") && lines.serviceOnly;
+  // No delivery saved (a booking needs none), or no way at all to pay (cash off, and no KHQR): the shop isn't open for orders.
+  if ((!configured && !serviceOnly) || (!store.allowCod && !bakongAccountId)) throw new AppException(409, "not_accepting_orders");
 
   const checkout = parseCheckout(request.checkout, store.allowCod);
   const errors: Record<string, FormErrorCode> = {};
 
-  // Cash only until KHQR (step 5): a Bakong ID doesn't make KHQR available yet.
   const methods = getAvailablePaymentMethods({
-    khqrReady: false,
+    khqrReady: bakongAccountId !== null,
     payWayReady: false,
     storeAllowsCod: store.allowCod,
     area: checkout.area,
@@ -98,27 +110,17 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
     districtId: checkout.fulfilment === "delivery" && checkout.area === "phnom_penh" ? checkout.districtId : undefined,
     provinceId: checkout.fulfilment === "delivery" && checkout.area === "province" ? checkout.provinceId : undefined,
   };
-  const quote = getDeliveryQuote(delivery, choice);
+  const quote = getOrderQuote(delivery, choice, serviceOnly);
   if (quote.status !== "ok") {
     errors[checkout.fulfilment === "pickup" ? "fulfilment" : checkout.area === "province" ? "provinceId" : "districtId"] = "delivery_unavailable";
   }
-
-  // The buyer can only see visible, not-deleted products (step 3 public read), so anything else is simply missing.
-  const variants = await tx.productVariant.findMany({
-    where: { id: { in: request.lines.map((line) => line.variantId) } },
-    include: { product: { select: { titleKm: true, titleEn: true, discountPercent: true } } },
-  });
-  const byId = new Map(variants.map((variant) => [variant.id, variant]));
-  request.lines.forEach((line, index) => {
-    if (!byId.has(line.variantId)) errors[`lines.${index}`] = "product_unavailable";
-  });
+  const booking = serviceOnly ? bookingProblem(checkout.preferredAt, new Date()) : null;
+  if (booking) errors.preferredAt = booking;
+  Object.assign(errors, lines.errors);
   if (Object.keys(errors).length > 0) throw new InvalidInputException(errors);
 
   const total = computeOrderTotal({
-    lines: request.lines.map((line) => {
-      const variant = byId.get(line.variantId)!;
-      return { key: line.variantId, quantity: line.quantity, priceUsdCents: variant.priceUsdCents, priceKhr: variant.priceKhr, discountPercent: variant.product.discountPercent };
-    }),
+    lines: orderTotalLines(request.lines, lines),
     currency: checkout.currency,
     usdToKhrRate: store.usdToKhrRate,
     vatPercent: store.vatPercent,
@@ -157,30 +159,26 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
       pickupHours: checkout.fulfilment === "pickup" ? store.pickupHours : "",
       buyerName: checkout.name,
       buyerPhone: checkout.phone,
+      preferredAt: serviceOnly && checkout.preferredAt ? new Date(checkout.preferredAt) : null,
       idempotencyKey: request.idempotencyKey,
     },
     select: { id: true, orderNumber: true },
   });
-  await tx.orderItem.createMany({
-    data: total.lines.map((line) => {
-      const variant = byId.get(line.key)!;
-      return {
-        storeId,
-        orderId: order.id,
-        variantId: variant.id,
-        titleKm: variant.product.titleKm,
-        titleEn: variant.product.titleEn,
-        variantLabelKm: variant.isDefault ? "" : variant.labelKm,
-        variantLabelEn: variant.isDefault ? "" : variant.labelEn,
-        unitPriceMinor: line.unitPrice,
-        quantity: line.quantity,
-        lineTotalMinor: line.lineTotal,
-      };
-    }),
-  });
+  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, lines, { currency: checkout.currency, usdToKhrRate: store.usdToKhrRate }) });
+  // Pro and Advance: a cash order takes its stock now, a KHQR order holds it until paid;
+  // too little left refuses the whole order (docs/blueprint.md "Stock").
+  if (tracksStock(await publicStorePlan(tx))) {
+    const lineVariantIds = request.lines.map((line) => line.variantId);
+    if (takesStockWhenPlaced(checkout.paymentMethod)) await takeOrderStock(tx, order.id, lineVariantIds);
+    else await reserveOrderStock(tx, order.id, lineVariantIds);
+  }
+  if (checkout.paymentMethod === "khqr" && khqr && bakongAccountId) {
+    await startKhqrPayment(tx, khqr, { storeId, orderId: order.id, amountMinor: total.total, currency: checkout.currency, bakongAccountId });
+  }
   await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status, actor: "buyer" }] });
   // The seller's Telegram alert, sent by the worker — written with the order, so it can't be lost or sent for an order that failed.
-  await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
+  // A KHQR order alerts the seller once it's paid (the worker), not before: until then there's nothing to do.
+  if (checkout.paymentMethod === "cod") await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
   return { token, orderNumber: order.orderNumber, created: true };
 }
 

@@ -5,20 +5,24 @@ import {
   businessTypeSchema,
   deliveryAreaSchema,
   formatKhmerPhoneLocal,
+  invoiceDetailsSchema,
+  offersAnyFulfilment,
+  planHasFeature,
+  shopLocationSchema,
   storeProfileSchema,
+  storeSettingsSchema,
   toFieldErrors,
   type BusinessType,
   type DeliveryArea,
   type FormErrorCode,
-} from "@khmer-micro-store/shared";
-import { Button, Card, Input, SegmentedControl, Select } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { Button, Card, Input, Notice, SegmentedControl, Select, Switch } from "@khmio/ui";
 import {
   Check,
   ChevronRight,
   CreditCard,
   Send,
   ShieldCheck,
-  SlidersHorizontal,
   Truck,
   Upload,
   Users,
@@ -30,10 +34,17 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { mockMerchant } from "@/mock/mock-data";
+import { useDeliverySettings } from "../../delivery-settings-context";
 import { useAdmin } from "../../admin-context";
 import { useMerchantAccount } from "../../merchant-account-context";
 import { LoginMethods } from "./login-methods";
-import { FormActions, FormSection, ReadOnlyField, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { InvoiceFields } from "@/components/shop-details/invoice-fields";
+import { LocationFields } from "@/components/shop-details/location-fields";
+import { PricingFields, toPricingDraft, toPricingInput } from "@/components/shop-details/pricing-fields";
+import { PaymentQrField } from "@/components/counter/payment-qr-field";
+import { useMerchantInventory } from "../../merchant-inventory-context";
+import { useStoreSettings } from "../../store-settings-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
 import { useMerchantSubscription } from "../../merchant-subscription-context";
 
@@ -48,6 +59,35 @@ interface Draft {
   description: string;
   bakongId: string;
   logoDataUrl: string | null;
+  // Location and pickup
+  address: string;
+  mapUrl: string;
+  pickupEnabled: boolean;
+  pickupHours: string;
+  // Getting paid, and Prices & tax (once Store settings)
+  allowCod: boolean;
+  defaultCurrency: "USD" | "KHR";
+  usdToKhrRate: string;
+  vatPercent: string;
+  /** Advance: "type::id" of where online orders ship from, or "" for the main branch. */
+  onlineStockKey: string;
+  /** The seller's own payment QR, for buyers paying at the counter. */
+  paymentQrDataUrl: string | null;
+  // On your invoices
+  taxNumber: string;
+  telegramLink: string;
+  facebookLink: string;
+  invoiceNote: string;
+}
+
+/** The groups of the form, in order: each a FormSection other screens can link to (profile#location). */
+const SECTION_IDS = ["details", "location", "payments", "prices", "invoices", "alerts"] as const;
+
+const locationKey = (location: { type: string; id: string }) => `${location.type}::${location.id}`;
+
+function parseLocationKey(key: string) {
+  const [type, id] = key.split("::");
+  return type && id ? { type, id } : undefined;
 }
 
 const BAKONG_ID_PATTERN = /^[^\s@]+@[^\s@]+$/;
@@ -56,11 +96,19 @@ const BAKONG_ID_PATTERN = /^[^\s@]+@[^\s@]+$/;
 // not the pre-load empty ones.
 export default function DashboardProfileMockupPage() {
   const { hydrated } = useMerchantProfile();
-  return hydrated ? <ProfileForm /> : null;
+  const { hydrated: deliveryReady } = useDeliverySettings();
+  const { hydrated: settingsReady } = useStoreSettings();
+  const { hydrated: subscriptionReady } = useMerchantSubscription();
+  const { hydrated: inventoryReady } = useMerchantInventory();
+  return hydrated && deliveryReady && settingsReady && subscriptionReady && inventoryReady ? <ProfileForm /> : null;
 }
 
-// The standard form (see ../../form-ui.tsx): edits stay in a draft until Save,
-// which runs storeProfileSchema — the same check the API will run.
+// The standard form (see ../../form-ui.tsx), in groups: the shop, its location
+// and pickup, getting paid, prices and tax, what goes on invoices, order
+// alerts. Edits stay in a draft until Save, which runs storeProfileSchema,
+// shopLocationSchema, storeSettingsSchema and invoiceDetailsSchema — the same
+// checks the API will run — and won't switch pickup off when it's the shop's
+// only way to get an order to buyers.
 function ProfileForm() {
   const t = useTranslations("DashboardProfile");
   const tType = useTranslations("BusinessType");
@@ -70,6 +118,18 @@ function ProfileForm() {
   const locale = useLocale();
   const { subscription } = useMerchantSubscription();
   const profile = useMerchantProfile();
+  const { settings: delivery, savePickup } = useDeliverySettings();
+  const { settings: storeSettings, saveSettings, band } = useStoreSettings();
+  const { warehouses, branches } = useMerchantInventory();
+  const tStore = useTranslations("StoreSettings");
+  const tStock = useTranslations("Stock");
+  const tApp = useTranslations("App");
+  // Choosing where online orders ship from only matters with several locations (Advance).
+  const choosesStockLocation = planHasFeature(subscription.plan, "warehouses");
+  const stockOptions = [
+    ...branches.map((branch) => ({ value: locationKey({ type: "branch", id: branch.id }), label: `${tStock("branchTag")}: ${locale === "km" ? branch.nameKm : branch.nameEn}` })),
+    ...warehouses.map((warehouse) => ({ value: locationKey({ type: "warehouse", id: warehouse.id }), label: `${tStock("warehouseTag")}: ${locale === "km" ? warehouse.nameKm : warehouse.nameEn}` })),
+  ];
   const errorText = useFormErrorText();
   const formRef = useRef<HTMLDivElement>(null);
 
@@ -81,9 +141,18 @@ function ProfileForm() {
     description: profile.description,
     bakongId: profile.bakongId,
     logoDataUrl: profile.logoDataUrl,
+    address: delivery.pickup.address,
+    mapUrl: profile.mapUrl,
+    pickupEnabled: delivery.pickup.enabled,
+    pickupHours: delivery.pickup.hours,
+    allowCod: storeSettings.allowCod,
+    ...toPricingDraft(storeSettings),
+    onlineStockKey: storeSettings.onlineStockLocation ? locationKey(storeSettings.onlineStockLocation) : "",
+    paymentQrDataUrl: profile.paymentQrDataUrl,
+    ...profile.invoiceDetails,
   };
   const [draft, setDraft] = useState<Draft>(saved);
-  const [errors, setErrors] = useState<Partial<Record<keyof Draft, FormErrorCode>>>({});
+  const [errors, setErrors] = useState<Partial<Record<string, FormErrorCode>>>({});
   const [justSaved, setJustSaved] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
 
@@ -96,16 +165,35 @@ function ProfileForm() {
     profile.telegramConnected ? "connected" : "idle",
   );
 
-  function update<K extends keyof Draft>(field: K, value: Draft[K]) {
-    setDraft((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  function updateFields(patch: Partial<Draft>) {
+    setDraft((prev) => ({ ...prev, ...patch }));
+    setErrors((prev) => Object.fromEntries(Object.entries(prev).filter(([field]) => !(field in patch))));
     setJustSaved(false);
   }
 
+  function update<K extends keyof Draft>(field: K, value: Draft[K]) {
+    updateFields({ [field]: value });
+  }
+
+  /** Every group's own check, plus the one that ties pickup to the delivery settings. */
+  function validate(from: Draft) {
+    const shop = storeProfileSchema.safeParse(from);
+    const location = shopLocationSchema.safeParse(from);
+    const invoice = invoiceDetailsSchema.safeParse(from);
+    const settings = storeSettingsSchema(band).safeParse({ ...toPricingInput(from), allowCod: from.allowCod, onlineStockLocation: parseLocationKey(from.onlineStockKey) });
+    const found: Partial<Record<string, FormErrorCode>> = {
+      ...(shop.success ? {} : toFieldErrors(shop.error)),
+      ...(location.success ? {} : toFieldErrors(location.error)),
+      ...(settings.success ? {} : toFieldErrors(settings.error)),
+      ...(invoice.success ? {} : toFieldErrors(invoice.error)),
+    };
+    if (!offersAnyFulfilment({ ...delivery, pickup: { enabled: from.pickupEnabled } })) found.pickupEnabled = "delivery_required";
+    return { shop, location, settings, invoice, found };
+  }
+
   /** On leaving a field: show its problem now rather than waiting for Save. */
-  function checkField(field: keyof Draft) {
-    const result = storeProfileSchema.safeParse(draft);
-    const code = result.success ? undefined : toFieldErrors(result.error)[field];
+  function checkField(field: string) {
+    const code = validate(draft).found[field];
     setErrors((prev) => ({ ...prev, [field]: code }));
   }
 
@@ -152,13 +240,13 @@ function ProfileForm() {
   }
 
   function handleSave() {
-    const result = storeProfileSchema.safeParse(draft);
-    if (!result.success) {
-      setErrors(toFieldErrors(result.error));
+    const { shop, location, settings, invoice, found } = validate(draft);
+    if (!shop.success || !location.success || !settings.success || !invoice.success || Object.keys(found).length > 0) {
+      setErrors(found);
       focusFirstInvalidField(formRef.current);
       return;
     }
-    const valid = result.data;
+    const valid = shop.data;
     profile.setShopName(valid.shopName);
     profile.setBusinessType(valid.businessType);
     profile.setPhone(valid.phone);
@@ -166,8 +254,13 @@ function ProfileForm() {
     profile.setDescription(valid.description);
     profile.setBakongId(valid.bakongId);
     profile.setLogoDataUrl(draft.logoDataUrl);
+    profile.setPaymentQrDataUrl(draft.paymentQrDataUrl);
+    profile.setMapUrl(location.data.mapUrl);
+    profile.setInvoiceDetails(invoice.data);
+    saveSettings(settings.data);
+    savePickup({ enabled: location.data.pickupEnabled, address: location.data.address, hours: location.data.pickupHours });
     // Show the cleaned-up values (trimmed, phone in local format) so the form matches what was saved.
-    setDraft({ ...valid, phone: formatKhmerPhoneLocal(valid.phone), logoDataUrl: draft.logoDataUrl });
+    setDraft({ ...draft, ...valid, ...location.data, ...invoice.data, ...toPricingDraft(settings.data), phone: formatKhmerPhoneLocal(valid.phone) });
     setErrors({});
     setJustSaved(true);
   }
@@ -185,11 +278,13 @@ function ProfileForm() {
     <div ref={formRef} className="mx-auto flex max-w-[720px] flex-col gap-5 p-4 text-fg md:p-6">
       <h1 className="text-lg font-semibold">{t("title")}</h1>
 
+      {/* Straight to a group: the form is long on a phone. */}
+      <SectionJumpLinks label={t("jumpTo")} links={SECTION_IDS.map((id) => ({ id, label: t(`jump_${id}`) }))} />
+
       {/* The sidebar-only pages, reachable on phones from here. */}
       <nav aria-label={t("moreSettings")} className="overflow-hidden rounded-DEFAULT border border-border bg-bg shadow-card">
         {[
           { href: "delivery", icon: Truck, title: t("delivery"), detail: t("deliveryDetail") },
-          { href: "settings", icon: SlidersHorizontal, title: t("storeSettings"), detail: t("storeSettingsDetail") },
           {
             href: "verification",
             icon: ShieldCheck,
@@ -301,6 +396,8 @@ function ProfileForm() {
           />
         </FormSection>
 
+        <LocationFields values={draft} errors={errors} onChange={updateFields} onCheck={checkField} />
+
         <FormSection id="payments" stacked title={t("sectionPayments")} description={t("sectionPaymentsHelp")}>
           {!profile.bakongId && (
             <p className="flex items-start gap-2 rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
@@ -327,7 +424,40 @@ function ProfileForm() {
               {t("bakongIdVerified")}
             </p>
           )}
+          <Switch checked={draft.allowCod} onChange={(allowCod) => update("allowCod", allowCod)} label={tStore("codLabel")} description={tStore("codHint")} />
+          {!draft.allowCod && <Notice tone="warning">{tApp("codOffWarning")}</Notice>}
+          <PaymentQrField
+            previewUrl={draft.paymentQrDataUrl}
+            onFile={(file) => {
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === "string") update("paymentQrDataUrl", reader.result);
+              };
+              reader.readAsDataURL(file);
+            }}
+            onRemove={() => update("paymentQrDataUrl", null)}
+          />
         </FormSection>
+
+        <PricingFields values={draft} band={band} errors={errors} onChange={updateFields} onCheck={checkField}>
+          {choosesStockLocation && (
+            <Select
+              label={tStore("onlineStockLabel")}
+              value={draft.onlineStockKey}
+              onChange={(e) => update("onlineStockKey", e.target.value)}
+              placeholder={tStore("onlineStockDefault")}
+              options={stockOptions}
+              error={errorText(errors.onlineStockLocation)}
+            />
+          )}
+        </PricingFields>
+
+        <InvoiceFields
+          values={draft}
+          errors={errors}
+          onChange={update}
+          shop={{ name: draft.shopName, logoUrl: draft.logoDataUrl, phone: profile.phone, address: draft.address }}
+        />
 
         {/* Signed in with Telegram = alerts already work, in a private chat with the bot.
             A group is only for shops where staff should see orders too. */}

@@ -2,26 +2,32 @@
 
 import {
   dispatchInputSchema,
-  formatKhmerPhoneLocal,
-  isCashOrder,
-  orderCancellationSchema,
-  SELLER_CANCEL_REASONS,
-  toFieldErrors,
   type Driver,
+  formatKhmerPhoneLocal,
   type FormErrorCode,
+  hasModule,
+  isCashOrder,
+  isPlainOrderAction,
   type OrderActionRequest,
+  orderCancellationSchema,
   type OrderCancelReason,
+  SELLER_CANCEL_REASONS,
   type SellerOrderAction,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Card, Input, Select } from "@khmer-micro-store/ui";
-import { ArrowLeft, Bus, MapPin, Phone, Printer, Store, Truck, User } from "lucide-react";
+  toFieldErrors,
+} from "@khmio/shared";
+import { BottomSheet, Button, Card, Input, Notice, Select } from "@khmio/ui";
+import { ArrowLeft, Bus, MapPin, Phone, Store, Truck, User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useFormErrorText } from "@/components/form-ui";
-import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
-import { api, ApiError, type DeliveryResponse, type SellerOrderDetail } from "@/lib/api";
+import { formatMoney, LineDetails, OrderStatusPill, PreferredTime, useChoiceLabels, useOrderText } from "@/components/order-ui";
+import { LineFields } from "@/components/orders/line-fields";
+import { OrderContactBar } from "@/components/seller-app";
+import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
+import { api, ApiError, type CustomField, customFieldsAnswerSchema, deliveryResponseSchema, type SellerOrderDetail, sellerOrderDetailSchema } from "@/lib/api";
+import { useMerchant } from "../../merchant-context";
 import { PageLoading, PageOffline } from "../../page-states";
 
 const OTHER_DRIVER = "__other__";
@@ -32,18 +38,27 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<SellerOrderDetail | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [lineFields, setLineFields] = useState<CustomField[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "not_found" | "offline">("loading");
+  const { store } = useMerchant();
+  const fieldsOn = hasModule(store.modules, "customFields");
 
   const load = useCallback(() => {
     setState("loading");
-    Promise.all([api<SellerOrderDetail>(`/orders/${id}`), api<DeliveryResponse>("/delivery")])
-      .then(([detail, delivery]) => {
+    Promise.all([
+      api(`/orders/${id}`, sellerOrderDetailSchema),
+      api("/delivery", deliveryResponseSchema),
+      // Each item's own fields (an IMEI), only while the shop uses them.
+      fieldsOn ? api("/custom-fields", customFieldsAnswerSchema) : Promise.resolve({ fields: [] }),
+    ])
+      .then(([detail, delivery, own]) => {
         setOrder(detail);
         setDrivers(delivery.settings.drivers);
+        setLineFields(own.fields.filter((field) => field.target === "orderLine"));
         setState("ready");
       })
       .catch((error: unknown) => setState(error instanceof ApiError && (error.status === 404 || error.status === 400) ? "not_found" : "offline"));
-  }, [id]);
+  }, [id, fieldsOn]);
   useEffect(load, [load]);
 
   if (state === "offline") return <PageOffline onRetry={load} />;
@@ -58,7 +73,7 @@ export default function OrderDetailPage() {
     );
   }
   if (!order) return <PageLoading />;
-  return <OrderDetail order={order} drivers={drivers} onChanged={setOrder} onReload={load} />;
+  return <OrderDetail order={order} drivers={drivers} lineFields={lineFields} onChanged={setOrder} onReload={load} />;
 }
 
 // The seller's order screen (design/screens.md S5). Which buttons show comes
@@ -67,11 +82,14 @@ export default function OrderDetailPage() {
 function OrderDetail({
   order,
   drivers,
+  lineFields,
   onChanged,
   onReload,
 }: {
   order: SellerOrderDetail;
   drivers: Driver[];
+  /** The shop's own fields for each item sold (empty when it doesn't use them). */
+  lineFields: CustomField[];
   onChanged: (order: SellerOrderDetail) => void;
   onReload: () => void;
 }) {
@@ -82,6 +100,7 @@ function OrderDetail({
   const errorText = useFormErrorText();
   const locale = useLocale();
   const { paymentLabel, placeLabel, timeAgo, clockTime, statusLabel, actionLabel } = useOrderText();
+  const choiceLabels = useChoiceLabels();
 
   const actions = order.actions;
   const primary = actions.find((action) => action !== "cancel" && action !== "fail_delivery");
@@ -109,7 +128,7 @@ function OrderDetail({
     setBusy(true);
     setProblem(null);
     try {
-      onChanged(await api<SellerOrderDetail>(`/orders/${order.id}/actions`, { method: "POST", body: request }));
+      onChanged(await api(`/orders/${order.id}/actions`, sellerOrderDetailSchema, { method: "POST", body: request }));
       return true;
     } catch (failure) {
       if (failure instanceof ApiError && failure.code === "action_not_allowed") {
@@ -164,22 +183,27 @@ function OrderDetail({
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
 
   return (
-    <div className="flex flex-col gap-4 p-4">
+    <div className={`${SELLER_FORM} gap-4`}>
       <div className="flex items-center gap-1">
         <Link href={`/${locale}/m/orders`} aria-label={t("backToOrders")} className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-border/30 print:hidden">
           <ArrowLeft className="h-5 w-5" aria-hidden="true" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-bold leading-normal">
+          <h1 className="truncate text-xl font-semibold leading-normal">
             {t("orderNumber")} #{order.orderNumber}
           </h1>
           <p className="text-sm text-muted">{timeAgo(order.createdAt)}</p>
         </div>
-        {/* A one-page slip to pack with, or to hand to the driver. */}
-        <Button variant="secondary" onClick={() => window.print()} className="shrink-0 px-3 print:hidden">
-          <Printer className="h-4 w-4" aria-hidden="true" />
-          {t("printSlip")}
-        </Button>
+      </div>
+
+      {/* Call, Telegram, copy address and the invoice (design/screens.md B7) — one tap each, above everything else. */}
+      <div className="print:hidden">
+        <OrderContactBar
+          phone={order.buyerPhone}
+          address={[isPickup ? order.pickupAddress : placeLabel(order), order.landmark].filter(Boolean).join(" · ")}
+          invoiceHref={`/${locale}/m/orders/${order.id}/invoice`}
+          trackingCode={order.trackingCode}
+        />
       </div>
 
       <Card className="flex flex-col gap-3 p-4 print:hidden">
@@ -188,9 +212,9 @@ function OrderDetail({
           <OrderStatusPill order={order} />
         </div>
         {problem && (
-          <p role="alert" className="rounded-DEFAULT border border-warning/40 bg-warning/5 p-3 text-sm">
+          <Notice tone="warning" role="alert">
             {problem}
-          </p>
+          </Notice>
         )}
         {order.status === "awaiting_payment" && <p className="text-sm text-muted">{t("hint_awaiting_payment")}</p>}
         {actions.length === 0 && <p className="text-sm text-muted">{t(order.status === "cancelled" ? "hint_cancelled" : "hint_completed")}</p>}
@@ -274,7 +298,7 @@ function OrderDetail({
         )}
 
         {primary && (
-          <Button variant="primary" className="w-full" loading={busy} onClick={() => (primary === "dispatch" ? handleSend() : void run({ action: primary } as OrderActionRequest))}>
+          <Button variant="primary" className="w-full" loading={busy} onClick={() => (primary === "dispatch" ? handleSend() : isPlainOrderAction(primary) && void run({ action: primary }))}>
             {actionLabel(order, primary, route)}
           </Button>
         )}
@@ -307,6 +331,8 @@ function OrderDetail({
 
       <Card className="flex flex-col gap-2 p-4">
         <h2 className="font-semibold">{t("items")}</h2>
+        <PreferredTime at={order.preferredAt} />
+        {order.tableName && <p className="text-sm font-medium">{t("tableName", { name: order.tableName })}</p>}
         {order.items.map((item, index) => {
           const option = text(item.variantLabelKm, item.variantLabelEn);
           return (
@@ -314,6 +340,10 @@ function OrderDetail({
               <span className="min-w-0">
                 <span className="font-semibold tabular-nums">{item.quantity} ×</span> {text(item.titleKm, item.titleEn)}
                 {option && <span className="text-muted"> – {option}</span>}
+                <LineDetails choices={choiceLabels(item.choices)} note={item.note} />
+                {lineFields.length > 0 && item.id && (
+                  <LineFields orderId={order.id} itemId={item.id} values={item.customValues ?? {}} fields={lineFields} onSaved={onChanged} />
+                )}
               </span>
               <span className="shrink-0 tabular-nums">{formatMoney(item.lineTotalMinor, order.currency)}</span>
             </div>
@@ -361,7 +391,7 @@ function OrderDetail({
             {dispatch.route === "driver" ? (
               <span>
                 <span className="block font-medium">{dispatch.driverName}</span>
-                <a href={`tel:+${dispatch.driverPhone}`} className="block text-brand tabular-nums">
+                <a href={`tel:+${dispatch.driverPhone}`} className="flex min-h-touch items-center text-brand tabular-nums">
                   {formatKhmerPhoneLocal(dispatch.driverPhone)}
                 </a>
               </span>

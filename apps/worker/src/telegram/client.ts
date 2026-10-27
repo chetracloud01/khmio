@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import { z } from "zod";
 
 // Talking to Telegram (Bot API over HTTPS). Without a bot token the worker
 // runs in dry run: every message it would send is recorded in the log
@@ -59,20 +60,41 @@ export class TelegramError extends Error {
   }
 }
 
+/** Every Bot API answer: ok, and the result or why not. */
+const answerSchema = z.object({ ok: z.boolean().optional(), result: z.unknown(), description: z.string().optional() });
+
+const chatSchema = z.object({ id: z.number(), type: z.enum(["private", "group", "supergroup", "channel"]), title: z.string().optional() });
+
+/** The parts of an update the bot reads (allowed_updates in getUpdates). */
+const updateSchema = z.object({
+  update_id: z.number(),
+  callback_query: z
+    .object({ id: z.string(), from: z.object({ id: z.number() }), data: z.string().optional(), message: z.object({ message_id: z.number(), chat: z.object({ id: z.number() }) }).optional() })
+    .optional(),
+  message: z.object({ chat: chatSchema, from: z.object({ id: z.number() }).optional(), text: z.string().optional() }).optional(),
+  my_chat_member: z
+    .object({ chat: chatSchema, new_chat_member: z.object({ status: z.enum(["member", "administrator", "left", "kicked", "restricted", "creator"]) }) })
+    .optional(),
+});
+
 class HttpTelegramClient implements TelegramClient {
   readonly dryRun = false;
-  constructor(private readonly token: string) {}
+  constructor(
+    private readonly token: string,
+    private readonly apiUrl: string,
+  ) {}
 
-  private async call<T>(method: string, body: object, timeoutMs = 15_000): Promise<T> {
-    const response = await fetch(`https://api.telegram.org/bot${this.token}/${method}`, {
+  private async call(method: string, body: object, timeoutMs = 15_000): Promise<unknown> {
+    const response = await fetch(`${this.apiUrl}/bot${this.token}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const data = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: T; description?: string };
+    const answer = answerSchema.safeParse(await response.json().catch(() => ({})));
+    const data = answer.success ? answer.data : {};
     if (!response.ok || !data.ok) throw new TelegramError(method, response.status, data.description ?? "no description");
-    return data.result as T;
+    return data.result;
   }
 
   async sendMessage(chatId: string, text: string, buttons?: InlineButton[][]) {
@@ -80,15 +102,13 @@ class HttpTelegramClient implements TelegramClient {
   }
 
   async getUpdates(offset: number, timeoutSeconds: number) {
-    type Chat = { id: number; type: IncomingMessage["chatType"]; title?: string };
-    type Update = {
-      update_id: number;
-      callback_query?: { id: string; from: { id: number }; data?: string; message?: { message_id: number; chat: { id: number } } };
-      message?: { chat: Chat; from?: { id: number }; text?: string };
-      my_chat_member?: { chat: Chat; new_chat_member: { status: MembershipChange["status"] } };
-    };
-    const raw = await this.call<Update[]>("getUpdates", { offset, timeout: timeoutSeconds, allowed_updates: ["callback_query", "message", "my_chat_member"] }, (timeoutSeconds + 10) * 1000);
-    const updates = raw.flatMap((update): TelegramUpdate[] => {
+    const result = await this.call("getUpdates", { offset, timeout: timeoutSeconds, allowed_updates: ["callback_query", "message", "my_chat_member"] }, (timeoutSeconds + 10) * 1000);
+    // Each update is read on its own: one of a shape the bot doesn't know is skipped, never retried forever.
+    const raw = z.array(z.object({ update_id: z.number() }).passthrough()).parse(result);
+    const updates = raw.flatMap((entry): TelegramUpdate[] => {
+      const parsed = updateSchema.safeParse(entry);
+      if (!parsed.success) return [];
+      const update = parsed.data;
       const q = update.callback_query;
       if (q?.data) {
         return [{ type: "callback", query: { id: q.id, fromUserId: String(q.from.id), data: q.data, chatId: q.message ? String(q.message.chat.id) : null, messageId: q.message?.message_id ?? null } }];
@@ -133,6 +153,7 @@ class DryRunTelegramClient implements TelegramClient {
   async editButtons() {}
 }
 
-export function createTelegramClient(token: string | undefined, logger: Logger): TelegramClient {
-  return token ? new HttpTelegramClient(token) : new DryRunTelegramClient(logger);
+/** apiUrl: Telegram's Bot API (TELEGRAM_API_URL); only the end-to-end tests point it elsewhere. */
+export function createTelegramClient(token: string | undefined, logger: Logger, apiUrl = "https://api.telegram.org"): TelegramClient {
+  return token ? new HttpTelegramClient(token, apiUrl) : new DryRunTelegramClient(logger);
 }

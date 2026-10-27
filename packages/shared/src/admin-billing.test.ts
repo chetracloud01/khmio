@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { adminCan, adminInviteSchema, canChangeAdmin, type AdminAccount } from "./admin-roles";
+import { adminCan, adminInviteSchema, canChangeAdmin, type AdminAccount, type AdminRole } from "./admin-roles";
+import { backupIsStale } from "./backups";
+import { workerState } from "./health";
 import { applyInvoicePaid, getInvoiceView, invoiceManualPaymentSchema, invoiceVoidSchema } from "./billing";
 import { toFieldErrors } from "./form-errors";
 import { evaluatePaymentCheck, failedCheckCloseSchema, isExactPaymentMatch } from "./payment-attempts";
@@ -83,6 +85,28 @@ describe("admin roles", () => {
     expect(adminCan("finance", "billing_manage")).toBe(true);
     expect(adminCan("finance", "kyc_review")).toBe(false);
     expect(adminCan("finance", "admins_manage")).toBe(false);
+  });
+
+  it("lets everyone see backups, support and owners start one, and only owners restore a shop", () => {
+    expect(["owner", "support", "finance"].every((role) => adminCan(role as AdminRole, "backups_view"))).toBe(true);
+    expect(adminCan("support", "backups_run")).toBe(true);
+    expect(adminCan("finance", "backups_run")).toBe(false);
+    expect(adminCan("owner", "shop_restore")).toBe(true);
+    expect(adminCan("support", "shop_restore")).toBe(false);
+  });
+
+  it("calls the worker down after 15 minutes without a heartbeat", () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    expect(workerState(new Date("2026-10-07T11:50:00Z"), now)).toBe("ok");
+    expect(workerState(new Date("2026-10-07T11:44:00Z"), now)).toBe("warning");
+    expect(workerState(null, now)).toBe("warning");
+  });
+
+  it("calls the backups stale after 26 hours without a good one", () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    expect(backupIsStale(new Date("2026-10-07T03:00:00Z"), now)).toBe(false);
+    expect(backupIsStale(new Date("2026-10-06T09:59:00Z"), now)).toBe(true);
+    expect(backupIsStale(null, now)).toBe(true);
   });
 
   it("never leaves the admin area without an active owner", () => {

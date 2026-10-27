@@ -9,13 +9,31 @@ import {
   type Currency,
   type DeliveryArea,
   type DispatchRoute,
-  type Fulfilment,
+  type OrderFulfilment,
   type OrderAction,
   type OrderStatus,
-  type PaymentMethod,
-} from "@khmer-micro-store/shared";
-import { cn } from "@khmer-micro-store/ui";
+  type OrderTab,
+  type OrderPaymentMethod,
+} from "@khmio/shared";
+import { cn, StatusPill, type Tone } from "@khmio/ui";
+import {
+  AlertTriangle,
+  BellRing,
+  CalendarClock,
+  CircleCheckBig,
+  HandCoins,
+  Hourglass,
+  PackageOpen,
+  PackageX,
+  Store,
+  ThumbsUp,
+  Truck,
+  UserRoundSearch,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useDateText } from "./use-date-text";
 
 // One wording and one colour per order status, for the buyer's order page,
 // the seller's dashboard and (later) Telegram — design/design-standard.md §7.
@@ -23,25 +41,78 @@ import { useLocale, useTranslations } from "next-intl";
 /** The parts of an order these helpers read; the mockup's sample orders and the API's orders both fit. */
 export interface OrderFactsForText {
   status: OrderStatus;
-  fulfilment: Fulfilment;
-  paymentMethod: PaymentMethod;
+  fulfilment: OrderFulfilment;
+  paymentMethod: OrderPaymentMethod;
   area: DeliveryArea;
   districtId?: string | null;
   provinceId?: string | null;
 }
 
-export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
-  awaiting_payment: "bg-warning/10 text-warning",
-  paid: "bg-success/10 text-success",
-  cod_pending: "bg-warning/10 text-warning",
-  confirmed: "bg-info/10 text-info",
-  packing: "bg-info/10 text-info",
-  waiting_for_driver: "bg-info/10 text-info",
-  out_for_delivery: "bg-info/10 text-info",
-  delivered: "bg-success/10 text-success",
-  completed: "bg-success/10 text-success",
-  cancelled: "bg-danger/10 text-danger",
-  failed_delivery: "bg-danger/10 text-danger",
+/**
+ * Each status's colour role (design/design-standard.md §7): waiting = warning,
+ * being prepared = info, on its way = brand, done = success, stopped = danger.
+ */
+export const ORDER_STATUS_TONE: Record<OrderStatus, Tone> = {
+  awaiting_payment: "warning",
+  paid: "success",
+  cod_pending: "warning",
+  confirmed: "info",
+  packing: "info",
+  waiting_for_driver: "brand",
+  out_for_delivery: "brand",
+  delivered: "success",
+  completed: "success",
+  cancelled: "danger",
+  failed_delivery: "danger",
+};
+
+/** One icon per status, the same everywhere (design/design-standard.md §7). */
+export const ORDER_STATUS_ICON: Record<OrderStatus, LucideIcon> = {
+  awaiting_payment: Hourglass,
+  paid: BellRing,
+  cod_pending: BellRing,
+  confirmed: ThumbsUp,
+  packing: PackageOpen,
+  waiting_for_driver: UserRoundSearch,
+  out_for_delivery: Truck,
+  delivered: HandCoins,
+  completed: CircleCheckBig,
+  cancelled: XCircle,
+  failed_delivery: PackageX,
+};
+
+/** The status's icon; a pickup order "out for delivery" is waiting at the shop. */
+export function orderStatusIcon(order: { status: OrderStatus; fulfilment?: OrderFulfilment }): LucideIcon {
+  if (order.status === "out_for_delivery" && order.fulfilment === "pickup") return Store;
+  if (order.status === "delivered" && order.fulfilment === "pickup") return HandCoins;
+  return ORDER_STATUS_ICON[order.status];
+}
+
+/** The orders list's steps (its tabs and status groups), in the order work happens. */
+export const ORDER_TAB_ICON: Record<OrderTab, LucideIcon> = {
+  to_confirm: BellRing,
+  packing: PackageOpen,
+  sending: Truck,
+  delivered: CircleCheckBig,
+  problems: AlertTriangle,
+  awaiting: Hourglass,
+};
+export const ORDER_TAB_TONE: Record<OrderTab, Tone> = {
+  to_confirm: "warning",
+  packing: "info",
+  sending: "brand",
+  delivered: "success",
+  problems: "danger",
+  awaiting: "muted",
+};
+/** Text colour per tone, for icons and headers on a plain background. */
+export const TONE_TEXT: Record<Tone, string> = {
+  brand: "text-brand",
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  info: "text-info",
+  muted: "text-muted",
 };
 
 export function formatMoney(amount: number, currency: Currency): string {
@@ -52,10 +123,12 @@ export function formatMoney(amount: number, currency: Currency): string {
 export function useOrderText() {
   const t = useTranslations("Orders");
   const tCheckout = useTranslations("Checkout");
+  const { timeAgo, clockTime } = useDateText();
   const locale = useLocale();
 
-  /** A pickup order is never "out for delivery": at that point it's waiting at the shop. */
+  /** A pickup order is never "out for delivery": at that point it's waiting at the shop. A counter sale is "sold in shop", or "voided". */
   function statusLabel(order: Pick<OrderFactsForText, "status" | "fulfilment">): string {
+    if (order.fulfilment === "in_store") return order.status === "cancelled" ? t("status_voided") : t("status_sold_in_shop");
     if (order.status === "out_for_delivery" && order.fulfilment === "pickup") return t("status_ready_for_pickup");
     if (order.status === "failed_delivery" && order.fulfilment === "pickup") return t("status_not_collected");
     return t(`status_${order.status}`);
@@ -73,12 +146,15 @@ export function useOrderText() {
 
   function paymentLabel(order: Pick<OrderFactsForText, "paymentMethod" | "status" | "fulfilment">): string {
     if (order.paymentMethod === "cod") return order.fulfilment === "pickup" ? t("payAtPickup") : t("payCod");
+    if (order.paymentMethod === "cash") return t("payCash");
+    if (order.paymentMethod === "shop_qr") return t("payShopQr");
     return order.status === "awaiting_payment" ? t("payOnlinePending") : t("payOnlinePaid");
   }
 
   /** "Daun Penh, Phnom Penh", "Kampot", or "Pickup". */
   function placeLabel(order: Pick<OrderFactsForText, "fulfilment" | "area" | "districtId" | "provinceId">): string {
     if (order.fulfilment === "pickup") return tCheckout("pickup");
+    if (order.fulfilment === "in_store") return t("soldInShop");
     const district = PHNOM_PENH_DISTRICTS.find((place) => place.id === order.districtId);
     if (district) return `${placeName(district, locale)}, ${tCheckout("phnomPenh")}`;
     const province = PROVINCES.find((place) => place.id === order.provinceId);
@@ -86,40 +162,52 @@ export function useOrderText() {
     return order.area === "phnom_penh" ? tCheckout("phnomPenh") : tCheckout("otherProvince");
   }
 
-  function timeAgo(iso: string): string {
-    const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-    if (minutes < 1) return t("justNow");
-    if (minutes < 60) return t("minutesAgo", { count: minutes });
-    if (minutes < 1440) return t("hoursAgo", { count: Math.round(minutes / 60) });
-    return t("daysAgo", { count: Math.round(minutes / 1440) });
-  }
-
-  /** "14:05" today, "29 Sep, 14:05" otherwise — for the status history. */
-  function clockTime(iso: string): string {
-    const date = new Date(iso);
-    const sameDay = date.toDateString() === new Date().toDateString();
-    return date.toLocaleString(locale === "km" ? "km-KH" : "en-GB", {
-      ...(sameDay ? {} : { day: "numeric", month: "short" }),
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  }
-
   return { statusLabel, actionLabel, paymentLabel, placeLabel, timeAgo, clockTime };
+}
+
+/** A booking's preferred time (only services), as the seller's and the buyer's order pages show it. Nothing for other orders. */
+export function PreferredTime({ at, className }: { at: string | null; className?: string }) {
+  const t = useTranslations("Orders");
+  const { date, clockTime } = useDateText();
+  if (!at) return null;
+  return (
+    <p className={cn("flex items-center gap-2 text-sm", className)}>
+      <CalendarClock className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+      <span>
+        <span className="font-medium">{t("preferredAt")}</span> {date(at)} {clockTime(at)}
+      </span>
+    </p>
+  );
+}
+
+/** An order line's frozen choices in the reader's language: ["Less sugar", "+1 shot"]. */
+export function useChoiceLabels() {
+  const locale = useLocale();
+  return (choices: readonly { labelKm: string; labelEn: string }[]) => choices.map((choice) => (locale === "km" ? choice.labelKm || choice.labelEn : choice.labelEn || choice.labelKm));
+}
+
+/**
+ * Under a line's name: the choices picked and the buyer's note — the cart,
+ * checkout, the order pages, the invoice and the counter alike. Nothing
+ * when there's neither.
+ */
+export function LineDetails({ choices, note, className }: { choices: readonly string[]; note: string; className?: string }) {
+  if (!choices.length && !note) return null;
+  return (
+    <span className={cn("block text-xs leading-normal text-muted", className)}>
+      {choices.length > 0 && <span className="block">{choices.join(" · ")}</span>}
+      {note && <span className="block italic">“{note}”</span>}
+    </span>
+  );
 }
 
 export function OrderStatusPill({ order, className }: { order: Pick<OrderFactsForText, "status" | "fulfilment">; className?: string }) {
   const { statusLabel } = useOrderText();
+  const Icon = orderStatusIcon(order);
   return (
-    <span
-      className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold",
-        ORDER_STATUS_TONE[order.status],
-        className,
-      )}
-    >
+    <StatusPill tone={ORDER_STATUS_TONE[order.status]} className={cn("items-center gap-1", className)}>
+      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       {statusLabel(order)}
-    </span>
+    </StatusPill>
   );
 }

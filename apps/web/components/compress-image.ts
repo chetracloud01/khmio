@@ -4,8 +4,8 @@
 
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp";
 
-/** Longest side at most `maxSide` px, re-encoded as JPEG. Rejects files that aren't images. */
-export function compressImage(file: File, maxSide = 1600, quality = 0.8): Promise<string> {
+/** The photo drawn onto a canvas, longest side at most `maxSide` px. Rejects files that aren't images. */
+function drawShrunk(file: File, maxSide: number): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
       reject(new Error("not an image"));
@@ -25,7 +25,7 @@ export function compressImage(file: File, maxSide = 1600, quality = 0.8): Promis
         return;
       }
       context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      resolve(canvas);
     };
     image.onerror = () => {
       URL.revokeObjectURL(url);
@@ -35,13 +35,21 @@ export function compressImage(file: File, maxSide = 1600, quality = 0.8): Promis
   });
 }
 
+/** Longest side at most `maxSide` px, re-encoded as JPEG, as a data URL (the mockups keep photos this way). */
+export async function compressImage(file: File, maxSide = 1600, quality = 0.8): Promise<string> {
+  return (await drawShrunk(file, maxSide)).toDataURL("image/jpeg", quality);
+}
+
 /**
  * The same shrink, as a JPEG file ready to upload (the API takes at most
  * 2 MB). A photo that would still be too big is tried again smaller.
+ * Straight from the canvas: turning a data URL back into a file with fetch()
+ * is blocked by the site's Content-Security-Policy (connect-src).
  */
 export async function compressImageToBlob(file: File, maxSide = 1600, quality = 0.8): Promise<Blob> {
-  const dataUrl = await compressImage(file, maxSide, quality);
-  const blob = await (await fetch(dataUrl)).blob();
+  const canvas = await drawShrunk(file, maxSide);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  if (!blob) throw new Error("couldn't encode the photo");
   if (blob.size <= MAX_UPLOAD_BYTES || maxSide <= 640) return blob;
   return compressImageToBlob(file, Math.round(maxSide * 0.75), quality);
 }

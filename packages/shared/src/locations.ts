@@ -68,3 +68,16 @@ export function isProvince(id: string): boolean {
 export function placeName(place: Place, locale: string): string {
   return locale === "km" ? place.nameKm : place.nameEn;
 }
+
+const MAP_SEARCH_URL = "https://www.google.com/maps/search/?api=1&query=";
+
+/** A shop's address as a map search buyers can open (Google Maps opens the app on a phone). */
+export function mapSearchUrl(address: string): string | null {
+  const query = address.trim();
+  return query ? `${MAP_SEARCH_URL}${encodeURIComponent(query)}` : null;
+}
+
+/** Where the buyer's Map button goes: the seller's own map link, else a search for the address. */
+export function shopMapLink(mapUrl: string, address: string): string | null {
+  return mapUrl.trim() || mapSearchUrl(address);
+}

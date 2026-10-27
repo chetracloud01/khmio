@@ -1,4 +1,4 @@
-import { convertKhrToUsdCents, formatKhr, formatUsd } from "@khmer-micro-store/shared";
+import { convertKhrToUsdCents, formatKhr, formatUsd } from "@khmio/shared";
 import type { Product, ProductVariant } from "./api";
 
 // Prices as the dashboard list and the shop page show them. Display only:

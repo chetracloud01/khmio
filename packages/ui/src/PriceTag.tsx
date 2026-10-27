@@ -1,4 +1,4 @@
-import { formatKhr, formatUsd, type Currency } from "@khmer-micro-store/shared";
+import { formatKhr, formatUsd, type Currency } from "@khmio/shared";
 import { cn } from "./cn";
 
 export interface PriceTagProps {

@@ -18,7 +18,7 @@ import {
   type KycRejectReason,
   type KycSubmission,
   type PlanId,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
@@ -37,7 +37,7 @@ export interface AdminAuditEntry {
   id: string;
   storeNameKm: string;
   storeNameEn: string;
-  /** For admin-user actions there's no store: the two name fields hold the admin's name. */
+  /** For admin-user actions there's no store: the two name fields hold the admin's name; for website actions, the page's name. */
   action:
     | "kycApproved"
     | "kycRejected"
@@ -49,7 +49,9 @@ export interface AdminAuditEntry {
     | "adminInvited"
     | "adminRoleChanged"
     | "adminDisabled"
-    | "adminEnabled";
+    | "adminEnabled"
+    | "websitePublished"
+    | "websiteRestored";
   plan?: PlanId;
   days?: number;
   reason?: KycRejectReason;
@@ -98,13 +100,16 @@ interface AdminContextValue {
   inviteAdmin: (invite: AdminInvite) => void;
   /** False (and nothing changes) if it would leave no active owner. */
   changeAdmin: (adminId: string, change: { role?: AdminRole; disabled?: boolean }) => boolean;
+  /** A website page was published, or an earlier version restored to its draft (A10). */
+  /** The page's key goes in the name fields; the audit log shows its name in the reader's language. */
+  logWebsiteChange: (action: "websitePublished" | "websiteRestored", pageKey: string, version: number) => void;
 }
 
 const AdminContext = createContext<AdminContextValue | null>(null);
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const STORAGE_KEY = "khmer-micro-store:mockup-admin";
+const STORAGE_KEY = "khmio:mockup-admin";
 
 interface PersistedAdmin {
   stores: MockAdminStore[];
@@ -335,6 +340,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         rejectKyc,
         overrideStore,
         logChange,
+        logWebsiteChange: (action, pageKey, version) => log({ km: pageKey, en: pageKey }, { action, detail: String(version) }),
         settings,
         saveSettings: setSettings,
         invoices,

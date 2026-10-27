@@ -1,17 +1,20 @@
-import type { SystemDb } from "@khmer-micro-store/db";
-import { adminCodeSchema, telegramLoginPayloadSchema } from "@khmer-micro-store/shared";
+import { queueAdminAlert, type SystemDb, writeAudit } from "@khmio/db";
+import { adminCodeSchema, telegramLoginPayloadSchema, type AuditAction } from "@khmio/shared";
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Post, Req, Res, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { readCookie } from "../auth/sessions";
 import { checkTelegramLogin } from "../auth/telegram";
 import { getEnv } from "../config";
 import { SYSTEM_DB } from "../db";
 import { AppException, InvalidInputException } from "../errors";
+import { clientAddress, RATE_LIMITER, type RateLimiter } from "../security/rate-limit";
 import {
   ADMIN_COOKIE,
   adminCookie,
   beginEnrolment,
   clearedAdminCookie,
   findActiveAdmin,
+  firstActiveOwner,
+  hasAuthenticator,
   readAdminSession,
   revokeAdminSession,
   startAdminSession,
@@ -23,6 +26,7 @@ interface CookieResponse {
 }
 interface CookieRequest {
   headers: { cookie?: string };
+  ip?: string;
 }
 
 /**
@@ -32,7 +36,10 @@ interface CookieRequest {
  */
 @Controller("admin/auth")
 export class AdminAuthController {
-  constructor(@Inject(SYSTEM_DB) private readonly db: SystemDb) {}
+  constructor(
+    @Inject(SYSTEM_DB) private readonly db: SystemDb,
+    @Inject(RATE_LIMITER) private readonly limits: RateLimiter,
+  ) {}
 
   private key(): string {
     const key = getEnv().ADMIN_SECRETS_KEY;
@@ -45,7 +52,8 @@ export class AdminAuthController {
   /** Step one with Telegram's signed login. An unlisted or disabled account gets nothing — and isn't told why. */
   @Post("telegram")
   @HttpCode(200)
-  async telegram(@Body() body: unknown, @Res({ passthrough: true }) res: CookieResponse) {
+  async telegram(@Req() req: CookieRequest, @Body() body: unknown, @Res({ passthrough: true }) res: CookieResponse) {
+    await this.limits.hit("adminLogin", clientAddress(req));
     this.key();
     const botToken = getEnv().TELEGRAM_BOT_TOKEN;
     if (!botToken) throw new ServiceUnavailableException();
@@ -62,7 +70,7 @@ export class AdminAuthController {
   async devLogin(@Res({ passthrough: true }) res: CookieResponse) {
     if (getEnv().NODE_ENV === "production") throw new NotFoundException();
     this.key();
-    const owner = await this.db.adminUser.findFirst({ where: { role: "owner", disabledAt: null }, orderBy: { createdAt: "asc" } });
+    const owner = await firstActiveOwner(this.db);
     if (!owner) throw new UnauthorizedException();
     return this.startStepTwo(owner.id, res);
   }
@@ -71,6 +79,7 @@ export class AdminAuthController {
   @Post("enrol")
   @HttpCode(200)
   async enrol(@Req() req: CookieRequest) {
+    await this.limits.hit("adminCode", clientAddress(req));
     const key = this.key();
     const session = await this.pending(req);
     if (session.enrolled) throw new AppException(409, "action_not_allowed");
@@ -81,6 +90,7 @@ export class AdminAuthController {
   @Post("verify")
   @HttpCode(200)
   async verify(@Req() req: CookieRequest, @Body() body: unknown) {
+    await this.limits.hit("adminCode", clientAddress(req));
     const key = this.key();
     const session = await this.pending(req);
     const { code } = adminCodeSchema.parse(body);
@@ -89,7 +99,7 @@ export class AdminAuthController {
     if (!outcome.ok) {
       await this.audit(session.admin.adminId, outcome.reason === "locked" ? "admin.login_locked" : "admin.code_wrong");
       if (outcome.lockedJustNow) {
-        await this.db.outboxEvent.create({ data: { kind: "admin_alert", payload: { reason: "admin_locked", adminName: session.admin.name } } });
+        await queueAdminAlert(this.db, { reason: "admin_locked", adminName: session.admin.name });
       }
       if (outcome.reason === "locked") throw new AppException(429, "code_locked");
       throw new InvalidInputException({ code: "otp_invalid" });
@@ -121,8 +131,7 @@ export class AdminAuthController {
   private async startStepTwo(adminId: string, res: CookieResponse) {
     const { token, expiresAt } = await startAdminSession(this.db, adminId);
     res.setHeader("Set-Cookie", adminCookie(token, expiresAt, this.secure()));
-    const admin = await this.db.adminUser.findUniqueOrThrow({ where: { id: adminId }, select: { totpSecretEnc: true } });
-    return { next: admin.totpSecretEnc ? "code" : "enrol" };
+    return { next: (await hasAuthenticator(this.db, adminId)) ? "code" : "enrol" };
   }
 
   private async pending(req: CookieRequest) {
@@ -132,7 +141,7 @@ export class AdminAuthController {
     return session;
   }
 
-  private audit(adminId: string, action: string) {
-    return this.db.auditLog.create({ data: { actorType: "admin", actorId: adminId, action, entity: "admin_user", entityId: adminId } });
+  private audit(adminId: string, action: AuditAction) {
+    return writeAudit(this.db, { actorType: "admin", actorId: adminId }, { action, entity: "admin_user", entityId: adminId });
   }
 }

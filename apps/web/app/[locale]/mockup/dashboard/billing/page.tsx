@@ -11,21 +11,17 @@ import {
   PLANS,
   planHasFeature,
   type Currency,
-  type PlanFeature,
+  PLAN_FEATURES,
   type PlanId,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Card, cn, SegmentedControl } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { BottomSheet, Button, Card, cn, SegmentedControl } from "@khmio/ui";
 import { Check, Minus, QrCode } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePlanFeatureLabels } from "@/components/plan-features";
 import { useState } from "react";
 import { useMerchantProducts } from "../../merchant-products-context";
 import { useMerchantSubscription, type SubscriptionPreview } from "../../merchant-subscription-context";
 
-const FEATURES: { key: PlanFeature; label: "featureStock" | "featureWholesale" | "featureWarehouses" }[] = [
-  { key: "stock", label: "featureStock" },
-  { key: "wholesalePrice", label: "featureWholesale" },
-  { key: "warehouses", label: "featureWarehouses" },
-];
 
 const STATUS_STYLES = {
   trialing: "bg-brand/10 text-brand",
@@ -46,6 +42,8 @@ export default function DashboardBillingMockupPage() {
 
 function Billing() {
   const t = useTranslations("Billing");
+  const featureLabels = usePlanFeatureLabels();
+  const tDates = useTranslations("Dates");
   const tPlan = useTranslations("Plans");
   const { subscription, setBillingCurrency, changePlan, cancelPendingDowngrade, payInvoice, preview } =
     useMerchantSubscription();
@@ -183,16 +181,16 @@ function Billing() {
                     ? t("featureUnlimitedProducts")
                     : t("featureProductLimit", { count: definition.maxProducts })}
                 </li>
-                {FEATURES.map((feature) => {
-                  const included = planHasFeature(target, feature.key);
+                {PLAN_FEATURES.map((feature) => {
+                  const included = planHasFeature(target, feature);
                   return (
-                    <li key={feature.key} className={cn("flex items-center gap-2", !included && "text-muted")}>
+                    <li key={feature} className={cn("flex items-center gap-2", !included && "text-muted")}>
                       {included ? (
                         <Check className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
                       ) : (
                         <Minus className="h-4 w-4 shrink-0" aria-hidden="true" />
                       )}
-                      <span className={cn(!included && "line-through")}>{t(feature.label)}</span>
+                      <span className={cn(!included && "line-through")}>{featureLabels[feature]}</span>
                     </li>
                   );
                 })}
@@ -223,7 +221,7 @@ function Billing() {
                     {tPlan(invoice.plan)} · {t(`reason_${invoice.reason}`)}
                   </p>
                   <p className="text-xs text-muted">
-                    {invoice.createdDaysAgo === 0 ? t("today") : t("daysAgo", { count: invoice.createdDaysAgo })}
+                    {invoice.createdDaysAgo === 0 ? t("today") : tDates("daysAgo", { count: invoice.createdDaysAgo })}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">

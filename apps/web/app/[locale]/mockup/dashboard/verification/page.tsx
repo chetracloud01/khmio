@@ -6,8 +6,8 @@ import {
   toFieldErrors,
   type FormErrorCode,
   type KycIdType,
-} from "@khmer-micro-store/shared";
-import { Card, cn, Input, SegmentedControl } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { Card, cn, Input, SegmentedControl } from "@khmio/ui";
 import { AlertCircle, BadgeCheck, Camera, Clock, ShieldAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useId, useRef, useState } from "react";

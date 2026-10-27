@@ -1,5 +1,5 @@
-import type { SystemDb } from "@khmer-micro-store/db";
-import { adminCan, type AdminPermission } from "@khmer-micro-store/shared";
+import type { SystemDb } from "@khmio/db";
+import { adminCan, type AdminPermission } from "@khmio/shared";
 import { createParamDecorator, ForbiddenException, Inject, Injectable, SetMetadata, UnauthorizedException, type CanActivate, type ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { readCookie } from "../auth/sessions";

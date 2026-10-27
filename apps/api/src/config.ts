@@ -1,4 +1,4 @@
-import { apiEnvSchema, loadEnv, type ApiEnv } from "@khmer-micro-store/shared";
+import { apiEnvSchema, loadEnv, type ApiEnv } from "@khmio/shared";
 
 let cached: ApiEnv | undefined;
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { formatKhmerPhoneLocal, getOrderTab, ORDER_TABS } from "@khmer-micro-store/shared";
+import { formatKhmerPhoneLocal, getOrderTab, ORDER_TABS } from "@khmio/shared";
+import { Mio } from "@khmio/ui";
 import { ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
@@ -111,6 +112,7 @@ function OrdersList() {
       </div>
 
       <DataGrid
+        rowNumbers
         rows={orders}
         getRowId={(order) => order.orderNumber}
         columns={columns}
@@ -174,6 +176,7 @@ function OrdersList() {
         exportFileName="orders"
         storageKey="merchant-orders"
         emptyTitle={t("noOrders")}
+        emptyArt={<Mio size={80} />}
       />
     </div>
   );

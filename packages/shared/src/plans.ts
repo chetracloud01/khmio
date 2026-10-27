@@ -14,7 +14,10 @@ export const PLAN_ORDER: readonly PlanId[] = planIdSchema.options;
 export const subscriptionStatusSchema = z.enum(["trialing", "active", "grace", "paused"]);
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
-export type PlanFeature = "stock" | "wholesalePrice" | "warehouses";
+export type PlanFeature = "counterSales" | "stock" | "wholesalePrice" | "warehouses";
+
+/** Every feature, in the order plan tables and lists show them. */
+export const PLAN_FEATURES: readonly PlanFeature[] = ["counterSales", "stock", "wholesalePrice", "warehouses"];
 
 export interface PlanDefinition {
   id: PlanId;
@@ -27,34 +30,37 @@ export interface PlanDefinition {
   features: Record<PlanFeature, boolean>;
 }
 
+/** A new shop's Free trial: every shop starts on it (apps/api create-store.ts). */
+export const FREE_TRIAL_DAYS = 14;
+
 export const PLANS: Record<PlanId, PlanDefinition> = {
   free: {
     id: "free",
     monthlyPrice: { usdCents: 0, khr: 0 },
     maxProducts: 10,
-    trialDays: 14,
-    features: { stock: false, wholesalePrice: false, warehouses: false },
+    trialDays: FREE_TRIAL_DAYS,
+    features: { counterSales: false, stock: false, wholesalePrice: false, warehouses: false },
   },
   basic: {
     id: "basic",
     monthlyPrice: { usdCents: 500, khr: 20000 },
     maxProducts: null,
     trialDays: null,
-    features: { stock: false, wholesalePrice: false, warehouses: false },
+    features: { counterSales: true, stock: false, wholesalePrice: false, warehouses: false },
   },
   pro: {
     id: "pro",
     monthlyPrice: { usdCents: 1200, khr: 48000 },
     maxProducts: null,
     trialDays: null,
-    features: { stock: true, wholesalePrice: true, warehouses: false },
+    features: { counterSales: true, stock: true, wholesalePrice: true, warehouses: false },
   },
   advance: {
     id: "advance",
     monthlyPrice: { usdCents: 2900, khr: 116000 },
     maxProducts: null,
     trialDays: null,
-    features: { stock: true, wholesalePrice: true, warehouses: true },
+    features: { counterSales: true, stock: true, wholesalePrice: true, warehouses: true },
   },
 };
 

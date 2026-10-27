@@ -1,5 +1,5 @@
 {
-  "name": "@khmer-micro-store/worker",
+  "name": "@khmio/worker",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -8,15 +8,21 @@
     "start": "node --enable-source-maps dist/index.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run --passWithNoTests"
+    "test": "node --env-file-if-exists=../../.env ./node_modules/vitest/vitest.mjs run --passWithNoTests",
+    "backup": "tsx --env-file-if-exists=../../.env src/cli/backup.ts",
+    "restore": "tsx --env-file-if-exists=../../.env src/cli/restore.ts"
   },
   "dependencies": {
-    "@khmer-micro-store/db": "workspace:^",
-    "@khmer-micro-store/shared": "workspace:*",
+    "@aws-sdk/client-s3": "^3",
+    "@aws-sdk/lib-storage": "^3",
+    "@khmio/db": "workspace:^",
+    "@khmio/payments": "workspace:^",
+    "@khmio/shared": "workspace:*",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^8",
     "pg-boss": "^10",
-    "pino": "^9"
+    "pino": "^9",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

@@ -7,8 +7,17 @@ import { deliveryAreaSchema } from "./store";
 // What the buyer fills in at checkout (docs/blueprint.md "Buyer checkout",
 // design/screens.md B4).
 
+/** What a buyer can pay with on the shop page. */
 export const paymentMethodSchema = z.enum(["khqr", "aba_payway", "cod"]);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+/** Paid at the counter (design/screens.md P2): cash, or the seller's own QR. */
+export const counterPaymentMethodSchema = z.enum(["cash", "shop_qr"]);
+export type CounterPaymentMethod = z.infer<typeof counterPaymentMethodSchema>;
+
+/** Any order's payment, online or at the counter — what a saved order is read with. */
+export const orderPaymentMethodSchema = z.enum([...paymentMethodSchema.options, ...counterPaymentMethodSchema.options]);
+export type OrderPaymentMethod = z.infer<typeof orderPaymentMethodSchema>;
 
 type DeliveryArea = z.infer<typeof deliveryAreaSchema>;
 
@@ -26,6 +35,8 @@ export const checkoutInputSchema = z
     provinceId: z.string().optional(),
     landmark: z.string().trim().max(200, "too_long"),
     paymentMethod: paymentMethodSchema,
+    /** A cart of only services: the time the buyer would like (checked with the cart by services.ts bookingProblem). */
+    preferredAt: z.string().max(40).optional(),
     /** Whether this store accepts cash on delivery at all (a store setting, not typed by the buyer). */
     storeAllowsCod: z.boolean(),
   })

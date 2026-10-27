@@ -8,12 +8,12 @@ export type ThemeMode = (typeof THEME_MODES)[number];
 export const ACCENTS = ["teal", "indigo", "violet", "rose", "amber"] as const;
 export type Accent = (typeof ACCENTS)[number];
 
-export const THEME_STORAGE_KEY = "khmer-micro-store:theme";
-export const ACCENT_STORAGE_KEY = "khmer-micro-store:accent";
+export const THEME_STORAGE_KEY = "khmio:theme";
+export const ACCENT_STORAGE_KEY = "khmio:accent";
 
 /** Swatch colours for the picker (the light-theme shade of each accent). */
 export const ACCENT_SWATCHES: Record<Accent, string> = {
-  teal: "rgb(8 145 178)",
+  teal: "rgb(14 116 144)",
   indigo: "rgb(79 70 229)",
   violet: "rgb(124 58 237)",
   rose: "rgb(225 29 72)",

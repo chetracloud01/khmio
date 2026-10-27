@@ -7,8 +7,13 @@ import { khmerPhoneSchema } from "./phone";
 // Phnom Penh districts grouped into zones with a fee each, pickup at the
 // shop, provinces by bus, and the drivers an order can be handed to.
 
+/** How a buyer on the shop page gets the order. */
 export const fulfilmentSchema = z.enum(["delivery", "pickup"]);
 export type Fulfilment = z.infer<typeof fulfilmentSchema>;
+
+/** Any order's: the shop page's two, or handed over at the counter — what a saved order is read with. */
+export const orderFulfilmentSchema = z.enum([...fulfilmentSchema.options, "in_store"]);
+export type OrderFulfilment = z.infer<typeof orderFulfilmentSchema>;
 
 export const MAX_DELIVERY_ZONES = PHNOM_PENH_DISTRICTS.length;
 export const MAX_DRIVERS = 50;
@@ -50,43 +55,57 @@ export const driverSchema = z.object({
 });
 export type Driver = z.infer<typeof driverSchema>;
 
-export const deliverySettingsSchema = z
-  .object({
-    zones: z.array(deliveryZoneSchema).max(MAX_DELIVERY_ZONES, "too_long"),
-    pickup: z.object({
-      enabled: z.boolean(),
-      address: z.string().trim().max(200, "too_long"),
-      hours: z.string().trim().max(100, "too_long"),
-    }),
-    /** Outside Phnom Penh: sent by bus or transport company, one fee for every province. */
-    province: z.object({
-      enabled: z.boolean(),
-      note: z.string().trim().max(200, "too_long"),
-      ...feeFields,
-    }),
-    drivers: z.array(driverSchema).max(MAX_DRIVERS, "too_long"),
-  })
-  .superRefine((settings, ctx) => {
-    const seen = new Set<string>();
-    settings.zones.forEach((zone, index) => {
-      if (zone.districtIds.length === 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "zone_empty", path: ["zones", index, "districtIds"] });
-      }
-      // One fee per district: a district can't sit in two zones.
-      if (zone.districtIds.some((id) => seen.has(id))) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "district_duplicate", path: ["zones", index, "districtIds"] });
-      }
-      zone.districtIds.forEach((id) => seen.add(id));
-    });
-    // A buyer who picks up needs to know where.
-    if (settings.pickup.enabled && !settings.pickup.address) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["pickup", "address"] });
+/**
+ * A shop's delivery settings without the rules that tie the fields together:
+ * what a saved answer from the API is read with. A save is checked with
+ * deliverySettingsSchema below.
+ */
+export const deliverySettingsShape = z.object({
+  zones: z.array(deliveryZoneSchema).max(MAX_DELIVERY_ZONES, "too_long"),
+  pickup: z.object({
+    enabled: z.boolean(),
+    address: z.string().trim().max(200, "too_long"),
+    hours: z.string().trim().max(100, "too_long"),
+  }),
+  /** Outside Phnom Penh: sent by bus or transport company, one fee for every province. */
+  province: z.object({
+    enabled: z.boolean(),
+    note: z.string().trim().max(200, "too_long"),
+    ...feeFields,
+  }),
+  drivers: z.array(driverSchema).max(MAX_DRIVERS, "too_long"),
+});
+
+/**
+ * True when a buyer has at least one way to get an order: a Phnom Penh zone,
+ * pickup or provinces. Delivery and Shop details (where pickup is set) both
+ * check it, so neither page can switch the last way off.
+ */
+export function offersAnyFulfilment(settings: { zones: readonly unknown[]; pickup: { enabled: boolean }; province: { enabled: boolean } }): boolean {
+  return settings.zones.length > 0 || settings.pickup.enabled || settings.province.enabled;
+}
+
+export const deliverySettingsSchema = deliverySettingsShape.superRefine((settings, ctx) => {
+  const seen = new Set<string>();
+  settings.zones.forEach((zone, index) => {
+    if (zone.districtIds.length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "zone_empty", path: ["zones", index, "districtIds"] });
     }
-    // With nothing on, no buyer could ever complete checkout.
-    if (settings.zones.length === 0 && !settings.pickup.enabled && !settings.province.enabled) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "delivery_required", path: ["zones"] });
+    // One fee per district: a district can't sit in two zones.
+    if (zone.districtIds.some((id) => seen.has(id))) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "district_duplicate", path: ["zones", index, "districtIds"] });
     }
+    zone.districtIds.forEach((id) => seen.add(id));
   });
+  // A buyer who picks up needs to know where.
+  if (settings.pickup.enabled && !settings.pickup.address) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["pickup", "address"] });
+  }
+  // With nothing on, no buyer could ever complete checkout.
+  if (!offersAnyFulfilment(settings)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "delivery_required", path: ["zones"] });
+  }
+});
 
 export type DeliverySettings = z.infer<typeof deliverySettingsSchema>;
 
@@ -166,3 +185,37 @@ export const SUGGESTED_DELIVERY_SETTINGS: DeliverySettings = {
   province: { enabled: true, note: "", feeUsdCents: 200, feeKhr: 8000 },
   drivers: [],
 };
+
+export const MAX_MAP_URL_LENGTH = 300;
+
+/** The link the seller copied from Google Maps (Share → Copy link); empty = none. Only web links. */
+export const shopMapUrlSchema = z
+  .string()
+  .trim()
+  .max(MAX_MAP_URL_LENGTH, "too_long")
+  .refine((value) => value === "" || /^https?:\/\/\S+$/i.test(value), "map_link_invalid");
+
+const pickupFields = deliverySettingsShape.shape.pickup.shape;
+
+/**
+ * Shop details' "Location and pickup" (design/screens.md S10): the shop's
+ * address (also printed on invoices), its map link, and whether buyers can
+ * pick up there and when. Whether pickup may be switched off depends on the
+ * delivery settings too (offersAnyFulfilment), checked on save.
+ */
+export const shopLocationFields = z.object({
+  address: pickupFields.address,
+  mapUrl: shopMapUrlSchema,
+  pickupEnabled: pickupFields.enabled,
+  pickupHours: pickupFields.hours,
+});
+
+/** A buyer who picks up needs to know where. */
+export function requirePickupAddress(location: { address: string; pickupEnabled: boolean }, ctx: z.RefinementCtx): void {
+  if (location.pickupEnabled && !location.address) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["address"] });
+  }
+}
+
+export const shopLocationSchema = shopLocationFields.superRefine(requirePickupAddress);
+export type ShopLocation = z.infer<typeof shopLocationSchema>;

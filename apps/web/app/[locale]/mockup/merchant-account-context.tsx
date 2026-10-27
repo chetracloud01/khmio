@@ -1,6 +1,6 @@
 "use client";
 
-import { loginMethodSchema, type LoginMethod } from "@khmer-micro-store/shared";
+import { loginMethodSchema, type LoginMethod } from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -28,7 +28,7 @@ interface MerchantAccountContextValue {
 
 const MerchantAccountContext = createContext<MerchantAccountContextValue | null>(null);
 
-const STORAGE_KEY = "khmer-micro-store:mockup-merchant-account";
+const STORAGE_KEY = "khmio:mockup-merchant-account";
 
 function isLinkedLogin(value: unknown): value is LinkedLogin {
   if (typeof value !== "object" || value === null) return false;

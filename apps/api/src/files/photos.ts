@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 /** After the browser has compressed it (design: photos are resized before upload), a photo is well under this. */
 export const MAX_PHOTO_BYTES = 2_000_000;
+/** The small copy for lists (about 400 px), made by the browser next to the photo. */
+export const MAX_THUMB_BYTES = 200_000;
 
 export type PhotoType = "image/jpeg" | "image/png" | "image/webp";
 const EXTENSION: Record<PhotoType, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
@@ -23,6 +25,21 @@ export function newPhotoKey(storeId: string, type: PhotoType): string {
 }
 
 const KEY = /^stores\/([0-9a-f-]{36})\/[0-9a-f-]{36}\.(jpg|png|webp)$/;
+const THUMB_KEY = /^stores\/[0-9a-f-]{36}\/[0-9a-f-]{36}-t\.jpg$/;
+
+/** A key the API could have made (newPhotoKey or thumbKeyOf), in any store's folder. */
+export function isPhotoKey(key: string): boolean {
+  return KEY.test(key) || THUMB_KEY.test(key);
+}
+
+/**
+ * Where a photo's small copy lives: next to it, always a JPEG
+ * (stores/<store>/<name>-t.jpg). Photos uploaded before thumbnails existed
+ * have none; the screens then fall back to the full photo.
+ */
+export function thumbKeyOf(key: string): string {
+  return key.replace(/\.(jpg|png|webp)$/, "-t.jpg");
+}
 
 /** True only for a photo key in this store's own folder — a product can't point at another shop's photos. */
 export function isStorePhotoKey(storeId: string, key: string): boolean {

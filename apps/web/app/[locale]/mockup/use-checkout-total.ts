@@ -4,7 +4,7 @@ import {
   deliveryFeeIn,
   getDeliveryQuote,
   type Currency,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import {
   getDiscountedUnitAmount,
   getUnitAmount,

@@ -9,8 +9,8 @@ import {
   toFieldErrors,
   type FormErrorCode,
   type InvoiceView,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Input } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { BottomSheet, Button, Input } from "@khmio/ui";
 import { AlertTriangle, ChevronRight, CircleCheck, Clock, ReceiptText } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";

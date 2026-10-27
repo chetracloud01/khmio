@@ -7,7 +7,7 @@ import {
   type BuyerStockState,
   type PlanId,
   type StoreSettings,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 import { useEffect, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import {

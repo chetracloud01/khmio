@@ -1,110 +1,98 @@
 "use client";
 
-import { getMissingForSharing } from "@khmer-micro-store/shared";
-import { Button, Card } from "@khmer-micro-store/ui";
-import { Check, Copy, Download, Share2 } from "lucide-react";
+import { getMissingForSharing } from "@khmio/shared";
+import { BottomSheet, Button } from "@khmio/ui";
+import { Lock, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import QRCode from "qrcode";
-import { useEffect, useState } from "react";
-import { copyText, shareOrCopyLink } from "@/components/share-link";
-import { api } from "@/lib/api";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { SharedPill, ShareShopPanel } from "@/components/seller-cards";
+import { HEADER_PILL, HEADER_PILL_TEXT } from "@/components/seller-frame/seller-frame";
+import { apiSend } from "@/lib/api";
 import { useMerchant } from "./merchant-context";
 
 /**
- * "Share your shop": the link to copy or send, and a QR code to download and
- * print for the counter or a sticker. Any of these marks the link as shared
- * — the setup checklist's last step. Shown once the shop is ready for buyers
- * (packages/shared getMissingForSharing): before that, the link would lead
- * them to a shop they can't buy from.
+ * "Share your shop" on the live dashboard: one sheet (components/seller-cards
+ * ShareShopPanel) opened from the header's Share button, Home's "Share shop"
+ * quick action and the setup checklist's last step. Sharing, copying or
+ * downloading the QR marks the link as shared — that step. Until the shop is
+ * ready for buyers (packages/shared getMissingForSharing) the sheet says so
+ * instead: the link would lead them to a shop they can't buy from.
  */
-export function ShareShop() {
-  const t = useTranslations("Share");
+const ShareShopContext = createContext<{ open: () => void } | null>(null);
+
+export function useShareShop(): { open: () => void } {
+  const context = useContext(ShareShopContext);
+  if (!context) throw new Error("useShareShop needs ShareShopProvider");
+  return context;
+}
+
+export function ShareShopProvider({ children }: { children: ReactNode }) {
   const locale = useLocale();
+  const t = useTranslations("Share");
+  const tApp = useTranslations("SellerApp");
   const { store, refreshStore } = useMerchant();
-  const ready = getMissingForSharing({ businessType: store.businessType, shopPhone: store.phone, ...store.readiness }).length === 0;
+  const ready =
+    getMissingForSharing({
+      businessType: store.businessType,
+      shopPhone: store.phone,
+      ...store.readiness,
+    }).length === 0;
+  const [isOpen, setOpen] = useState(false);
   const [url, setUrl] = useState("");
-  const [qr, setQr] = useState<string | null>(null);
-  const [note, setNote] = useState<"copied" | "shared" | "manual" | null>(null);
 
   useEffect(() => {
-    const link = `${window.location.origin}/${locale}/s/${store.slug}`;
-    setUrl(link);
-    void QRCode.toDataURL(link, { margin: 2, width: 600, errorCorrectionLevel: "M" }).then(setQr);
+    setUrl(`${window.location.origin}/${locale}/s/${store.slug}`);
   }, [locale, store.slug]);
-
-  if (!ready) return null;
 
   async function markShared() {
     if (store.linkShared) return;
-    await api("/store/link-shared", { method: "POST" }).catch(() => undefined);
+    await apiSend("/store/link-shared", { method: "POST" }).catch(() => undefined);
     await refreshStore().catch(() => undefined);
   }
 
-  async function share() {
-    const outcome = await shareOrCopyLink(store.name, url);
-    if (outcome === "cancelled") return;
-    setNote(outcome === "manual" ? "manual" : outcome);
-    if (outcome !== "manual") await markShared();
-  }
-
-  async function copy() {
-    if (!(await copyText(url))) {
-      setNote("manual");
-      return;
-    }
-    setNote("copied");
-    await markShared();
-  }
+  const open = useCallback(() => setOpen(true), []);
+  const value = useMemo(() => ({ open }), [open]);
 
   return (
-    <Card className="flex flex-col gap-4 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">{t("title")}</h2>
-          <p className="text-sm text-muted">{t("body")}</p>
+    <ShareShopContext.Provider value={value}>
+      {children}
+      <BottomSheet open={isOpen} onClose={() => setOpen(false)} closeLabel={tApp("close")} title={t("title")}>
+        <div className="flex flex-col gap-4 pb-2">
+          {ready ? (
+            <>
+              {store.linkShared && <SharedPill />}
+              <ShareShopPanel url={url} shopName={store.name} qrFileName={`${store.slug}-qr.png`} onShared={() => void markShared()} />
+            </>
+          ) : (
+            <p className="flex items-center gap-2 rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning">
+              <Lock className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {t("notReady")}
+            </p>
+          )}
         </div>
-        {store.linkShared && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-            <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            {t("shared")}
-          </span>
-        )}
-      </div>
+      </BottomSheet>
+    </ShareShopContext.Provider>
+  );
+}
 
-      <label className="flex flex-col gap-1.5 text-sm">
-        <span className="text-muted">{t("linkLabel")}</span>
-        <input readOnly value={url} onFocus={(event) => event.currentTarget.select()} className="min-h-touch w-full rounded-DEFAULT border border-border bg-bg px-3 text-base text-fg" />
-      </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="primary" onClick={() => void share()}>
-          <Share2 className="h-4 w-4" aria-hidden="true" />
-          {t("share")}
-        </Button>
-        <Button variant="secondary" onClick={() => void copy()}>
-          <Copy className="h-4 w-4" aria-hidden="true" />
-          {t("copy")}
-        </Button>
-      </div>
-      {note && (
-        <p role="status" className="text-sm text-muted">
-          {note === "manual" ? t("manual") : note === "copied" ? t("copied") : t("sharedNow")}
-        </p>
-      )}
-
-      {qr && (
-        <div className="flex items-center gap-4 rounded-2xl border border-border p-3">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a QR code made in the browser */}
-          <img src={qr} alt={t("qrAlt")} width={112} height={112} className="h-28 w-28 shrink-0 rounded-DEFAULT bg-white" />
-          <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-sm text-muted">{t("qrBody")}</p>
-            <a href={qr} download={`${store.slug}-qr.png`} onClick={() => void markShared()} className="flex min-h-touch items-center gap-2 text-sm font-medium text-brand">
-              <Download className="h-4 w-4" aria-hidden="true" />
-              {t("download")}
-            </a>
-          </div>
-        </div>
-      )}
-    </Card>
+/** The header's Share button: a teal "Share" pill on a phone (a round icon once the header turns slim), a text button in the laptop's top bar. */
+export function ShareShopButton({ variant }: { variant: "round" | "bar" }) {
+  const t = useTranslations("Share");
+  const tApp = useTranslations("SellerApp");
+  const { open } = useShareShop();
+  if (variant === "round") {
+    return (
+      // eslint-disable-next-line no-restricted-syntax -- the seller header's pill (HEADER_PILL), which shrinks to a round icon when the header turns slim
+      <button type="button" onClick={open} className={HEADER_PILL}>
+        <Share2 className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+        <span className={HEADER_PILL_TEXT}>{tApp("headerShare")}</span>
+      </button>
+    );
+  }
+  return (
+    <Button variant="ghost" onClick={open}>
+      <Share2 className="h-4 w-4" aria-hidden="true" />
+      {t("shareShop")}
+    </Button>
   );
 }

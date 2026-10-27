@@ -1,16 +1,12 @@
 "use client";
 
-import { BILLING_PERIOD_DAYS, formatKhr, formatUsd, GRACE_PERIOD_DAYS, INVOICE_LEAD_DAYS, PLAN_ORDER, PLANS, type PlanFeature } from "@khmer-micro-store/shared";
-import { Card } from "@khmer-micro-store/ui";
+import { BILLING_PERIOD_DAYS, formatKhr, formatUsd, GRACE_PERIOD_DAYS, INVOICE_LEAD_DAYS, PLAN_ORDER, PLANS, PLAN_FEATURES } from "@khmio/shared";
+import { Card } from "@khmio/ui";
 import { Check, Minus } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePlanFeatureLabels } from "@/components/plan-features";
 import { PageHeader } from "../admin-ui";
 
-const FEATURES: { key: PlanFeature; label: "featureStock" | "featureWholesale" | "featureWarehouses" }[] = [
-  { key: "stock", label: "featureStock" },
-  { key: "wholesalePrice", label: "featureWholesale" },
-  { key: "warehouses", label: "featureWarehouses" },
-];
 
 // The plans (design/screens.md A4), read-only: everything comes from
 // packages/shared plans.ts — the same rules the API enforces — so this page
@@ -19,6 +15,7 @@ export default function AdminPlansPage() {
   const t = useTranslations("Admin");
   const tPlans = useTranslations("Plans");
   const tBilling = useTranslations("Billing");
+  const featureLabels = usePlanFeatureLabels();
   const days = (count: number) => t("daysValue", { count });
 
   return (
@@ -61,13 +58,13 @@ export default function AdminPlansPage() {
                 </td>
               ))}
             </tr>
-            {FEATURES.map((feature) => (
-              <tr key={feature.key} className="border-b border-border last:border-0">
-                <th className="px-4 py-3 font-medium text-muted">{tBilling(feature.label)}</th>
+            {PLAN_FEATURES.map((feature) => (
+              <tr key={feature} className="border-b border-border last:border-0">
+                <th className="px-4 py-3 font-medium text-muted">{featureLabels[feature]}</th>
                 {PLAN_ORDER.map((plan) => (
                   <td key={plan} className="px-4 py-3">
-                    {PLANS[plan].features[feature.key] ? (
-                      <Check className="h-4 w-4 text-success" aria-label={tBilling(feature.label)} />
+                    {PLANS[plan].features[feature] ? (
+                      <Check className="h-4 w-4 text-success" aria-label={featureLabels[feature]} />
                     ) : (
                       <Minus className="h-4 w-4 text-muted" aria-label={t("notIncluded")} />
                     )}

@@ -3,7 +3,8 @@
 The rules every screen follows. Read this before building or changing a
 screen; `design/screens.md` says *what* each screen contains, this file says
 *how* it must look and behave. Source document: `docs/blueprint.md` (the
-one plan for the whole project).
+one plan for the whole project). The brand outside the app — logo, Mio,
+marketing colours and fonts, social media — is in `design/brand-guide.md`.
 
 ## 1. What the app is for
 
@@ -70,11 +71,51 @@ colours (`amber-500`, `text-white`, hex codes) in screens.
 | `info` | Neutral in-progress states: packing, out for delivery |
 | `bg`, `canvas`, `border` | Surfaces, page background, lines |
 | `fg`, `muted` | Text, secondary text |
-| `nav-*` | The admin's dark sidebar and dark overlays on images |
+| `nav-*` | The admin's dark sidebar (Deep Khmio Teal `#0A2A33`, a dark shade of the viewer's accent) and dark overlays on images; `nav-accent` is the current-page bar and logo square, `nav-badge` the menu's count badges |
 
 Every screen must read correctly in light and dark mode and with all five
 accent colours. Meaning is never carried by colour alone: pair it with an
-icon or a word ("Sold out", not just grey).
+icon or a word ("Sold out", not just grey). Readability is tested, not
+eyeballed: `apps/web/components/theme-contrast.test.ts` reads `globals.css`
+and checks every text pair (4.5 : 1) and shape (3 : 1) in light, dark and
+"follow the device", for every accent. A colour change that fails it doesn't
+ship.
+
+**One kit, no copies.** Every screen — admin, seller, buyer and their
+mockups — is built from the shared building blocks in `packages/ui`
+(`blocks.tsx`: `PageHeader`, `SectionTitle`, `StatCard`, `StatusPill` with
+the tones `brand` `success` `warning` `danger` `info` `muted`, `EmptyState`,
+`LoadingBlocks`, `ErrorState`, `DetailList`, `ConfirmDialog`; plus `Button`,
+`Card`, `Input`, `BottomSheet` …), the admin frame in
+`apps/web/components/admin-frame`, the seller frame in
+`apps/web/components/seller-frame` (bottom tabs on a phone, a sidebar from
+768 px; pages use its `SELLER_PAGE` / `SELLER_FORM` widths and
+`SELLER_FORM_BAR`) and the data grid in
+`apps/web/components/data-grid.tsx`. A page never re-creates one of these; a
+block that's missing is added to the kit, shown on `/styleguide`, then used.
+The kit holds no words — every label comes from `messages/*.json`.
+
+**Kit or app block — where a shared part lives.**
+
+| `packages/ui` (the kit) | `apps/web/components` (app blocks) |
+| --- | --- |
+| Pure look and behaviour: Button, Input, MoneyInput, Notice… | Needs Next.js (`next/link`, the router) or `next-intl`: MenuList, DataGrid, FormSection |
+| No business data, no words (labels come in as props) | Knows orders, shops or the API: OrderStatusPill, PhotoThumb |
+| Could be used by any app later | Belongs to the Khmio web app |
+
+A new look for an existing part is a new `variant` of that part, never a
+copy. `/styleguide` has four tabs — Foundations, Kit, App blocks, Website —
+and each part is shown inside a `Demo` labelled with its name, so the page
+doubles as the list of what exists. Two checks keep it honest:
+`apps/web/app/[locale]/styleguide/coverage.test.ts` fails when a kit part
+isn't on the page, and lint stops a screen in `apps/web/app` that uses a raw
+`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit — an
+error on live screens, a warning in `app/[locale]/mockup` until that mockup
+is next worked on. A part that really needs a raw element (a whole-row tap
+target, the seller header's pill) says why in an `eslint-disable-next-line`
+comment. The kit's answers to the usual cases: `Button variant="ghost"` for
+small text actions, `IconButton` for an icon alone, `ChoiceCards` and
+`SegmentedControl mode="choice"` for picking one, `FileButton` for photos.
 
 **Type** — Kantumruy Pro for Khmer, system sans for Latin.
 
@@ -88,7 +129,8 @@ icon or a word ("Sold out", not just grey).
 
 Line height 1.5 or more for any Khmer text (`leading-normal`; never
 `leading-tight` or `leading-snug`) or the vowels above and below are cut
-off. Khmer labels run 30–40% longer than English: every button and tab
+off. Every text size already carries at least 1.5 (`fontSize` in
+`apps/web/tailwind.config.ts`), so `text-xs`/`text-sm` are safe as they are. Khmer labels run 30–40% longer than English: every button and tab
 must be checked in Khmer at 360 px and stay on one line, or be reworded.
 Numbers that change or line up (prices, quantities, countdowns) use
 `tabular-nums`.
@@ -194,19 +236,23 @@ has to message the seller.
 From `docs/blueprint.md` "Workflows from start to end". The same names, colours and order on the
 buyer's order page, the seller's order list and Telegram messages.
 
-| Status | Colour | Buyer sees | Seller's next button |
-| --- | --- | --- | --- |
-| Awaiting payment | `warning` | QR and pay-by time | — |
-| Paid | `success` | Receipt | Confirm order |
-| COD pending | `warning` | Order summary, "pay on delivery" | Confirm order |
-| Confirmed | `info` | "The shop accepted your order" | Start packing |
-| Packing | `info` | "Being packed" | Send (driver / pickup / bus) |
-| Waiting for driver | `info` | "Being packed" (no change for the buyer) | — |
-| Out for delivery | `info` | Tracking link or bus ticket number | Mark delivered |
-| Delivered | `success` | Thank-you and reorder link | Cash settled (COD only) |
-| Completed | `success` | — | — |
-| Cancelled | `danger` | Reason | — |
-| Failed delivery | `danger` | Rebook option | Rebook delivery |
+| Status | Colour | Icon | Buyer sees | Seller's next button |
+| --- | --- | --- | --- | --- |
+| Awaiting payment | `warning` | Hourglass | QR and pay-by time | — |
+| Paid | `success` | Bell ringing | Receipt | Confirm order |
+| COD pending | `warning` | Bell ringing | Order summary, "pay on delivery" | Confirm order |
+| Confirmed | `info` | Thumbs up | "The shop accepted your order" | Start packing |
+| Packing | `info` | Open box | "Being packed" | Send (driver / pickup / bus) |
+| Waiting for driver | `brand` | Person searching | "Being packed" (no change for the buyer) | — |
+| Out for delivery | `brand` | Truck (pickup: shop) | Tracking link or bus ticket number | Mark delivered |
+| Delivered | `success` | Hand with coins | Thank-you and reorder link | Cash settled (COD only) |
+| Completed | `success` | Big check | — | — |
+| Cancelled | `danger` | Circle with X | Reason | — |
+| Failed delivery | `danger` | Box with X | Rebook option | Rebook delivery |
+
+The seller's orders list groups by step in this order — To confirm (bell, `warning`), Packing (open box,
+`info`), Sending (truck, `brand`), Delivered (big check, `success`), Problems (warning sign, `danger`) —
+with the same icon on each tab. Icons and colours come from `apps/web/components/order-ui.tsx`.
 
 ## 8. Before a screen counts as done
 

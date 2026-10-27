@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { createSystemDb, type SystemDb } from "@khmer-micro-store/db";
-import { stopButtonData } from "@khmer-micro-store/shared";
+import { createSystemDb, type SystemDb } from "@khmio/db";
+import { stopButtonData } from "@khmio/shared";
 import pino from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { InlineButton, TelegramClient } from "../telegram/client";
@@ -29,7 +29,7 @@ class Recorder implements TelegramClient {
 describe("startPayload", () => {
   it("reads the code after /start, with or without the bot's name", () => {
     expect(startPayload("/start g_abc")).toBe("g_abc");
-    expect(startPayload("/start@kms_test_alerts_bot g_abc")).toBe("g_abc");
+    expect(startPayload("/start@khmio_test_alerts_bot g_abc")).toBe("g_abc");
     expect(startPayload("/start")).toBe("");
     expect(startPayload("hello")).toBeNull();
   });
@@ -107,7 +107,7 @@ describe.skipIf(!ownerUrl)("Telegram links", () => {
 
   it("links a staff group with its shop's code — once", async () => {
     const plain = await code("group_link");
-    const first = await handleMessage(db, group(`/start@kms_test_alerts_bot ${plain}`));
+    const first = await handleMessage(db, group(`/start@khmio_test_alerts_bot ${plain}`));
     expect(first.result).toBe("group_linked");
     expect(first.reply).toContain("Link shop");
     expect(await db.storeAlertChat.count({ where: { storeId, chatId: groupChat } })).toBe(1);

@@ -9,15 +9,18 @@ import {
   phoneLoginSchema,
   toFieldErrors,
   type FormErrorCode,
-} from "@khmer-micro-store/shared";
-import { Button, Input, SegmentedControl } from "@khmer-micro-store/ui";
-import { ArrowLeft, Phone, Send, Store } from "lucide-react";
+} from "@khmio/shared";
+import { Button, Input, Mio, ThemeSwitcher } from "@khmio/ui";
+import { ArrowLeft, Phone, Send } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { mockMerchant } from "@/mock/mock-data";
 import { useFormErrorText } from "@/components/form-ui";
+import { LanguageSwitch } from "@/components/language-switch";
+import { SignUpFrame } from "@/components/sign-up-frame";
+import { useThemeLabels } from "@/components/use-theme-labels";
 import { useMerchantAccount } from "../merchant-account-context";
 import { useMerchantProfile } from "../merchant-profile-context";
 
@@ -28,7 +31,9 @@ type Step = "choose" | "phone" | "code";
 // number with an SMS code works for everyone else. Google comes later.
 export default function MerchantLoginMockupPage() {
   const t = useTranslations("MerchantLogin");
+  const tMascot = useTranslations("Mascot");
   const errorText = useFormErrorText();
+  const themeLabels = useThemeLabels();
   const locale = useLocale();
   const router = useRouter();
   const { signIn } = useMerchantAccount();
@@ -119,21 +124,19 @@ export default function MerchantLoginMockupPage() {
   }
 
   const languageSwitch = (
-    <SegmentedControl
-      value={locale}
-      onChange={(next) => router.push(`/${next}/mockup/merchant-login`)}
-      options={[
-        { value: "km", label: "ខ្មែរ" },
-        { value: "en", label: "EN" },
-      ]}
-    />
+    <LanguageSwitch />
   );
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center bg-gradient-to-b from-brand/10 via-canvas to-canvas p-4 text-fg">
-      <div className="absolute right-4 top-4">{languageSwitch}</div>
-
-      <div className="flex w-full max-w-[400px] flex-col gap-5 rounded-2xl border border-border bg-bg p-5 shadow-raised sm:p-8">
+    <SignUpFrame
+      controls={
+        <>
+          {languageSwitch}
+          <ThemeSwitcher labels={themeLabels} />
+        </>
+      }
+    >
+      <div className="flex w-full flex-col gap-5 rounded-2xl border border-border bg-bg p-5 shadow-raised sm:p-8">
         {step !== "choose" && (
           <button
             type="button"
@@ -151,8 +154,9 @@ export default function MerchantLoginMockupPage() {
         {step === "choose" && (
           <>
             <div className="flex flex-col items-center gap-3 text-center">
-              <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-brand text-on-brand">
-                <Store className="h-8 w-8" aria-hidden="true" />
+              {/* On a laptop Mio is on the teal side already. */}
+              <span className="lg:hidden">
+                <Mio size={88} label={tMascot("label")} />
               </span>
               <h1 className="text-xl font-bold">{t("title")}</h1>
               <p className="text-sm text-muted">{t("subtitle")}</p>
@@ -273,6 +277,6 @@ export default function MerchantLoginMockupPage() {
           </form>
         )}
       </div>
-    </div>
+    </SignUpFrame>
   );
 }

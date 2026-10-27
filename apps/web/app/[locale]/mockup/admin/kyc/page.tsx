@@ -6,8 +6,8 @@ import {
   toFieldErrors,
   type FormErrorCode,
   type KycRejectReason,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Card, Input, Select } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { BottomSheet, Button, Card, Input, Select } from "@khmio/ui";
 import { IdCard } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";

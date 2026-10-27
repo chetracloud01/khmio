@@ -1,5 +1,6 @@
 "use client";
 
+import { TONE_STYLES } from "@khmio/ui";
 import {
   formatKhr,
   formatUsd,
@@ -7,8 +8,7 @@ import {
   type Currency,
   type InvoiceView,
   type PaymentAttemptStatus,
-} from "@khmer-micro-store/shared";
-import type { ReactNode } from "react";
+} from "@khmio/shared";
 import type { MockFailedCheck } from "@/mock/mock-admin-billing";
 
 // Shared by the admin's money screens (subscriptions, invoices, buyer
@@ -42,41 +42,30 @@ export function shortRef(ref: string): string {
 }
 
 export const INVOICE_VIEW_STYLES: Record<InvoiceView, string> = {
-  due: "bg-info/10 text-info",
-  overdue: "bg-danger/10 text-danger",
-  paid: "bg-success/10 text-success",
-  void: "bg-border/30 text-muted",
+  due: TONE_STYLES.info,
+  overdue: TONE_STYLES.danger,
+  paid: TONE_STYLES.success,
+  void: TONE_STYLES.muted,
 };
 
 export const ATTEMPT_STATUS_STYLES: Record<PaymentAttemptStatus, string> = {
-  pending: "bg-warning/10 text-warning",
-  paid: "bg-success/10 text-success",
-  expired: "bg-border/30 text-muted",
-  failed: "bg-danger/10 text-danger",
+  pending: TONE_STYLES.warning,
+  paid: TONE_STYLES.success,
+  expired: TONE_STYLES.muted,
+  failed: TONE_STYLES.danger,
 };
 
 export const CHECK_STATUS_STYLES: Record<MockFailedCheck["status"], string> = {
-  open: "bg-danger/10 text-danger",
-  confirmed: "bg-success/10 text-success",
-  closed: "bg-border/30 text-muted",
+  open: TONE_STYLES.danger,
+  confirmed: TONE_STYLES.success,
+  closed: TONE_STYLES.muted,
 };
 
 export const ROLE_STYLES: Record<AdminRole, string> = {
-  owner: "bg-brand/10 text-brand",
-  support: "bg-info/10 text-info",
-  finance: "bg-success/10 text-success",
+  owner: TONE_STYLES.brand,
+  support: TONE_STYLES.info,
+  finance: TONE_STYLES.success,
 };
 
-/** Label–value pairs in a details panel. */
-export function DetailList({ items }: { items: { label: string; value: ReactNode }[] }) {
-  return (
-    <dl className="grid grid-cols-2 gap-3 rounded-DEFAULT bg-border/10 p-3">
-      {items.map((item) => (
-        <div key={item.label} className="min-w-0">
-          <dt className="text-xs text-muted">{item.label}</dt>
-          <dd className="break-words font-medium">{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
+// Label–value pairs in a details panel: the shared kit's, re-exported for the mockup pages.
+export { DetailList } from "@khmio/ui";

@@ -9,7 +9,7 @@ import type {
   PaymentCheckIssue,
   PaymentProvider,
   PlanId,
-} from "@khmer-micro-store/shared";
+} from "@khmio/shared";
 
 // Sample data for the admin's money and access screens. Stands in for the
 // subscription_invoices, payment_attempts and admin_users tables in
@@ -120,7 +120,7 @@ export interface MockAdminUser {
 export const CURRENT_ADMIN_ID = "admin-owner";
 
 export const mockAdminUsers: MockAdminUser[] = [
-  { id: CURRENT_ADMIN_ID, name: "Platform owner", telegramUsername: "kms_owner", role: "owner", disabled: false, lastActiveMinutesAgo: 0 },
+  { id: CURRENT_ADMIN_ID, name: "Platform owner", telegramUsername: "khmio_owner", role: "owner", disabled: false, lastActiveMinutesAgo: 0 },
   { id: "admin-sreymom", name: "Sreymom Tan", telegramUsername: "sreymom_support", role: "support", disabled: false, lastActiveMinutesAgo: 35 },
   { id: "admin-visal", name: "Visal Chhun", telegramUsername: "visal_finance", role: "finance", disabled: false, lastActiveMinutesAgo: 1500 },
   { id: "admin-ratanak", name: "Ratanak Meas", telegramUsername: "ratanak_m", role: "support", disabled: true, lastActiveMinutesAgo: 57600 },

@@ -6,8 +6,8 @@ import {
   PLAN_ORDER,
   type PlanId,
   type SubscriptionStatus,
-} from "@khmer-micro-store/shared";
-import { BottomSheet, Button, Select } from "@khmer-micro-store/ui";
+} from "@khmio/shared";
+import { BottomSheet, Button, Select } from "@khmio/ui";
 import { ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -34,6 +34,7 @@ export default function AdminMerchantsPage() {
 
 function Merchants() {
   const t = useTranslations("Admin");
+  const tDates = useTranslations("Dates");
   const tNav = useTranslations("AdminNav");
   const tPlan = useTranslations("Plans");
   const tType = useTranslations("BusinessType");
@@ -114,8 +115,8 @@ function Merchants() {
       sortable: true,
       defaultHidden: true,
       value: (row) => row.joinedDaysAgo,
-      exportValue: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : t("daysAgo", { count: row.joinedDaysAgo })),
-      cell: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : t("daysAgo", { count: row.joinedDaysAgo })),
+      exportValue: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : tDates("daysAgo", { count: row.joinedDaysAgo })),
+      cell: (row) => (row.joinedDaysAgo === 0 ? t("appliedToday") : tDates("daysAgo", { count: row.joinedDaysAgo })),
     },
     {
       key: "actions",

@@ -1,4 +1,4 @@
-import { createAppDb, createSystemDb, type AppDb, type SystemDb } from "@khmer-micro-store/db";
+import { createAppDb, createSystemDb, type AppDb, type SystemDb } from "@khmio/db";
 import { Inject, Injectable, type OnApplicationShutdown, type Provider } from "@nestjs/common";
 import { getEnv } from "./config";
 

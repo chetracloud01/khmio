@@ -3,9 +3,12 @@
 import {
   businessTypeSchema,
   deliveryAreaSchema,
+  invoiceDetailsSchema,
+  shopMapUrlSchema,
   type BusinessType,
   type DeliveryArea,
-} from "@khmer-micro-store/shared";
+  type InvoiceDetails,
+} from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 
@@ -32,6 +35,15 @@ interface MerchantProfileContextValue {
   setArea: Dispatch<SetStateAction<ShopArea>>;
   description: string;
   setDescription: Dispatch<SetStateAction<string>>;
+  /** Copied from Google Maps; the buyer's Map button opens it (design/screens.md S10). */
+  mapUrl: string;
+  setMapUrl: Dispatch<SetStateAction<string>>;
+  /** "On your invoices": VAT TIN, Telegram, Facebook, note. */
+  invoiceDetails: InvoiceDetails;
+  setInvoiceDetails: Dispatch<SetStateAction<InvoiceDetails>>;
+  /** The seller's own payment QR (a picture from their bank app), shown to buyers paying at the counter. */
+  paymentQrDataUrl: string | null;
+  setPaymentQrDataUrl: Dispatch<SetStateAction<string | null>>;
   /** True once the seller has copied or shared the shop link (the setup checklist's last step). */
   linkShared: boolean;
   setLinkShared: Dispatch<SetStateAction<boolean>>;
@@ -43,7 +55,7 @@ const MerchantProfileContext = createContext<MerchantProfileContextValue | null>
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const STORAGE_KEY = "khmer-micro-store:mockup-merchant-profile";
+const STORAGE_KEY = "khmio:mockup-merchant-profile";
 
 interface PersistedProfile {
   businessType: BusinessType;
@@ -55,8 +67,13 @@ interface PersistedProfile {
   phone: string;
   area: ShopArea;
   description: string;
+  mapUrl: string;
+  invoiceDetails: InvoiceDetails;
+  paymentQrDataUrl: string | null;
   linkShared: boolean;
 }
+
+const EMPTY_INVOICE_DETAILS: InvoiceDetails = { taxNumber: "", invoiceNote: "", telegramLink: "", facebookLink: "" };
 
 export function MerchantProfileProvider({ children }: { children: ReactNode }) {
   const [businessType, setBusinessType] = useState<BusinessType>("other");
@@ -68,6 +85,9 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
   const [phone, setPhone] = useState("");
   const [area, setArea] = useState<ShopArea>("phnom_penh");
   const [description, setDescription] = useState("");
+  const [mapUrl, setMapUrl] = useState("");
+  const [invoiceDetails, setInvoiceDetails] = useState<InvoiceDetails>(EMPTY_INVOICE_DETAILS);
+  const [paymentQrDataUrl, setPaymentQrDataUrl] = useState<string | null>(null);
   const [linkShared, setLinkShared] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -90,6 +110,11 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         const storedArea = deliveryAreaSchema.safeParse(parsed.area);
         if (storedArea.success) setArea(storedArea.data);
         if (parsed.description) setDescription(parsed.description);
+        const storedMapUrl = shopMapUrlSchema.safeParse(parsed.mapUrl);
+        if (storedMapUrl.success) setMapUrl(storedMapUrl.data);
+        const storedInvoice = invoiceDetailsSchema.safeParse(parsed.invoiceDetails);
+        if (storedInvoice.success) setInvoiceDetails(storedInvoice.data);
+        if (parsed.paymentQrDataUrl) setPaymentQrDataUrl(parsed.paymentQrDataUrl);
         if (parsed.linkShared) setLinkShared(true);
         if (parsed.shopName) setHasProfile(true);
       }
@@ -115,13 +140,16 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         phone,
         area,
         description,
+        mapUrl,
+        invoiceDetails,
+        paymentQrDataUrl,
         linkShared,
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Storage full or unavailable — profile just won't persist this time.
     }
-  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, linkShared, hydrated]);
+  }, [businessType, shopName, slug, logoDataUrl, bakongId, telegramConnected, phone, area, description, mapUrl, invoiceDetails, paymentQrDataUrl, linkShared, hydrated]);
 
   return (
     <MerchantProfileContext.Provider
@@ -148,6 +176,12 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
         setArea,
         description,
         setDescription,
+        mapUrl,
+        setMapUrl,
+        invoiceDetails,
+        setInvoiceDetails,
+        paymentQrDataUrl,
+        setPaymentQrDataUrl,
         linkShared,
         setLinkShared,
         hasProfile,

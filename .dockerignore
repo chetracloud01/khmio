@@ -1,0 +1,15 @@
+# What the Docker images never need (infra/docker/*.Dockerfile build from the repo root).
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+.git
+.env
+.env.*
+!.env.example
+**/.uploads
+.uploads-verify
+.s3-data
+infra/bin
+.playwright-mcp

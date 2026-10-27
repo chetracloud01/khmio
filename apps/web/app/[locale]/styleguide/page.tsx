@@ -1,92 +1,70 @@
 "use client";
 
-import { Button, Card, Input, PriceTag } from "@khmer-micro-store/ui";
+import { SegmentedControl, ThemeSwitcher } from "@khmio/ui";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useThemeLabels } from "@/components/use-theme-labels";
+import { AppBlocksTab } from "./app-blocks-tab";
+import { FoundationsTab } from "./foundations-tab";
+import { KitTab } from "./kit-tab";
+import { WebsiteTab } from "./website-tab";
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 border-b border-border pb-6">
-      <h2 className="text-lg font-semibold text-fg">{title}</h2>
-      {children}
-    </section>
-  );
-}
+// The one place to see the app's standard, in the viewer's theme and accent
+// (switch them top right): Foundations (colours, type, brand), the Kit
+// (every part in packages/ui), App blocks (shared parts in
+// apps/web/components) and the Website parts. A new screen is built from
+// what's here; a part that's missing is added, shown here first, then used.
+// coverage.test.ts fails if a kit part is left off.
 
-function Swatch({ label, className }: { label: string; className: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className={`h-14 w-14 rounded-DEFAULT ${className}`} />
-      <span className="text-xs text-muted">{label}</span>
-    </div>
-  );
-}
+const TABS = ["foundations", "kit", "app", "website"] as const;
+type Tab = (typeof TABS)[number];
+const isTab = (value: string): value is Tab => (TABS as readonly string[]).includes(value);
 
 export default function StyleguidePage() {
   const t = useTranslations("Styleguide");
-  const [loading, setLoading] = useState(false);
+  const themeLabels = useThemeLabels();
+  const [tab, setTab] = useState<Tab>("foundations");
+
+  // The tab is kept in the address (#kit), so a refresh or a shared link opens it again.
+  useEffect(() => {
+    const fromHash = window.location.hash.slice(1);
+    if (isTab(fromHash)) setTab(fromHash);
+  }, []);
+  function choose(next: string) {
+    if (!isTab(next)) return;
+    setTab(next);
+    window.history.replaceState(null, "", `#${next}`);
+  }
 
   return (
-    <main className="mx-auto flex max-w-[360px] flex-col gap-6 bg-bg p-4 pb-12 text-fg">
-      <h1 className="text-2xl font-bold">{t("title")}</h1>
-
-      <Section title={t("colors")}>
-        <div className="flex gap-4">
-          <Swatch label={t("colorBrand")} className="bg-brand" />
-          <Swatch label={t("colorSuccess")} className="bg-success" />
-          <Swatch label={t("colorDanger")} className="bg-danger" />
+    <main className="min-h-dvh bg-canvas text-fg">
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-8 p-4 pb-12 md:p-6">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold">{t("title")}</h1>
+            <ThemeSwitcher labels={themeLabels} />
+          </div>
+          <p className="max-w-2xl text-sm text-muted">{t("intro")}</p>
+          {/* On a narrow phone the tabs slide sideways in their own strip; the page itself never does. */}
+          <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+            <SegmentedControl
+              value={tab}
+              onChange={choose}
+              options={[
+                { value: "foundations", label: t("tabFoundations") },
+                { value: "kit", label: t("tabKit") },
+                { value: "app", label: t("tabApp") },
+                { value: "website", label: t("tabWebsite") },
+              ]}
+            />
+          </div>
         </div>
-      </Section>
 
-      <Section title={t("typography")}>
-        <p className="font-khmer text-base leading-relaxed">{t("typographySampleKhmer")}</p>
-        <p className="text-base leading-relaxed">{t("typographySample")}</p>
-      </Section>
-
-      <Section title={t("buttons")}>
-        <Button variant="primary" fullWidth>
-          {t("buttonPrimary")}
-        </Button>
-        <Button variant="secondary" fullWidth>
-          {t("buttonSecondary")}
-        </Button>
-        <Button variant="danger" fullWidth>
-          {t("buttonDanger")}
-        </Button>
-        <Button
-          variant="primary"
-          fullWidth
-          loading={loading}
-          onClick={() => {
-            setLoading(true);
-            setTimeout(() => setLoading(false), 1500);
-          }}
-        >
-          {loading ? t("buttonLoading") : t("buttonPrimary")}
-        </Button>
-      </Section>
-
-      <Section title={t("inputs")}>
-        <Input label={t("nameLabel")} placeholder={t("namePlaceholder")} />
-        <Input label={t("phoneLabel")} prefix="+855" inputMode="tel" error={t("phoneError")} />
-      </Section>
-
-      <Section title={t("cards")}>
-        <Card className="flex items-center justify-between">
-          <span className="font-medium">{t("cardDeliveryTitle")}</span>
-          <span className="text-sm text-muted">{t("cardDeliveryFee")}</span>
-        </Card>
-        <Card className="flex items-center justify-between">
-          <span className="font-medium">{t("cardPickupTitle")}</span>
-          <span className="text-sm text-muted">{t("cardPickupFee")}</span>
-        </Card>
-      </Section>
-
-      <Section title={t("prices")}>
-        <PriceTag usdCents={850} khr={34850} />
-        <PriceTag usdCents={500} />
-        <PriceTag khr={20000} />
-      </Section>
+        {tab === "foundations" && <FoundationsTab />}
+        {tab === "kit" && <KitTab />}
+        {tab === "app" && <AppBlocksTab />}
+        {tab === "website" && <WebsiteTab />}
+      </div>
     </main>
   );
 }

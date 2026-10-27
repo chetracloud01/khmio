@@ -80,7 +80,7 @@ export function matchTotp(secretBase32: string, code: string, nowMs: number, las
 }
 
 /** What the app scans: otpauth://totp/… with the issuer and the admin's name. */
-export function otpauthUri(secretBase32: string, accountName: string, issuer = "Khmer Micro-Store Admin"): string {
+export function otpauthUri(secretBase32: string, accountName: string, issuer = "Khmio Admin"): string {
   const label = encodeURIComponent(`${issuer}:${accountName}`);
   return `otpauth://totp/${label}?secret=${secretBase32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=${DIGITS}&period=${TOTP_STEP_SECONDS}`;
 }

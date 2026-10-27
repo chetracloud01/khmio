@@ -1,4 +1,4 @@
-import { withContext, type AppDb, type SystemDb } from "@khmer-micro-store/db";
+import { withContext, type AppDb, type SystemDb } from "@khmio/db";
 import { createParamDecorator, Inject, Injectable, UnauthorizedException, type CanActivate, type ExecutionContext } from "@nestjs/common";
 import { readCookie, resolveSession, SESSION_COOKIE } from "../auth/sessions";
 import { APP_DB, SYSTEM_DB } from "../db";

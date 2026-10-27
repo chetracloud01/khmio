@@ -1,25 +1,33 @@
 "use client";
 
-import { formatKhr, formatUsd, isStorefrontOpen, maxOrderQuantity, type Currency } from "@khmer-micro-store/shared";
-import { Badge, Button, cn, SearchInput, SegmentedControl, Skeleton, ThemeSwitcher } from "@khmer-micro-store/ui";
-import { ChevronRight, Clock, Info, SearchX, ShoppingBag, Store, X } from "lucide-react";
+import { formatKhr, formatUsd, isStorefrontOpen, maxOrderQuantity, type Currency } from "@khmio/shared";
+import { Badge, Button, cn, Skeleton, ThemeSwitcher } from "@khmio/ui";
+import { ChevronRight, Info, SearchX, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
+import { CartPanel } from "@/components/buyer/cart-panel";
+import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
+import { ShopHero } from "@/components/buyer/shop-hero";
+import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
+import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
+import { TrackOrderCard } from "@/components/invoice/track-order-card";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { getStoreMaxDiscountPercent, mockStore, parseLineKey, type MockProduct } from "@/mock/mock-data";
+import { getStartingVariant, getStoreMaxDiscountPercent, getUnitUsdCents, mockStore, parseLineKey, type MockProduct } from "@/mock/mock-data";
 import { useAdmin } from "../admin-context";
 import { useCart } from "../cart-context";
 import { useDeliverySettings } from "../delivery-settings-context";
+import { useStorePayments, useStoreSettings } from "../store-settings-context";
 import { useMerchantSubscription } from "../merchant-subscription-context";
 import { useOnlineStock } from "../online-stock";
 import { useCheckoutTotal } from "../use-checkout-total";
-import { useThemeLabels } from "../use-theme-labels";
-import { CategoryChip, ProductCard } from "../shared-ui";
+import { LanguageSwitch } from "@/components/language-switch";
+import { useThemeLabels } from "@/components/use-theme-labels";
+import { ProductCard } from "../shared-ui";
 import { useShopIdentity } from "../shop-identity";
 import { useShopProducts } from "../shop-products";
 import { ProductDetail } from "./product-detail";
-import { ShopInfo } from "./shop-info";
 
 // A paused store (trial ended or subscription unpaid) keeps its link working
 // but takes no orders — see docs/blueprint.md "Subscription life cycle".
@@ -97,7 +105,12 @@ function Storefront() {
   const locale = useLocale();
   const router = useRouter();
   const { quantities, setQuantities, currency } = useCart();
-  const { name: storeName, initial: storeInitial, logoDataUrl } = useShopIdentity();
+  const identity = useShopIdentity();
+  const { name: storeName, initial: storeInitial, logoDataUrl } = identity;
+  const [infoOpen, setInfoOpen] = useState(false);
+  const { settings: deliverySettings } = useDeliverySettings();
+  const { settings: storeSettings, rate } = useStoreSettings();
+  const { khqrReady } = useStorePayments();
   // The seller's logo once they've added one; the shop's first letter until then.
   const logo = logoDataUrl ? (
     // eslint-disable-next-line @next/next/no-img-element -- merchant's own upload preview, not a remote image
@@ -105,10 +118,7 @@ function Storefront() {
   ) : (
     storeInitial
   );
-  const ratingCountLabel = locale === "km" ? mockStore.ratingCountLabelKm : mockStore.ratingCountLabelEn;
 
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const { products, categories } = useShopProducts();
 
   // The open product lives in the link (?product=p1), so a product can be
@@ -149,20 +159,24 @@ function Storefront() {
   const specialOfferProducts = products.filter((product) => (product.discountPercent ?? 0) > 0);
   // Only categories with something to buy get a chip.
   const shownCategories = categories.filter((category) => products.some((product) => product.categoryId === category.id));
-  const showSpecialOffers = selectedCategory === "all" && !searchQuery && specialOfferProducts.length > 0;
 
-  const visibleProducts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return products.filter((product) => {
-      const inCategory = selectedCategory === "all" || product.categoryId === selectedCategory;
-      // Search both languages: a buyer may type "coffee" on the Khmer page.
-      const matchesSearch = `${product.titleKm} ${product.titleEn}`.toLowerCase().includes(query);
-      return inCategory && matchesSearch;
-    });
-  }, [products, selectedCategory, searchQuery]);
+  // The list's search, category, sort and grid-or-list — the same block as the live shop (components/buyer).
+  const browseAccessors = useMemo<BrowseAccessors<MockProduct>>(
+    () => ({
+      text: (product) => `${product.titleKm} ${product.titleEn}`,
+      category: (product) => product.categoryId,
+      price: (product) => getUnitUsdCents(product, product.variants?.length ? getStartingVariant(product) : undefined) ?? 0,
+      discount: (product) => product.discountPercent ?? 0,
+    }),
+    [],
+  );
+  const browse = useProductBrowse(products, browseAccessors, mockStore.slug);
+  const visibleProducts = browse.shown;
+  const showSpecialOffers = browse.category === "all" && !browse.query && browse.sort === "newest" && specialOfferProducts.length > 0;
 
   // The cart bar shows the goods total in the buyer's currency — the same
   // round-each-line-then-sum numbers checkout uses.
+  const tCart = useTranslations("Cart");
   const { itemCount, lines } = useCheckoutTotal(quantities, locale, null, currency);
   const goodsTotal = lines.reduce((sum, line) => sum + line.discounted * line.qty, 0);
   const format = (amount: number, cur: Currency) => (cur === "USD" ? formatUsd(amount) : formatKhr(amount));
@@ -181,8 +195,8 @@ function Storefront() {
   }
 
   function clearFilters() {
-    setSearchQuery("");
-    setSelectedCategory("all");
+    browse.setQuery("");
+    browse.setCategory("all");
   }
 
   const cardProps = {
@@ -199,54 +213,65 @@ function Storefront() {
     increaseLabelFor: (title: string) => t("increase", { title }),
   };
 
-  return (
-    <div className="min-h-dvh bg-canvas text-fg">
-      {/* Phones: full width. Tablet and up: a centred shop column on the page background. */}
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1100px] flex-col bg-bg pb-32 md:border-x md:border-border">
-        <section className="relative">
-          <div className={cn("h-32 w-full sm:h-44", mockStore.bannerColor)} />
-          {/* A dark shade at the bottom keeps the offer text readable on any banner colour. */}
-          <div aria-hidden="true" className="absolute inset-0 bg-gradient-to-t from-nav-bg/50 via-transparent to-transparent" />
-          <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-bg/85 p-0.5 shadow-card backdrop-blur">
-            <SegmentedControl
-              value={locale}
-              onChange={(next) => router.push(`/${next}/mockup/storefront`)}
-              options={[
-                { value: "km", label: "ខ្មែរ" },
-                { value: "en", label: "EN" },
-              ]}
-            />
-            <ThemeSwitcher labels={themeLabels} />
-          </div>
-          {maxDiscount > 0 && (
-            <span className="absolute bottom-3 right-4 text-xl font-extrabold text-nav-fg drop-shadow sm:text-2xl">
-              {t("upTo", { percent: maxDiscount })}
-            </span>
-          )}
-          <div className="absolute -bottom-7 left-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-4 border-bg bg-brand text-2xl font-bold text-on-brand shadow-raised">
-            {logo}
-          </div>
-        </section>
+  const cartHref = `/${locale}/mockup/cart`;
 
-        <div ref={identityRef} className="flex flex-col gap-1 px-4 pb-3 pt-9">
-          <h1 className="text-lg font-bold leading-normal">{storeName}</h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-            {/* Only after the super admin approved the owner's ID — the badge is a promise to buyers. */}
-            {demoKycStatus === "approved" && <Badge>{t("verified")}</Badge>}
-            <span>{t("rating", { value: mockStore.ratingValue, count: ratingCountLabel })}</span>
-            <span className="inline-flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-              {t("deliveryTime", { min: mockStore.deliveryEtaMinMinutes, max: mockStore.deliveryEtaMaxMinutes })}
-            </span>
-          </div>
-          <div className="mt-2">
-            <ShopInfo />
-          </div>
+  return (
+    <BuyerShell wide className="pb-32 lg:pb-0">
+      <BuyerColumns
+        aside={
+          <CartPanel
+            title={tCart("yourCart")}
+            lines={lines.map((line) => ({ key: line.key, name: line.title, qty: line.qty, amount: format(line.discounted * line.qty, currency) }))}
+            totalLabel={t("goodsTotal")}
+            total={format(goodsTotal, currency)}
+            checkoutHref={cartHref}
+            checkoutLabel={tCart("checkout")}
+            emptyText={t("panelEmpty")}
+          />
+        }
+      >
+        <div ref={identityRef}>
+          <ShopHero
+            name={storeName}
+            logo={logo}
+            openLabel={t("openNow")}
+            highlight={maxDiscount > 0 ? t("upTo", { percent: maxDiscount }) : undefined}
+            controls={
+              <>
+                <LanguageSwitch />
+                <ThemeSwitcher labels={themeLabels} />
+              </>
+            }
+            // Only after the super admin approved the owner's ID — the badge is a promise to buyers.
+            nameBadge={demoKycStatus === "approved" ? <Badge>{t("verified")}</Badge> : undefined}
+            info={<ShopInfoButton onClick={() => setInfoOpen(true)} />}
+          />
+          <ShopInfoSheet
+            open={infoOpen}
+            onClose={() => setInfoOpen(false)}
+            shop={{
+              ...identity,
+              logo,
+              openLabel: t("openNow"),
+              delivery: deliverySettings,
+              currency,
+              rate,
+              khqrReady,
+              allowCod: storeSettings.allowCod,
+            }}
+          />
+        </div>
+
+        {/* For buyers without Telegram (design/screens.md B8). */}
+        <div className="px-4 pb-3">
+          <TrackOrderCard href={`/${locale}/mockup/track`} />
         </div>
 
         {/* Only search and categories stay pinned — the rest of the screen is for products. */}
-        <div className="sticky top-0 z-20 flex flex-col gap-2 border-b border-border bg-bg pb-2 pt-2">
-          <div className="flex items-center gap-2 px-4">
+        <BrowseToolbar
+          browse={browse}
+          categories={shownCategories.map((category) => ({ id: category.id, label: locale === "km" ? category.labelKm : category.labelEn }))}
+          leading={
             <span
               aria-hidden="true"
               className={cn(
@@ -256,32 +281,8 @@ function Storefront() {
             >
               {logo}
             </span>
-            <div className="min-w-0 flex-1">
-              <SearchInput
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onClear={() => setSearchQuery("")}
-                clearLabel={t("clearSearch")}
-                placeholder={t("searchPlaceholder")}
-                aria-label={t("searchPlaceholder")}
-              />
-            </div>
-          </div>
-          <div className="no-scrollbar flex snap-x gap-2 overflow-x-auto scroll-px-4 px-4">
-            <CategoryChip active={selectedCategory === "all"} onClick={() => setSelectedCategory("all")}>
-              {t("categoryAll")}
-            </CategoryChip>
-            {shownCategories.map((category) => (
-              <CategoryChip
-                key={category.id}
-                active={selectedCategory === category.id}
-                onClick={() => setSelectedCategory(category.id)}
-              >
-                {locale === "km" ? category.labelKm : category.labelEn}
-              </CategoryChip>
-            ))}
-          </div>
-        </div>
+          }
+        />
 
         {productParam && !detailProduct && (
           <div role="status" className="mx-4 mt-4 flex items-center gap-3 rounded-DEFAULT border border-border bg-canvas p-3 text-sm">
@@ -312,9 +313,9 @@ function Storefront() {
         <section className="flex flex-1 flex-col gap-3 pt-4">
           {showSpecialOffers && <h2 className="px-4 text-base font-semibold">{t("allProducts")}</h2>}
           {visibleProducts.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div className={browse.view === "grid" ? "grid grid-cols-2 gap-3 px-4 pb-4 sm:grid-cols-3" : "flex flex-col gap-3 px-4 pb-4"}>
               {visibleProducts.map((product) => (
-                <ProductCard key={product.id} product={product} {...cardProps} />
+                <ProductCard key={product.id} product={product} view={browse.view} {...cardProps} />
               ))}
             </div>
           ) : (
@@ -323,7 +324,7 @@ function Storefront() {
                 <SearchX className="h-7 w-7 text-muted" aria-hidden="true" />
               </span>
               <p className="text-sm text-muted">
-                {searchQuery.trim() ? t("noResultsFor", { query: searchQuery.trim() }) : t("noProducts")}
+                {browse.query.trim() ? t("noResultsFor", { query: browse.query.trim() }) : t("noProducts")}
               </p>
               <Button variant="secondary" onClick={clearFilters}>
                 {t("showAllProducts")}
@@ -331,16 +332,16 @@ function Storefront() {
             </div>
           )}
         </section>
-      </div>
+      </BuyerColumns>
 
       {detailProduct && <ProductDetail key={detailProduct.id} product={detailProduct} onClose={closeProduct} />}
 
       {itemCount > 0 && (
-        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3">
+        <div className="pb-safe pointer-events-none fixed inset-x-0 bottom-0 z-30 px-4 pt-3 lg:hidden">
           <Link
             // Re-mounting on each change replays the small "bump", so adding an item is felt.
             key={itemCount}
-            href={`/${locale}/mockup/cart`}
+            href={cartHref}
             className="pointer-events-auto mx-auto flex min-h-[56px] w-full max-w-[520px] animate-bump items-center justify-between gap-3 rounded-2xl bg-brand px-4 py-2 text-on-brand shadow-raised motion-reduce:animate-none"
           >
             <span className="flex items-center gap-3">
@@ -362,6 +363,6 @@ function Storefront() {
           </Link>
         </div>
       )}
-    </div>
+    </BuyerShell>
   );
 }

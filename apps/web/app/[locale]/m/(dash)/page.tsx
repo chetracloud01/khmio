@@ -1,100 +1,128 @@
 "use client";
 
-import { needsSellerAction } from "@khmer-micro-store/shared";
-import { Card } from "@khmer-micro-store/ui";
-import { ChevronRight, Clock, ExternalLink, Link2, ShoppingBag } from "lucide-react";
+import { needsSellerAction, parseTrackingCode, trackingCodePrefix } from "@khmio/shared";
+import { BottomSheet, Card, EmptyState, Mio, Skeleton } from "@khmio/ui";
+import { PackagePlus, ScanLine, Share2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api, type SellerOrder } from "@/lib/api";
-import { useMerchant } from "./merchant-context";
+import { useCallback, useEffect, useState } from "react";
+import { formatMoney, useOrderText } from "@/components/order-ui";
+import { FindOrderPanel, OrdersNeedingAction, type ActionRow } from "@/components/seller-cards";
+import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
+import { SalesOverview } from "@/components/sales-overview";
+import { HomeTopBar, NeedsYouBanner, QuickActions } from "@/components/seller-app";
+import { api, type SellerOrder, sellerOrderSchema } from "@/lib/api";
+import { shopStateOf, useMerchant } from "./merchant-context";
+import { OrderNextStep } from "./order-next-step";
 import { SetupChecklist } from "./setup-checklist";
-import { ShareShop } from "./share-shop";
+import { useShareShop } from "./share-shop";
+import { z } from "zod";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-// The dashboard home: the shop, its link and what's left to set up.
+// The seller's home (design/screens.md S3), from the shared sections in
+// components/seller-home — the same ones as its mockup. The numbers come
+// from GET /orders/summary (kept fresh by the dashboard layout, every minute
+// and after each order step); the rows from the order list.
 export default function MerchantHomePage() {
-  const t = useTranslations("App");
-  const tType = useTranslations("BusinessType");
+  const t = useTranslations("Dashboard");
   const locale = useLocale();
-  const { me, store } = useMerchant();
-  const subscription = me.store?.subscription;
-  const trialEndsAt = subscription?.trialEndsAt ? new Date(subscription.trialEndsAt) : null;
-  const trialDaysLeft = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / DAY_MS)) : null;
-  const shopHref = `/${locale}/s/${store.slug}`;
+  const { me, store, summary, refreshSummary } = useMerchant();
+  const { placeLabel, timeAgo, statusLabel } = useOrderText();
+  const [orders, setOrders] = useState<SellerOrder[] | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const tApp = useTranslations("SellerApp");
+  const [findOpen, setFindOpen] = useState(false);
+  const shareShop = useShareShop();
 
-  return (
-    <div className="flex flex-col gap-5 p-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted">{t("homeGreeting", { name: me.merchant.firstName })}</p>
-        <h1 className="text-2xl font-bold leading-normal">{store.name}</h1>
-        <p className="text-sm text-muted">{tType(store.businessType)}</p>
-      </div>
-
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex items-start gap-3">
-          <Link2 className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-muted">{t("shopLinkLabel")}</p>
-            <p className="truncate font-medium">/s/{store.slug}</p>
-          </div>
-        </div>
-        <Link href={shopHref} target="_blank" className="flex min-h-touch items-center gap-2 text-sm font-medium text-brand">
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
-          {t("viewShop")}
-        </Link>
-        {trialDaysLeft !== null && subscription?.status === "trialing" && (
-          <div className="flex items-start gap-3">
-            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-hidden="true" />
-            <div>
-              <p className="text-sm text-muted">{t("planLabel")}</p>
-              <p className="font-medium">{t("planTrial", { count: trialDaysLeft })}</p>
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <WaitingOrders />
-
-      <SetupChecklist />
-
-      <div id="share" className="scroll-mt-4">
-        <ShareShop />
-      </div>
-
-      <Card className="flex flex-col gap-2 border-dashed p-4">
-        <p className="font-semibold">{t("previewTitle")}</p>
-        <p className="text-sm text-muted">{t("previewBody")}</p>
-        <Link href={`/${locale}/mockup/dashboard`} className="flex min-h-touch items-center justify-between gap-2 text-sm font-medium text-brand">
-          {t("openPreview")}
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </Card>
-    </div>
-  );
-}
-
-/** "3 orders need you": the orders whose next step is the seller's (packages/shared needsSellerAction). */
-function WaitingOrders() {
-  const t = useTranslations("App");
-  const locale = useLocale();
-  const [waiting, setWaiting] = useState<number | null>(null);
-  useEffect(() => {
-    api<SellerOrder[]>("/orders")
-      .then((orders) => setWaiting(orders.filter((order) => needsSellerAction(order.status)).length))
-      .catch(() => setWaiting(null));
+  const loadOrders = useCallback(() => {
+    api("/orders", z.array(sellerOrderSchema)).then(setOrders, () => setOrders((previous) => previous ?? []));
   }, []);
-  if (!waiting) return null;
+  // Again whenever the layout's minute refresh sees the waiting count change, so the rows follow the numbers.
+  const waiting = summary?.waiting ?? 0;
+  useEffect(loadOrders, [loadOrders, waiting]);
+
+  const base = `/${locale}/m`;
+  const header = (
+    <HomeTopBar
+      firstName={me.merchant.firstName}
+      state={shopStateOf(me, store)}
+      onSearch={() => setFindOpen(true)}
+      codePrefix={trackingCodePrefix(store.slug)}
+    />
+  );
+
+  if (!summary || !orders) {
+    return (
+      <div className={`${SELLER_PAGE} gap-5`} aria-busy="true">
+        {header}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((index) => (
+            <Skeleton key={index} className="h-32" />
+          ))}
+        </div>
+        <Skeleton className="h-72" />
+      </div>
+    );
+  }
+
+  const toHandle = orders.filter((order) => needsSellerAction(order.status));
+  const rows: ActionRow[] = toHandle.map((order) => ({
+    key: order.id,
+    href: `${base}/orders/${order.id}`,
+    number: `#${order.orderNumber}`,
+    buyer: order.buyerName,
+    details: `${placeLabel(order)} · ${timeAgo(order.createdAt)}`,
+    total: formatMoney(order.totalMinor, order.currency),
+    status: order.status,
+    fulfilment: order.fulfilment,
+    statusLabel: statusLabel(order),
+    next: (
+      <OrderNextStep
+        order={order}
+        onDone={() => {
+          loadOrders();
+          void refreshSummary();
+        }}
+        onProblem={setProblem}
+      />
+    ),
+  }));
+
+  const quickActions = [
+    { key: "sell", href: `${base}/sell`, icon: ScanLine, label: tApp("quickSell"), hint: tApp("quickSellHint"), tone: "teal" as const },
+    { key: "add", href: `${base}/products/new`, icon: PackagePlus, label: tApp("quickAddProduct"), hint: tApp("addProductHint"), tone: "teal" as const },
+    { key: "share", onClick: shareShop.open, icon: Share2, label: tApp("quickShareShop"), hint: tApp("shareShopHint"), tone: "amber" as const },
+  ];
+
   return (
-    <Link href={`/${locale}/m/orders`} className="block">
-      <Card className="flex items-center gap-3 border-brand/40 bg-brand/5 p-4">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-on-brand">
-          <ShoppingBag className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1 font-semibold">{t("ordersWaiting", { count: waiting })}</span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
-      </Card>
-    </Link>
+    <div className={`${SELLER_PAGE} gap-5`}>
+      {header}
+      <NeedsYouBanner count={summary.waiting} href={`${base}/orders`} />
+      <QuickActions items={quickActions} />
+      <SetupChecklist />
+      <SalesOverview days={summary.days} top={summary.topProducts} cashToCollect={summary.cashToCollect} mainCurrency={store.defaultCurrency} />
+      {problem && (
+        <p role="alert" className="rounded-DEFAULT bg-danger/10 px-4 py-2 text-sm text-danger">
+          {problem}
+        </p>
+      )}
+
+      {orders.length === 0 ? (
+        <Card className="p-4">
+          <EmptyState art={<Mio size={96} />} title={t("firstOrderTitle")} body={t("firstOrderBody")} />
+        </Card>
+      ) : (
+        <OrdersNeedingAction rows={rows} total={summary.waiting} allHref={`${base}/orders`} />
+      )}
+
+      <BottomSheet open={findOpen} onClose={() => setFindOpen(false)} closeLabel={tApp("close")} title={tApp("findOrder")}>
+        <FindOrderPanel
+          prefix={trackingCodePrefix(store.slug)}
+          hrefFor={(code) => {
+            // Among the latest orders the list holds.
+            const match = orders.find((order) => parseTrackingCode(order.trackingCode) === code);
+            return match ? `${base}/orders/${match.id}` : null;
+          }}
+        />
+      </BottomSheet>
+    </div>
   );
 }

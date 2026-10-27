@@ -1,0 +1,25 @@
+# Dependabot opens pull requests for library updates, so security fixes are
+# never missed. Each runs through CI (lint, types, unit and end-to-end tests,
+# images) before anyone merges it. Small updates come grouped, once a week.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Phnom_Penh
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: monthly

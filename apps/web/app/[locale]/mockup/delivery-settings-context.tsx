@@ -1,6 +1,6 @@
 "use client";
 
-import { deliverySettingsSchema, type DeliverySettings } from "@khmer-micro-store/shared";
+import { deliverySettingsSchema, type DeliverySettings } from "@khmio/shared";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { mockDeliverySettings } from "@/mock/mock-data";
@@ -11,6 +11,8 @@ interface DeliverySettingsContextValue {
   settings: DeliverySettings;
   /** Callers validate with deliverySettingsSchema first; saved values are always valid. */
   saveSettings: (settings: DeliverySettings) => void;
+  /** Pickup is set on Shop details; saving it there doesn't count as setting up delivery. */
+  savePickup: (pickup: DeliverySettings["pickup"]) => void;
   /** True once the seller has saved delivery settings themselves (the setup checklist's "Set delivery"). */
   configured: boolean;
   /**
@@ -24,8 +26,8 @@ const DeliverySettingsContext = createContext<DeliverySettingsContextValue | nul
 
 // Switching locale changes the [locale] URL segment, which remounts this
 // provider — localStorage is what survives that (and a page refresh).
-const STORAGE_KEY = "khmer-micro-store:mockup-delivery-settings";
-const CONFIGURED_KEY = "khmer-micro-store:mockup-delivery-configured";
+const STORAGE_KEY = "khmio:mockup-delivery-settings";
+const CONFIGURED_KEY = "khmio:mockup-delivery-configured";
 
 /** Zones, pickup, provinces and drivers — stands in for the store's delivery tables. */
 export function DeliverySettingsProvider({ children }: { children: ReactNode }) {
@@ -63,6 +65,10 @@ export function DeliverySettingsProvider({ children }: { children: ReactNode }) 
     setConfigured(true);
   }
 
+  function savePickup(pickup: DeliverySettings["pickup"]) {
+    setSettings((current) => ({ ...current, pickup }));
+  }
+
   function startNewShop() {
     setSettings({ ...mockDeliverySettings, pickup: { enabled: false, address: "", hours: "" }, drivers: [] });
     setConfigured(false);
@@ -74,7 +80,7 @@ export function DeliverySettingsProvider({ children }: { children: ReactNode }) 
   }
 
   return (
-    <DeliverySettingsContext.Provider value={{ hydrated, settings, saveSettings, configured, startNewShop }}>
+    <DeliverySettingsContext.Provider value={{ hydrated, settings, saveSettings, savePickup, configured, startNewShop }}>
       {children}
     </DeliverySettingsContext.Provider>
   );

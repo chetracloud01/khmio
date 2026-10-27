@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { createSystemDb, type SystemDb } from "@khmer-micro-store/db";
-import { confirmButtonData } from "@khmer-micro-store/shared";
+import { createSystemDb, type SystemDb } from "@khmio/db";
+import { confirmButtonData } from "@khmio/shared";
 import pino from "pino";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TelegramError, type InlineButton, type TelegramClient } from "../telegram/client";

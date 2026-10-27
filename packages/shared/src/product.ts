@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { rawCustomValuesSchema } from "./custom-fields";
+import { productKindSchema } from "./services";
+import { choiceGroupInputSchema, MAX_CHOICE_GROUPS, MAX_VARIANT_GROUPS, variantGroupInputSchema } from "./product-options";
 
 // A product as the merchant saves it from the product form. The same schema
 // checks the form now and the API request later. Rules from docs/blueprint.md
@@ -57,6 +60,8 @@ export const productOptionInputSchema = z.object({
     .regex(/^[A-Za-z0-9._-]*$/, "sku_invalid"),
   labelKm: z.string().trim().max(40, "too_long"),
   labelEn: z.string().trim().max(40, "too_long"),
+  /** With variant groups: one value id per group (the label then comes from them). */
+  valueIds: z.array(z.string().min(1)).max(MAX_VARIANT_GROUPS).optional(),
   ...priceFields,
 });
 
@@ -82,15 +87,33 @@ export const productInputSchema = z
     ...priceFields,
     /** When present, prices live on each option and the product-level prices are ignored. */
     options: z.array(productOptionInputSchema).max(MAX_PRODUCT_OPTIONS, "too_long").optional(),
+    /** Size, Colour…: each option is one value of each (Features › options). */
+    variantGroups: z.array(variantGroupInputSchema).max(MAX_VARIANT_GROUPS, "too_long").default([]),
+    /** Sugar, Add-ons…: picked when ordering (Features › choices). */
+    choiceGroups: z.array(choiceGroupInputSchema).max(MAX_CHOICE_GROUPS, "too_long").default([]),
+    /** The shop's own product fields (Features › customFields), field id → value; checked against them by the API. */
+    customValues: rawCustomValuesSchema,
+    /** A service has no stock and nothing to deliver (Features › services). */
+    kind: productKindSchema.default("item"),
   })
   .superRefine((product, ctx) => {
     if (!product.options?.length) {
       checkPrices(product, ctx, []);
+      if (product.variantGroups.length) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["options"] });
       return;
     }
     const seenSkus = new Set<string>();
+    const seenCombinations = new Set<string>();
     product.options.forEach((option, index) => {
-      if (!option.labelKm && !option.labelEn) {
+      if (product.variantGroups.length) {
+        // One value from each group, each combination once.
+        const valueIds = option.valueIds ?? [];
+        const fits = valueIds.length === product.variantGroups.length && product.variantGroups.every((group, at) => group.values.some((value) => value.id === valueIds[at]));
+        if (!fits) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "option_values_invalid", path: ["options", index, "valueIds"] });
+        const combination = valueIds.join("|");
+        if (fits && seenCombinations.has(combination)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "option_duplicate", path: ["options", index, "valueIds"] });
+        seenCombinations.add(combination);
+      } else if (!option.labelKm && !option.labelEn) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "option_label_required", path: ["options", index, "label"] });
       }
       checkPrices(option, ctx, ["options", index]);

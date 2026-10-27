@@ -1,6 +1,6 @@
 "use client";
 
-import { canShareShop, getMissingForSharing, type BusinessType, type ShopReadinessFacts } from "@khmer-micro-store/shared";
+import { canShareShop, getMissingForSharing, type BusinessType, type ShopReadinessFacts } from "@khmio/shared";
 import { mockBusinessTypeDefaults, mockUoms } from "@/mock/mock-data";
 import { useCart } from "./cart-context";
 import { useDeliverySettings } from "./delivery-settings-context";

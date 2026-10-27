@@ -3,22 +3,25 @@
 import {
   deliverySettingsSchema,
   formatKhmerPhoneLocal,
+  khrInputText,
   MAX_DELIVERY_ZONES,
   parseKhrInput,
   parseUsdInput,
   PHNOM_PENH_DISTRICTS,
   placeName,
   toFieldErrors,
+  usdInputText,
   type DeliverySettings,
   type FormErrorCode,
-} from "@khmer-micro-store/shared";
-import { Button, Card, cn, Input, Select } from "@khmer-micro-store/ui";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+} from "@khmio/shared";
+import { Button, Card, cn, Input, MoneyInput, Select, Switch } from "@khmio/ui";
+import { AlertTriangle, Plus, Store, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { useDeliverySettings } from "../../delivery-settings-context";
 import { useMerchantProfile } from "../../merchant-profile-context";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import { MenuList } from "@/components/menu-list";
 
 interface ZoneDraft {
   id: string;
@@ -37,35 +40,32 @@ interface DriverDraft {
 
 interface Draft {
   zones: ZoneDraft[];
-  pickup: { enabled: boolean; address: string; hours: string };
   province: { enabled: boolean; feeUsd: string; feeKhr: string; note: string };
   drivers: DriverDraft[];
 }
 
-const usdText = (cents: number | undefined) => (cents !== undefined ? (cents / 100).toFixed(2) : "");
-const khrText = (riel: number | undefined) => (riel !== undefined ? String(riel) : "");
 
 function toDraft(settings: DeliverySettings): Draft {
   return {
     zones: settings.zones.map((zone) => ({
       id: zone.id,
       name: zone.name,
-      feeUsd: usdText(zone.feeUsdCents),
-      feeKhr: khrText(zone.feeKhr),
+      feeUsd: usdInputText(zone.feeUsdCents),
+      feeKhr: khrInputText(zone.feeKhr),
       districtIds: zone.districtIds,
     })),
-    pickup: settings.pickup,
     province: {
       enabled: settings.province.enabled,
-      feeUsd: usdText(settings.province.feeUsdCents),
-      feeKhr: khrText(settings.province.feeKhr),
+      feeUsd: usdInputText(settings.province.feeUsdCents),
+      feeKhr: khrInputText(settings.province.feeKhr),
       note: settings.province.note,
     },
     drivers: settings.drivers.map((driver) => ({ ...driver, phone: formatKhmerPhoneLocal(driver.phone) })),
   };
 }
 
-function toInput(draft: Draft) {
+/** Pickup is set on Shop details (profile#location); a delivery save keeps it as saved. */
+function toInput(draft: Draft, pickup: DeliverySettings["pickup"]) {
   return {
     zones: draft.zones.map((zone) => ({
       id: zone.id,
@@ -74,7 +74,7 @@ function toInput(draft: Draft) {
       feeUsdCents: parseUsdInput(zone.feeUsd),
       feeKhr: parseKhrInput(zone.feeKhr),
     })),
-    pickup: draft.pickup,
+    pickup,
     province: {
       enabled: draft.province.enabled,
       note: draft.province.note,
@@ -104,15 +104,9 @@ function DeliveryForm() {
   const errorText = useFormErrorText();
   const locale = useLocale();
   const { settings, saveSettings, configured } = useDeliverySettings();
-  const { businessType } = useMerchantProfile();
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Buyers usually come to a salon or a repair shop, so a new service shop
-  // starts with pickup ("at the shop") switched on — saving then asks for the address.
-  const [draft, setDraft] = useState<Draft>(() => {
-    const saved = toDraft(settings);
-    return businessType === "service" && !configured ? { ...saved, pickup: { ...saved.pickup, enabled: true } } : saved;
-  });
+  const [draft, setDraft] = useState<Draft>(() => toDraft(settings));
   const [errors, setErrors] = useState<Record<string, FormErrorCode>>({});
   const [justSaved, setJustSaved] = useState(false);
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(settings));
@@ -171,7 +165,7 @@ function DeliveryForm() {
   }
 
   function handleSave() {
-    const result = deliverySettingsSchema.safeParse(toInput(draft));
+    const result = deliverySettingsSchema.safeParse(toInput(draft, settings.pickup));
     if (!result.success) {
       setErrors(toFieldErrors(result.error));
       focusFirstInvalidField(formRef.current);
@@ -195,10 +189,18 @@ function DeliveryForm() {
     usdKey: string,
     khrKey: string,
   ) => (
-    <div className="grid grid-cols-2 gap-3">
-      <Input label={t("feeUsd")} inputMode="decimal" placeholder="1.00" value={usd} onChange={(e) => onUsd(e.target.value)} error={error(usdKey)} />
-      <Input label={t("feeKhr")} inputMode="numeric" placeholder="4000" value={khr} onChange={(e) => onKhr(e.target.value)} error={error(khrKey)} />
-    </div>
+    <MoneyInput
+      usd={usd}
+      khr={khr}
+      usdLabel={t("feeUsd")}
+      khrLabel={t("feeKhr")}
+      onUsdChange={onUsd}
+      onKhrChange={onKhr}
+      usdPlaceholder="1.00"
+      usdError={error(usdKey)}
+      khrPlaceholder="4000"
+      khrError={error(khrKey)}
+    />
   );
 
   return (
@@ -301,47 +303,24 @@ function DeliveryForm() {
         </FormSection>
 
         <FormSection stacked title={t("sectionPickup")} description={t("sectionPickupHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.pickup.enabled}
-              onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, enabled: e.target.checked } }, "pickup.address", "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("pickupEnabled")}</span>
-          </label>
-          {draft.pickup.enabled && (
-            <>
-              <Input
-                label={t("pickupAddress")}
-                placeholder={t("pickupAddressPlaceholder")}
-                maxLength={200}
-                value={draft.pickup.address}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, address: e.target.value } }, "pickup.address")}
-                error={error("pickup.address")}
-              />
-              <Input
-                label={t("pickupHours")}
-                placeholder={t("pickupHoursPlaceholder")}
-                maxLength={100}
-                value={draft.pickup.hours}
-                onChange={(e) => change({ ...draft, pickup: { ...draft.pickup, hours: e.target.value } }, "pickup.hours")}
-                error={error("pickup.hours")}
-              />
-            </>
-          )}
+          {/* Set with the shop's address and map link on Shop details. */}
+          <MenuList
+            rows={[
+              {
+                key: "pickup",
+                href: `/${locale}/mockup/dashboard/profile#location`,
+                icon: Store,
+                tone: settings.pickup.enabled ? "success" : "muted",
+                title: settings.pickup.enabled ? t("pickupOn") : t("pickupOff"),
+                detail: [settings.pickup.address, settings.pickup.hours].filter(Boolean).join(" · ") || t("pickupChangeHint"),
+                value: t("pickupChange"),
+              },
+            ]}
+          />
         </FormSection>
 
         <FormSection stacked title={t("sectionProvince")} description={t("sectionProvinceHelp")}>
-          <label className="flex min-h-touch cursor-pointer items-center gap-3">
-            <input
-              type="checkbox"
-              checked={draft.province.enabled}
-              onChange={(e) => change({ ...draft, province: { ...draft.province, enabled: e.target.checked } }, "zones")}
-              className="h-5 w-5 shrink-0 accent-brand"
-            />
-            <span className="text-sm font-medium">{t("provinceEnabled")}</span>
-          </label>
+          <Switch checked={draft.province.enabled} onChange={(enabled) => change({ ...draft, province: { ...draft.province, enabled } }, "zones")} label={t("provinceEnabled")} />
           {draft.province.enabled && (
             <>
               {feeInputs(

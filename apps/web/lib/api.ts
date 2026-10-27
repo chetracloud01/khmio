@@ -1,43 +1,58 @@
-import type {
-  BusinessType,
-  Currency,
-  DeliveryArea,
-  DeliverySettings,
-  FormErrorCode,
-  Fulfilment,
-  OrderCancelReason,
-  OrderStatus,
-  PaymentMethod,
-  PlanId,
-  SellerOrderAction,
-  SubscriptionStatus,
-} from "@khmer-micro-store/shared";
+import { FORM_ERROR_CODES, followLocalAddress, isLocalNetworkHost, type FormErrorCode } from "@khmio/shared";
+import { z } from "zod";
+import { meSchema, uploadedPhotoSchema, type Me, type UploadedPhoto } from "./api-answers";
+
+export * from "./api-answers";
 
 // The browser's way to the API (apps/api). The session lives in an HttpOnly
 // cookie the API sets, so every call sends cookies; page scripts never see it.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const SAVED_API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+/**
+ * Where the API is. Production: exactly NEXT_PUBLIC_API_URL. Development, when
+ * that is a local address (localhost, 192.168.x …): in the browser, the same
+ * address the page was opened with — so a PC that joins another Wi-Fi needs no
+ * settings change, and the admin cookie stays same-site — and on the server,
+ * the API on this machine.
+ */
+export function apiBaseUrl(): string {
+  if (process.env.NODE_ENV === "production") return SAVED_API_URL;
+  if (typeof window !== "undefined") return followLocalAddress(SAVED_API_URL, window.location);
+  try {
+    const url = new URL(SAVED_API_URL);
+    return isLocalNetworkHost(url.hostname) ? `http://localhost:${url.port || "80"}` : SAVED_API_URL;
+  } catch {
+    return SAVED_API_URL;
+  }
+}
 
 /** The API's one error shape (apps/api errors.ts). `status` 0 = the API couldn't be reached at all. */
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
-    public readonly fields: Partial<Record<string, FormErrorCode>> = {},
+    public readonly fields: Record<string, FormErrorCode> = {},
   ) {
     super(code);
     this.name = "ApiError";
   }
 }
 
-export async function api<T>(
-  path: string,
-  options: { method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; form?: FormData } = {},
-): Promise<T> {
+const errorBodySchema = z.object({ error: z.string(), fields: z.record(z.enum(FORM_ERROR_CODES)).optional() });
+
+interface RequestOptions {
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  body?: unknown;
+  form?: FormData;
+}
+
+/** Sends one request and returns the answer's JSON (null when it has none); a refusal becomes an ApiError. */
+async function request(path: string, options: RequestOptions): Promise<{ status: number; data: unknown }> {
   let response: Response;
   const json = options.body !== undefined;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(`${apiBaseUrl()}${path}`, {
       method: options.method ?? "GET",
       credentials: "include",
       // A FormData body sets its own Content-Type (with the multipart boundary).
@@ -49,242 +64,45 @@ export async function api<T>(
   }
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const body = (data ?? {}) as { error?: string; fields?: Partial<Record<string, FormErrorCode>> };
-    throw new ApiError(response.status, body.error ?? "internal", body.fields ?? {});
+    const body = errorBodySchema.safeParse(data);
+    throw new ApiError(response.status, body.success ? body.data.error : "internal", body.success ? (body.data.fields ?? {}) : {});
   }
-  return data as T;
+  return { status: response.status, data };
 }
 
-export interface Me {
-  /** signedInWithTelegram: new-order alerts reach the merchant's own chat with the bot. */
-  merchant: { firstName: string; lastName: string; telegramUsername: string | null; signedInWithTelegram: boolean };
-  store: {
-    id: string;
-    slug: string;
-    name: string;
-    businessType: BusinessType;
-    phone: string;
-    subscription: { plan: PlanId; status: SubscriptionStatus; trialEndsAt: string | null } | null;
-  } | null;
+/**
+ * Calls the API and reads its answer with `answer` (lib/api-answers.ts). An
+ * answer of another shape is refused as ApiError "bad_answer", so a screen
+ * shows its error state instead of breaking on a missing field.
+ */
+export async function api<Answer extends z.ZodTypeAny>(path: string, answer: Answer, options: RequestOptions = {}): Promise<z.output<Answer>> {
+  const { status, data } = await request(path, options);
+  const parsed = answer.safeParse(data);
+  if (parsed.success) return parsed.data;
+  // Only where the shape differs, never the values: an answer can hold a buyer's phone.
+  if (process.env.NODE_ENV !== "production") console.error(`API answer for ${path} has another shape:`, parsed.error.issues.map((issue) => issue.path.join(".")));
+  throw new ApiError(status, "bad_answer");
+}
+
+/** Calls the API for what it does, not for an answer (save, delete, sign out). */
+export async function apiSend(path: string, options: RequestOptions = {}): Promise<void> {
+  await request(path, options);
 }
 
 /** null when nobody is signed in. */
 export async function getMe(): Promise<Me | null> {
   try {
-    return await api<Me>("/auth/me");
+    return await api("/auth/me", meSchema);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) return null;
     throw error;
   }
 }
 
-/** Sends one photo (already shrunk in the browser) and returns the key to save with the product or logo. */
-export function uploadPhoto(photo: Blob): Promise<UploadedPhoto> {
+/** Sends one photo (already shrunk in the browser), and optionally its small copy for lists (about 400 px); returns the keys to save with the product or logo. */
+export function uploadPhoto(photo: Blob, thumb?: Blob): Promise<UploadedPhoto> {
   const form = new FormData();
   form.append("file", photo, "photo.jpg");
-  return api<UploadedPhoto>("/uploads/photo", { method: "POST", form });
-}
-
-export interface UploadedPhoto {
-  key: string;
-  url: string;
-}
-
-export interface CatalogName {
-  id: string;
-  nameKm: string;
-  nameEn: string;
-}
-
-/** GET /catalog: what the product form picks from. */
-export interface Catalog {
-  categories: CatalogName[];
-  brands: CatalogName[];
-  units: CatalogName[];
-  defaultUnitId: string | null;
-}
-
-/** GET /store: the shop details page, the plan in force and the setup checklist's facts. */
-export interface StoreDetails {
-  slug: string;
-  name: string;
-  businessType: BusinessType;
-  phone: string;
-  area: DeliveryArea;
-  description: string;
-  logoKey: string | null;
-  logoUrl: string | null;
-  bakongId: string;
-  usdToKhrRate: number;
-  plan: PlanId;
-  paused: boolean;
-  readiness: { visibleProducts: number; productsWithPhoto: number; deliveryConfigured: boolean; khqrReady: boolean; codEnabled: boolean };
-  /** The last checklist step: the shop link was shared. */
-  linkShared: boolean;
-}
-
-export interface ProductVariant {
-  id: string;
-  sku: string;
-  labelKm: string;
-  labelEn: string;
-  priceUsdCents: number | null;
-  priceKhr: number | null;
-  /** Only on plans with wholesale prices. */
-  wholesalePriceUsdCents?: number | null;
-  wholesalePriceKhr?: number | null;
-}
-
-/** A product as GET /products and the shop page return it. */
-export interface Product {
-  id: string;
-  titleKm: string;
-  titleEn: string;
-  descriptionKm: string;
-  descriptionEn: string;
-  categoryId: string;
-  brandId: string | null;
-  unitId: string | null;
-  discountPercent: number | null;
-  isVisible: boolean;
-  photos: UploadedPhoto[];
-  /** false = one hidden default variant carries the price. */
-  hasOptions: boolean;
-  variants: ProductVariant[];
-}
-
-/** GET /public/stores/:slug: everything the buyer's shop page shows. */
-export interface PublicShop {
-  store: {
-    slug: string;
-    name: string;
-    businessType: BusinessType;
-    phone: string;
-    area: DeliveryArea;
-    description: string;
-    logoUrl: string | null;
-    defaultCurrency: Currency;
-    usdToKhrRate: number;
-    allowCod: boolean;
-    vatPercent: number;
-  };
-  categories: CatalogName[];
-  products: Product[];
-  /** Zones, pickup and provinces — never the drivers. */
-  delivery: Omit<DeliverySettings, "drivers">;
-  /** Orders need delivery saved at least once; KHQR joins in step 5. */
-  ordering: { deliveryConfigured: boolean; khqrReady: boolean };
-  /** false = the shop is paused: "temporarily closed", no orders. */
-  open: boolean;
-}
-
-/** GET/PUT /delivery. */
-export interface DeliveryResponse {
-  settings: DeliverySettings;
-  /** Saved at least once (the setup checklist's "delivery" step). */
-  configured: boolean;
-}
-
-/** GET/PUT /store/settings. */
-export interface StoreSettingsResponse {
-  defaultCurrency: Currency;
-  usdToKhrRate: number;
-  allowCod: boolean;
-  vatPercent: number;
-  /** The USD to KHR band the platform allows today. */
-  rateBand: { min: number; max: number };
-}
-
-/** POST /public/stores/:slug/orders. */
-export interface PlacedOrder {
-  token: string;
-  orderNumber: number;
-}
-
-/** GET /public/orders/:token: the buyer's order page. */
-export interface PublicOrder {
-  orderNumber: number;
-  status: OrderStatus;
-  paymentMethod: PaymentMethod;
-  currency: Currency;
-  subtotalMinor: number;
-  discountMinor: number;
-  deliveryFeeMinor: number;
-  vatPercent: number;
-  vatMinor: number;
-  totalMinor: number;
-  exchangeRateUsed: number;
-  fulfilment: Fulfilment;
-  area: DeliveryArea;
-  districtId: string | null;
-  provinceId: string | null;
-  landmark: string;
-  pickupAddress: string;
-  pickupHours: string;
-  buyerName: string;
-  cancelReason: OrderCancelReason | null;
-  createdAt: string;
-  items: { titleKm: string; titleEn: string; variantLabelKm: string; variantLabelEn: string; unitPriceMinor: number; quantity: number; lineTotalMinor: number }[];
-  events: { status: OrderStatus; at: string }[];
-  /** How it was sent: the driver's name or the bus ticket (never the driver's phone). */
-  dispatch: { route: "driver" | "bus" | "pickup"; driverName: string; busCompany: string; ticketNumber: string; dispatchedAt: string } | null;
-  /** The buyer may cancel by themselves right now (packages/shared canBuyerCancel). */
-  canCancel: boolean;
-  /** A Telegram chat follows this order's status. */
-  followingOnTelegram: boolean;
-  store: { slug: string; name: string; phone: string; logoUrl: string | null };
-}
-
-/** GET /orders: one row of the seller's order list. */
-export interface SellerOrder {
-  id: string;
-  orderNumber: number;
-  status: OrderStatus;
-  paymentMethod: PaymentMethod;
-  currency: Currency;
-  totalMinor: number;
-  buyerName: string;
-  buyerPhone: string;
-  fulfilment: Fulfilment;
-  area: DeliveryArea;
-  districtId: string | null;
-  provinceId: string | null;
-  createdAt: string;
-  itemCount: number;
-}
-
-/** GET /orders/:id and POST /orders/:id/actions: one order in full, for the seller. */
-export interface SellerOrderDetail extends Omit<PublicOrder, "store" | "events" | "dispatch" | "canCancel" | "followingOnTelegram"> {
-  id: string;
-  buyerPhone: string;
-  cancelNote: string;
-  events: { status: OrderStatus; actor: "buyer" | "merchant" | "system"; at: string }[];
-  dispatches: {
-    route: "driver" | "bus" | "pickup";
-    driverName: string;
-    driverPhone: string;
-    busCompany: string;
-    ticketNumber: string;
-    dispatchedAt: string;
-    pickedUpAt: string | null;
-    deliveredAt: string | null;
-    failedAt: string | null;
-  }[];
-  /** What the seller may do now (packages/shared getSellerActions), the main step first. */
-  actions: SellerOrderAction[];
-  /** How it must be sent (packages/shared getDispatchRoute). */
-  route: "driver" | "bus" | "pickup";
-}
-
-/** POST /store/telegram-groups/link and /public/orders/:token/telegram-link: a one-time t.me link (15 minutes). */
-export interface TelegramLink {
-  link: string;
-  expiresAt: string;
-}
-
-/** GET /store/telegram-groups. */
-export interface StaffGroup {
-  id: string;
-  title: string;
-  createdAt: string;
+  if (thumb) form.append("thumb", thumb, "thumb.jpg");
+  return api("/uploads/photo", uploadedPhotoSchema, { method: "POST", form });
 }
