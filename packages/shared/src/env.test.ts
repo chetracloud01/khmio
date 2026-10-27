@@ -68,6 +68,8 @@ describe("server settings", () => {
     expect(ready.TRUST_PROXY_HOPS).toBe(1);
     expect(ready.RATE_LIMITS).toBe("on");
     expect(() => loadEnv(apiEnvSchema, { ...productionSource, RATE_LIMITS: "off" })).toThrow(EnvError);
+    expect(ready.KHQR_PROVIDER).toBe("off");
+    expect(() => loadEnv(apiEnvSchema, { ...productionSource, KHQR_PROVIDER: "fake" })).toThrow(EnvError);
   });
 
   it("the worker needs the bot and backups in production", () => {

@@ -29,12 +29,28 @@ export async function mainLocationId(tx: Tx, storeId: string): Promise<string> {
  */
 export async function takeOrderStock(tx: Tx, orderId: string, lineVariantIds: string[]): Promise<void> {
   const [row] = await tx.$queryRaw<{ short: string | null }[]>`SELECT app_take_order_stock(${orderId}::uuid) AS short`;
-  if (!row?.short) return;
-  const index = Math.max(0, lineVariantIds.indexOf(row.short));
+  refuseShortLine(row?.short ?? null, lineVariantIds);
+}
+
+/**
+ * Holds an order's tracked items while it waits to be paid by KHQR: nothing
+ * leaves the shelf, but nobody else can have them. The worker turns the hold
+ * into a sale once paid, or lets it go when the code expires. Throws
+ * "sold_out" like takeOrderStock.
+ */
+export async function reserveOrderStock(tx: Tx, orderId: string, lineVariantIds: string[]): Promise<void> {
+  const [row] = await tx.$queryRaw<{ short: string | null }[]>`SELECT app_reserve_order_stock(${orderId}::uuid) AS short`;
+  refuseShortLine(row?.short ?? null, lineVariantIds);
+}
+
+/** "sold_out" under the request's line for the option without enough (the transaction then rolls back). */
+function refuseShortLine(short: string | null, lineVariantIds: string[]): void {
+  if (!short) return;
+  const index = Math.max(0, lineVariantIds.indexOf(short));
   throw new InvalidInputException({ [`lines.${index}`]: "sold_out" });
 }
 
-/** Puts back what an order took (cancelled order, voided counter sale). Nothing happens if it took nothing. */
+/** Puts back what an order took, and lets go of what it only held (cancelled order, voided counter sale). Nothing happens if it had none. */
 export async function returnOrderStock(tx: Tx, orderId: string): Promise<void> {
   await tx.$executeRaw`SELECT app_return_order_stock(${orderId}::uuid)`;
 }

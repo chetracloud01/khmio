@@ -239,6 +239,17 @@ export const publicOrderSchema = orderViewSchema.extend({
   canCancel: z.boolean(),
   /** A Telegram chat follows this order's status. */
   followingOnTelegram: z.boolean(),
+  /** The KHQR to pay while the order waits for payment; null otherwise. */
+  payment: z
+    .object({
+      qrPayload: z.string(),
+      amountMinor: z.number(),
+      currency: currencySchema,
+      expiresAt: z.string(),
+      /** Only with the stand-in bank (KHQR_PROVIDER=fake): what "pay (test)" pays. */
+      testBankRef: z.string().nullable(),
+    })
+    .nullable(),
   store: z.object({ slug: z.string(), name: z.string(), phone: z.string(), logoUrl: z.string().nullable() }),
 });
 export type PublicOrder = z.infer<typeof publicOrderSchema>;

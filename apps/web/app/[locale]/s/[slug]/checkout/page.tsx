@@ -175,7 +175,8 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
       saveBuyerDetails(details, remember);
       setPlaced(true);
       cart.clear();
-      router.replace(`/${locale}/o/${order.token}`);
+      // A KHQR order is paid next; any other goes to its order page.
+      router.replace(`/${locale}/o/${order.token}${paymentMethod === "khqr" ? "/pay" : ""}`);
     } catch (failure) {
       setPlacing(false);
       setBotReset((count) => count + 1);

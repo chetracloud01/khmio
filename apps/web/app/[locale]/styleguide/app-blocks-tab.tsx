@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn } from "@/components/data-grid";
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks } from "@/components/form-ui";
 import { ShopHero } from "@/components/buyer/shop-hero";
+import { KhqrPayPanel } from "@/components/buyer/khqr-pay-panel";
 import { StockNote } from "@/components/buyer/stock-note";
 import { CashPayment } from "@/components/counter/cash-payment";
 import { CounterCart } from "@/components/counter/counter-cart";
@@ -42,6 +43,7 @@ const SAMPLE_RATE_BAND = { min: DEFAULT_ADMIN_SETTINGS.usdToKhrMin, max: DEFAULT
 export function AppBlocksTab() {
   const t = useTranslations("Styleguide");
   const tShop = useTranslations("Storefront");
+  const tKhqr = useTranslations("Khqr");
   const savedShopName = t("detailShopValue");
   const [shopName, setShopName] = useState(savedShopName);
   const tProfile = useTranslations("DashboardProfile");
@@ -167,6 +169,19 @@ export function AppBlocksTab() {
           </Demo>
           <Demo name={["PaymentQrField", "PaymentQrGuide"]}>
             <PaymentQrField previewUrl={null} onFile={() => undefined} onRemove={() => undefined} />
+          </Demo>
+          <Demo name="KhqrPayPanel">
+            <KhqrPayPanel
+              storeName={mockStore.nameEn}
+              amountMinor={10_800}
+              currency="KHR"
+              qrText="KHQR-STYLEGUIDE"
+              secondsLeft={432}
+              status="pending"
+              saveName="khqr-styleguide.png"
+              expired={{ body: tKhqr("expiredOrderBody"), actionLabel: tKhqr("tryAgain"), onAction: () => undefined }}
+              testPay={{ label: tKhqr("testPay"), note: tKhqr("testPayNote"), onPay: () => undefined, busy: false }}
+            />
           </Demo>
           <Demo name="StockNote">
             <div className="flex flex-col gap-1">

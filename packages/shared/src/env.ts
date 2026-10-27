@@ -52,6 +52,12 @@ const shared = {
   S3_BUCKET: optional(z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, "must be a bucket name (lower-case letters, digits, dots, dashes)")),
   S3_ACCESS_KEY_ID: optional(z.string().min(1)),
   S3_SECRET_ACCESS_KEY: optional(z.string().min(1)),
+  /**
+   * How buyers pay by KHQR. "off": not offered (until the Bakong token and
+   * gate G3). "fake": a stand-in bank on this machine (the API's /dev/fake-bank)
+   * for local work and the end-to-end checks; production refuses it.
+   */
+  KHQR_PROVIDER: z.enum(["off", "fake"]).default("off"),
 };
 
 /**
@@ -71,6 +77,7 @@ function productionRules(required: string[]) {
     if (typeof env.TELEGRAM_API_URL === "string" && !env.TELEGRAM_API_URL.startsWith("https://")) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["TELEGRAM_API_URL"], message: "must be https in production" });
     }
+    if (env.KHQR_PROVIDER === "fake") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["KHQR_PROVIDER"], message: "can't be fake in production" });
     if (env.RATE_LIMITS === "off") ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["RATE_LIMITS"], message: "can't be off in production" });
     if (typeof env.FILES_PUBLIC_URL === "string" && !env.FILES_PUBLIC_URL.startsWith("https://")) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["FILES_PUBLIC_URL"], message: "must be https in production" });
@@ -149,6 +156,8 @@ const workerFields = z.object({
   /** pg_dump and pg_restore: on the PATH in the worker's image; on Windows e.g. C:/Program Files/PostgreSQL/16/bin/pg_dump.exe */
   PG_DUMP_PATH: z.string().min(1).default("pg_dump"),
   PG_RESTORE_PATH: z.string().min(1).default("pg_restore"),
+  /** KHQR_PROVIDER=fake: where the stand-in bank answers (the API's development route). */
+  FAKE_BANK_URL: z.string().url("must be a URL").default("http://localhost:4000/dev/fake-bank"),
 });
 
 function backupRules(env: z.infer<typeof workerFields>, ctx: z.RefinementCtx) {

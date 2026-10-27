@@ -16,6 +16,7 @@
     "@aws-sdk/client-s3": "^3",
     "@aws-sdk/lib-storage": "^3",
     "@khmio/db": "workspace:^",
+    "@khmio/payments": "workspace:^",
     "@khmio/shared": "workspace:*",
     "@prisma/client": "5.22.0",
     "@sentry/node": "^8",

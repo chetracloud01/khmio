@@ -2,7 +2,7 @@
 
 import { approximateIn, BUYER_ORDER_STEPS, formatKhmerPhoneLocal, getBuyerProgress, getInvoiceState } from "@khmio/shared";
 import { Button, cn, ConfirmDialog, GroupTitle, Notice } from "@khmio/ui";
-import { BellRing, Bus, Check, Clock, FileText, ListOrdered, MapPin, PackageX, Phone, RotateCcw, Send, Store, Truck } from "lucide-react";
+import { BellRing, Bus, Check, Clock, FileText, ListOrdered, MapPin, PackageX, Phone, QrCode, RotateCcw, Send, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -158,6 +158,14 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
               <Phone className="h-4 w-4" aria-hidden="true" />
               {t("callShop", { phone: formatKhmerPhoneLocal(order.store.phone) })}
             </a>
+          )}
+          {order.payment && (
+            <Link href={`/${locale}/o/${encodeURIComponent(token)}/pay`} className="block">
+              <Button variant="primary" className="w-full">
+                <QrCode className="h-4 w-4" aria-hidden="true" />
+                {t("payNow")}
+              </Button>
+            </Link>
           )}
           {canOrderAgain && (
             <Button variant="primary" className="w-full" onClick={orderAgain}>

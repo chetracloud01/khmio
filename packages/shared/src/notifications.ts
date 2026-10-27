@@ -3,6 +3,7 @@ import type { OrderFulfilment } from "./delivery";
 import { z } from "zod";
 import { formatKhr, formatUsd, type Currency } from "./money";
 import { PHNOM_PENH_DISTRICTS, PROVINCES } from "./locations";
+import { paymentCheckIssueSchema, type PaymentCheckIssue } from "./payment-attempts";
 
 // The Telegram messages the worker sends (docs/blueprint.md "Workflows from
 // start to end", workflow 4). Khmer first, then English, in one message: the
@@ -89,8 +90,17 @@ export const adminAlertSchema = z.discriminatedUnion("reason", [
   z.object({ reason: z.literal("worker_failing"), detail: z.string() }),
   z.object({ reason: z.literal("admin_locked"), adminName: z.string() }),
   z.object({ reason: z.literal("backup_failed"), detail: z.string() }),
+  z.object({ reason: z.literal("payment_issue"), issue: paymentCheckIssueSchema, orderNumber: z.number(), storeSlug: z.string() }),
 ]);
 export type AdminAlert = z.infer<typeof adminAlertSchema>;
+
+/** A payment issue in the admin alert's words (admins read English; the heading is in both). */
+const PAYMENT_ISSUE_TEXT: Record<PaymentCheckIssue, string> = {
+  provider_unreachable: "the bank never answered before the code expired",
+  amount_mismatch: "paid a different amount",
+  currency_mismatch: "paid in the other currency",
+  paid_after_expiry: "paid after the order was cancelled",
+};
 
 export function adminAlertText(alert: AdminAlert): string {
   switch (alert.reason) {
@@ -106,6 +116,12 @@ export function adminAlertText(alert: AdminAlert): string {
       return ["🔒 គណនីអ្នកគ្រប់គ្រងត្រូវបានចាក់សោ ១៥ នាទី", "", `Admin login locked for 15 minutes after 5 wrong codes: ${alert.adminName}`].join("\n");
     case "backup_failed":
       return ["💾 ការបម្រុងទុកទិន្នន័យប្រចាំថ្ងៃមិនបានសម្រេច", "", `Tonight's database backup failed: ${alert.detail}. The earlier backups are kept; check the worker's log and the backup bucket.`].join("\n");
+    case "payment_issue":
+      return [
+        `💳 ការបង់ប្រាក់ត្រូវការពិនិត្យ — ការបញ្ជាទិញ #${alert.orderNumber}`,
+        "",
+        `A payment needs a look (${PAYMENT_ISSUE_TEXT[alert.issue]}): order #${alert.orderNumber} of /s/${alert.storeSlug}. The order was not marked paid. Open Admin › Failed checks.`,
+      ].join("\n");
   }
 }
 

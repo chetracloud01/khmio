@@ -133,6 +133,29 @@ enum StockAdjustmentReason {
   other
 }
 
+/// One try to pay an order online (packages/shared payment-attempts.ts).
+enum PaymentAttemptStatus {
+  pending
+  paid
+  expired
+  failed
+}
+
+/// Why a payment check needs a person to look (packages/shared payment-attempts.ts).
+enum PaymentCheckIssue {
+  provider_unreachable
+  amount_mismatch
+  currency_mismatch
+  paid_after_expiry
+}
+
+/// An issue's handling: open, confirmed by an admin as real, or closed with a note.
+enum PaymentIssueStatus {
+  open
+  confirmed
+  closed
+}
+
 /// Where the order was made: the shop page, or the counter (design/screens.md P1).
 enum OrderChannel {
   online
@@ -307,21 +330,24 @@ model Store {
   createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt               DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  members        StoreMember[]
-  paymentConfigs StorePaymentConfig[]
-  subscription   Subscription?
-  categories     Category[]
-  units          Unit[]
-  brands         Brand[]
-  products       Product[]
-  deliveryZones  DeliveryZone[]
-  drivers        StoreDriver[]
-  customers      Customer[]
-  orders         Order[]
-  alertChats     StoreAlertChat[]
-  stockLocations StockLocation[]
-  stockLevels    StockLevel[]
-  stockMovements StockMovement[]
+  members             StoreMember[]
+  paymentConfigs      StorePaymentConfig[]
+  subscription        Subscription?
+  categories          Category[]
+  units               Unit[]
+  brands              Brand[]
+  products            Product[]
+  deliveryZones       DeliveryZone[]
+  drivers             StoreDriver[]
+  customers           Customer[]
+  orders              Order[]
+  alertChats          StoreAlertChat[]
+  onlineStockLocation StockLocation?       @relation("StoreOnlineLocation", fields: [onlineStockLocationId], references: [id], onDelete: SetNull)
+  stockLocations      StockLocation[]      @relation("StoreLocations")
+  stockLevels         StockLevel[]
+  stockMovements      StockMovement[]
+  stockReservations   StockReservation[]
+  paymentAttempts     PaymentAttempt[]
 
   @@map("stores")
 }
@@ -466,9 +492,10 @@ model ProductVariant {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product        Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  stockLevels    StockLevel[]
-  stockMovements StockMovement[]
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockLevels       StockLevel[]
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
 
   @@index([productId])
   @@map("product_variants")
@@ -486,11 +513,14 @@ model StockLocation {
   isMain               Boolean           @default(false) @map("is_main")
   createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  store      Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  suppliedBy StockLocation?  @relation("LocationSupply", fields: [suppliedByLocationId], references: [id], onDelete: SetNull)
-  supplies   StockLocation[] @relation("LocationSupply")
-  levels     StockLevel[]
-  movements  StockMovement[]
+  store        Store              @relation("StoreLocations", fields: [storeId], references: [id], onDelete: Cascade)
+  suppliedBy   StockLocation?     @relation("LocationSupply", fields: [suppliedByLocationId], references: [id], onDelete: SetNull)
+  supplies     StockLocation[]    @relation("LocationSupply")
+  levels       StockLevel[]
+  movements    StockMovement[]
+  reservations StockReservation[]
+  /// The store whose shop page sells from here (Advance; null = the main branch).
+  onlineFor    Store[]            @relation("StoreOnlineLocation")
 
   @@index([storeId])
   @@map("stock_locations")
@@ -545,6 +575,27 @@ model StockMovement {
   @@index([variantId])
   @@index([orderId])
   @@map("stock_movements")
+}
+
+/// Stock held for an order waiting to be paid online (KHQR): exactly what was held, so payment takes it and expiry gives it back.
+model StockReservation {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId    String   @map("store_id") @db.Uuid
+  orderId    String   @map("order_id") @db.Uuid
+  variantId  String   @map("variant_id") @db.Uuid
+  locationId String   @map("location_id") @db.Uuid
+  quantity   Int
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order    Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location StockLocation  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, variantId, locationId])
+  @@index([storeId])
+  @@index([variantId, locationId])
+  @@map("stock_reservations")
 }
 
 /// Up to 6 per product; the first is the cover.
@@ -681,6 +732,8 @@ model Order {
   cancelNote        String             @default("") @map("cancel_note")
   /// Pro and Advance: stock was taken for this order.
   stockTaken        Boolean            @default(false) @map("stock_taken")
+  /// Pro and Advance: stock is held for this order while it waits to be paid online (stock_reservations).
+  stockReserved     Boolean            @default(false) @map("stock_reserved")
   /// Cash at the counter: what the buyer handed over and the change given, in the order's currency.
   cashReceivedMinor Int?               @map("cash_received_minor")
   changeMinor       Int?               @map("change_minor")
@@ -691,19 +744,60 @@ model Order {
   createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  store          Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  customer       Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  soldBy         Merchant?          @relation("OrderSoldBy", fields: [soldByMerchantId], references: [id], onDelete: SetNull)
-  items          OrderItem[]
-  events         OrderStatusEvent[]
-  dispatches     DeliveryDispatch[]
-  followers      OrderFollower[]
-  stockMovements StockMovement[]
+  store             Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customer          Customer?          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  soldBy            Merchant?          @relation("OrderSoldBy", fields: [soldByMerchantId], references: [id], onDelete: SetNull)
+  items             OrderItem[]
+  events            OrderStatusEvent[]
+  dispatches        DeliveryDispatch[]
+  followers         OrderFollower[]
+  stockMovements    StockMovement[]
+  stockReservations StockReservation[]
+  paymentAttempts   PaymentAttempt[]
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, idempotencyKey])
   @@index([storeId, createdAt])
+  /// The seller's order list filters by status.
+  @@index([storeId, status])
   @@map("orders")
+}
+
+/// Every try to pay an order online (docs/blueprint.md "Payments"). Only the worker, with the provider's own status API, marks one paid.
+model PaymentAttempt {
+  id              String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId         String               @map("store_id") @db.Uuid
+  orderId         String               @map("order_id") @db.Uuid
+  provider        PaymentProvider
+  /// KHQR: the code's MD5; PayWay: the tran_id.
+  providerRef     String               @map("provider_ref")
+  /// What the buyer scans (KHQR), kept so the order page can show it again.
+  qrPayload       String               @default("") @map("qr_payload")
+  /// The order's total and currency when the attempt was made; paid only on an exact match.
+  amountMinor     Int                  @map("amount_minor")
+  currency        Currency
+  status          PaymentAttemptStatus @default(pending)
+  expiresAt       DateTime             @map("expires_at") @db.Timestamptz(6)
+  checkCount      Int                  @default(0) @map("check_count")
+  lastCheckedAt   DateTime?            @map("last_checked_at") @db.Timestamptz(6)
+  paidAt          DateTime?            @map("paid_at") @db.Timestamptz(6)
+  /// The provider's last answer, for an admin looking into an issue. Never secrets.
+  rawResponse     Json?                @map("raw_response")
+  issue           PaymentCheckIssue?
+  issueStatus     PaymentIssueStatus?  @map("issue_status")
+  issueNote       String               @default("") @map("issue_note")
+  issueClosedById String?              @map("issue_closed_by") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store         Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  order         Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  issueClosedBy AdminUser? @relation(fields: [issueClosedById], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerRef])
+  @@index([orderId])
+  @@index([storeId, createdAt])
+  @@map("payment_attempts")
 }
 
 /// An order line: a snapshot, so a later rename or price change never alters an old order.
@@ -725,6 +819,8 @@ model OrderItem {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  /// Best sellers and "how many of this option were sold".
+  @@index([variantId])
   @@map("order_items")
 }
 
@@ -845,8 +941,9 @@ model AdminUser {
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  backupCodes AdminBackupCode[]
-  sessions    AdminSession[]
+  backupCodes         AdminBackupCode[]
+  sessions            AdminSession[]
+  closedPaymentIssues PaymentAttempt[]
 
   @@map("admin_users")
 }

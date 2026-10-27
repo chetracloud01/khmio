@@ -95,6 +95,11 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
 - Time bar and "pay within 10 minutes or the order is cancelled"; three
   "how to pay" steps.
 - The QR is scannable but its content is a mock until Bakong is connected.
+- **Live** (2026-10-27): `/o/<token>/pay`, from checkout and the order page's
+  "Pay now"; one KhqrPayPanel for the live page and this mockup. Paid only by
+  the worker's bank check (the page asks every 3 s). Expired = the order was
+  cancelled, so "Order again" instead of "Try again". "Open bank app" waits
+  for Bakong's link. With `KHQR_PROVIDER=fake`, "Pay with the test bank".
 
 ### B6. Order status — Built · L
 - A link the buyer can reopen any time (also sent on Telegram).

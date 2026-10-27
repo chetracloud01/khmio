@@ -37,31 +37,47 @@ export const publicOrderSelect = {
   events: { select: { status: true, at: true }, orderBy: { at: "asc" } },
   // How it was sent: the driver's name or the bus ticket — the driver's phone stays with the shop.
   dispatches: { select: { route: true, driverName: true, busCompany: true, ticketNumber: true, dispatchedAt: true }, orderBy: { dispatchedAt: "desc" }, take: 1 },
+  // The KHQR code still waiting to be paid: the order page shows it with its countdown.
+  paymentAttempts: { where: { status: "pending" }, select: { providerRef: true, qrPayload: true, amountMinor: true, currency: true, expiresAt: true }, orderBy: { createdAt: "desc" }, take: 1 },
 } satisfies Prisma.OrderSelect;
 type PublicOrderRow = Prisma.OrderGetPayload<{ select: typeof publicOrderSelect }>;
 
 const publicOrderStoreSelect = { slug: true, name: true, phone: true, logoKey: true } satisfies Prisma.StoreSelect;
 type PublicOrderStoreRow = Prisma.StoreGetPayload<{ select: typeof publicOrderStoreSelect }>;
 
-/** The order page, or null when this link's order isn't there. */
-export async function readPublicOrder(tx: Tx, storeId: string, photoUrl: (key: string) => string) {
+/**
+ * The order page, or null when this link's order isn't there.
+ * testBank: KHQR runs on the stand-in bank (KHQR_PROVIDER=fake), so the page offers "pay (test)".
+ */
+export async function readPublicOrder(tx: Tx, storeId: string, photoUrl: (key: string) => string, testBank: boolean) {
   const [order, store, followers] = await Promise.all([
     tx.order.findFirst({ select: publicOrderSelect }),
     tx.store.findUniqueOrThrow({ where: { id: storeId }, select: publicOrderStoreSelect }),
     // Whether this order is followed on Telegram (the database shows only this order's followers).
     tx.orderFollower.count({ where: { stoppedAt: null } }),
   ]);
-  return order ? toPublicOrder(order, store, followers, photoUrl) : null;
+  return order ? toPublicOrder(order, store, followers, photoUrl, testBank) : null;
 }
 
 /** The order page's data. The buyer's phone stays off it: the link may be forwarded. */
-export function toPublicOrder(order: PublicOrderRow, store: PublicOrderStoreRow, followers: number, photoUrl: (key: string) => string) {
+export function toPublicOrder(order: PublicOrderRow, store: PublicOrderStoreRow, followers: number, photoUrl: (key: string) => string, testBank: boolean) {
   const { logoKey, ...shop } = store;
-  const { dispatches, trackingCode, ...rest } = order;
+  const { dispatches, trackingCode, paymentAttempts, ...rest } = order;
+  const attempt = order.status === "awaiting_payment" ? paymentAttempts[0] : undefined;
   return {
     ...rest,
     trackingCode: formatTrackingCode(store.slug, trackingCode),
     dispatch: dispatches[0] ?? null,
+    /** The KHQR to pay while the order waits for it; null otherwise. testBankRef: what "pay (test)" pays at the stand-in bank. */
+    payment: attempt
+      ? {
+          qrPayload: attempt.qrPayload,
+          amountMinor: attempt.amountMinor,
+          currency: attempt.currency,
+          expiresAt: attempt.expiresAt.toISOString(),
+          testBankRef: testBank ? attempt.providerRef : null,
+        }
+      : null,
     canCancel: canBuyerCancel(order),
     followingOnTelegram: followers > 0,
     store: { ...shop, logoUrl: logoKey ? photoUrl(logoKey) : null },

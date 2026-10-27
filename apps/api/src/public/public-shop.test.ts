@@ -32,6 +32,7 @@ const rows = (overrides: Partial<PublicShopRows> = {}): PublicShopRows => ({
   },
   open: true,
   stock: {},
+  khqrReady: false,
   ...overrides,
 });
 
@@ -65,6 +66,13 @@ describe("the buyer's shop page", () => {
   it("says whether it can take orders: delivery saved, and not paused", () => {
     expect(toPublicShop(rows(), photoUrl)).toMatchObject({ ordering: { deliveryConfigured: true, khqrReady: false }, open: true });
     expect(toPublicShop(rows({ open: false, delivery: { ...rows().delivery, configured: false } }), photoUrl)).toMatchObject({ ordering: { deliveryConfigured: false }, open: false });
+  });
+});
+
+describe("KHQR on the shop page", () => {
+  it("is offered only when the API says the shop can take it", () => {
+    expect(toPublicShop(rows(), photoUrl).ordering.khqrReady).toBe(false);
+    expect(toPublicShop(rows({ khqrReady: true }), photoUrl).ordering.khqrReady).toBe(true);
   });
 });
 

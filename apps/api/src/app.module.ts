@@ -14,6 +14,8 @@ import { HealthController } from "./health/health.controller";
 import { MerchantStoreGuard } from "./merchant/store.guard";
 import { OrdersController } from "./orders/orders.controller";
 import { ProductsController } from "./products/products.controller";
+import { FakeBankController } from "./payments/fake-bank.controller";
+import { khqrProvider } from "./payments/khqr";
 import { PublicController } from "./public/public.controller";
 import { rateLimiterProvider } from "./security/rate-limit";
 import { StockController } from "./stock/stock.controller";
@@ -38,7 +40,8 @@ import { WaitlistController } from "./website/waitlist.controller";
     FilesController,
     PublicController,
     WaitlistController,
+    FakeBankController,
   ],
-  providers: [...dbProviders, DbShutdown, fileStorageProvider, rateLimiterProvider, SessionGuard, MerchantStoreGuard, AdminGuard],
+  providers: [...dbProviders, DbShutdown, fileStorageProvider, rateLimiterProvider, khqrProvider, SessionGuard, MerchantStoreGuard, AdminGuard],
 })
 export class AppModule {}

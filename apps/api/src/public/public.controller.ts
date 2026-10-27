@@ -1,10 +1,12 @@
 import { withPublicOrder, withPublicStore, type AppDb } from "@khmio/db";
+import type { PaymentProvider } from "@khmio/payments";
 import { normalizeKhmerPhone, parseTrackingCode, shopSlugSchema, toFieldErrors, trackOrderInputSchema } from "@khmio/shared";
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, Post, Req, Res } from "@nestjs/common";
 import { AppException, InvalidInputException } from "../errors";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { ORDER_TOKEN_PATTERN, parsePlaceOrder, placeOrder } from "../orders/place-order";
+import { KHQR } from "../payments/khqr";
 import { linkFor, newLinkCode } from "../telegram/links";
 import { getEnv } from "../config";
 import { clientAddress, RATE_LIMITER, type RateLimiter } from "../security/rate-limit";
@@ -32,6 +34,7 @@ export class PublicController {
     @Inject(APP_DB) private readonly app: AppDb,
     @Inject(FILE_STORAGE) private readonly storage: FileStorage,
     @Inject(RATE_LIMITER) private readonly limits: RateLimiter,
+    @Inject(KHQR) private readonly khqr: PaymentProvider | null,
   ) {}
 
   private url = (key: string) => this.storage.publicUrl(key);
@@ -39,7 +42,7 @@ export class PublicController {
   @Get("stores/:slug")
   async store(@Param("slug") slug: string) {
     if (!shopSlugSchema.safeParse(slug).success) throw new NotFoundException();
-    const shop = await withPublicStore(this.app, slug, async (tx, storeId) => toPublicShop(await readPublicShop(tx, storeId), this.url));
+    const shop = await withPublicStore(this.app, slug, async (tx, storeId) => toPublicShop(await readPublicShop(tx, storeId, this.khqr), this.url));
     if (!shop) throw new NotFoundException();
     return shop;
   }
@@ -55,7 +58,7 @@ export class PublicController {
     const phone = typeof request.checkout.phone === "string" ? normalizeKhmerPhone(request.checkout.phone) : null;
     if (phone) await this.limits.hit("checkoutPhone", phone);
     await requireHuman(getEnv().TURNSTILE_SECRET_KEY, request.botCheck, address, () => captureError(new Error("Turnstile unreachable: an order went through without the bot check")));
-    const placed = await placeOrder(this.app, slug, request);
+    const placed = await placeOrder(this.app, slug, request, this.khqr);
     if (!placed) throw new NotFoundException();
     if (!placed.created) response.status(200);
     return { token: placed.token, orderNumber: placed.orderNumber };
@@ -65,7 +68,8 @@ export class PublicController {
   @Get("orders/:token")
   async orderPage(@Param("token") token: string) {
     if (!ORDER_TOKEN_PATTERN.test(token)) throw new NotFoundException();
-    const found = await withPublicOrder(this.app, token, (tx, storeId) => readPublicOrder(tx, storeId, this.url));
+    const testBank = getEnv().KHQR_PROVIDER === "fake";
+    const found = await withPublicOrder(this.app, token, (tx, storeId) => readPublicOrder(tx, storeId, this.url, testBank));
     if (!found) throw new NotFoundException();
     return found;
   }

@@ -1,4 +1,5 @@
 import { createSystemDb } from "@khmio/db";
+import { khqrProviderFor } from "@khmio/payments";
 import { adminAlertText, EnvError, loadEnv, workerEnvSchema, type WorkerEnv } from "@khmio/shared";
 import * as Sentry from "@sentry/node";
 import PgBoss from "pg-boss";
@@ -7,6 +8,7 @@ import { manualBackupOnce, MANUAL_BACKUP_EVERY_MS, registerBackup } from "./jobs
 import { registerCleanup } from "./jobs/cleanup";
 import { registerHeartbeat } from "./jobs/heartbeat";
 import { alertChats, deliverOutboxOnce } from "./jobs/outbox";
+import { checkPaymentsOnce, PAYMENT_CHECK_LOOP_MS } from "./jobs/payments";
 import { pollTelegram } from "./jobs/telegram-buttons";
 import { createTelegramClient } from "./telegram/client";
 
@@ -93,9 +95,24 @@ async function main() {
         }
       })()
     : Promise.resolve();
+  // KHQR payment checks (step 5): only while KHQR is on (KHQR_PROVIDER).
+  const khqr = khqrProviderFor({ KHQR_PROVIDER: env.KHQR_PROVIDER, fakeBankUrl: env.FAKE_BANK_URL });
+  const paymentsLoop = khqr
+    ? (async () => {
+        while (!stopping) {
+          try {
+            await checkPaymentsOnce({ db, provider: khqr, logger });
+          } catch (error) {
+            report(error, "payment check round failed");
+            await alertFailing(error);
+          }
+          await new Promise((resolve) => setTimeout(resolve, PAYMENT_CHECK_LOOP_MS));
+        }
+      })()
+    : Promise.resolve();
   // Button presses need a real bot; in dry run there is nothing to listen to.
   const buttonLoop = telegram.dryRun ? Promise.resolve() : pollTelegram({ db, telegram, logger, stopped: () => stopping });
-  logger.info({ environment: env.NODE_ENV, telegram: telegram.dryRun ? "dry run (no TELEGRAM_BOT_TOKEN)" : "on", backups: env.BACKUPS }, "worker started");
+  logger.info({ environment: env.NODE_ENV, telegram: telegram.dryRun ? "dry run (no TELEGRAM_BOT_TOKEN)" : "on", backups: env.BACKUPS, khqr: env.KHQR_PROVIDER }, "worker started");
 
   // Finish the jobs in hand before stopping, so a deploy never cuts a payment check in half.
   const stop = async (signal: string) => {
@@ -104,7 +121,7 @@ async function main() {
     logger.info({ signal }, "worker stopping");
     await boss.stop({ graceful: true, wait: true });
     // The outbox round and a backup in hand finish; a long poll for buttons may wait up to its timeout.
-    await Promise.race([Promise.all([outboxLoop, buttonLoop, manualBackupLoop]), new Promise((resolve) => setTimeout(resolve, 30_000))]);
+    await Promise.race([Promise.all([outboxLoop, buttonLoop, manualBackupLoop, paymentsLoop]), new Promise((resolve) => setTimeout(resolve, 30_000))]);
     await db.$disconnect();
     process.exit(0);
   };

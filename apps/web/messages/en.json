@@ -351,7 +351,11 @@
     "how2": "Scan this QR. On this phone: save it, then upload it in the app.",
     "how3": "Check the amount and confirm. This page updates by itself.",
     "paidTitle": "Paid!",
-    "paidBody": "Thank you — {shop} has your order. Opening your order…"
+    "paidBody": "Thank you — {shop} has your order. Opening your order…",
+    "backToOrder": "Your order",
+    "expiredOrderBody": "The time to pay ran out, so this order was cancelled and nothing was charged. Order again to get a new code.",
+    "testPay": "Pay with the test bank",
+    "testPayNote": "Test mode: this QR is not a real KHQR, so no bank app can pay it."
   },
   "Mascot": {
     "label": "Mio, the Khmio rabbit"

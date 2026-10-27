@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { asOrderBuyer, Prisma, withPublicStore, type AppDb, type Tx } from "@khmio/db";
+import type { PaymentProvider } from "@khmio/payments";
 import {
   checkoutInputSchema,
   computeOrderTotal,
@@ -19,12 +20,14 @@ import {
 type OrderLineRequest = PlaceOrderRequest["lines"][number];
 import { readDeliverySettings } from "../delivery/delivery";
 import { AppException, InvalidInputException } from "../errors";
-import { publicStorePlan, takeOrderStock, tracksStock } from "../stock/stock";
+import { publicKhqrAccount, startKhqrPayment } from "../payments/khqr";
+import { publicStorePlan, reserveOrderStock, takeOrderStock, tracksStock } from "../stock/stock";
 
 // Placing an order (roadmap step 4), as the buyer of one shop — no login.
 // The API recalculates every amount from the database; it never trusts a
 // total from the browser. The same checkout key twice gives back the same
-// order. Until step 5, cash on delivery is the only way to pay.
+// order. Cash on delivery, or KHQR when it's on (KHQR_PROVIDER) and the shop
+// set its Bakong account: the order then waits for payment with its stock held.
 
 export interface PlacedOrder {
   token: string;
@@ -48,9 +51,9 @@ export function parsePlaceOrder(body: unknown): PlaceOrderRequest {
 }
 
 /** Places the order, or returns null when no shop has this link. */
-export async function placeOrder(db: AppDb, slug: string, request: PlaceOrderRequest): Promise<PlacedOrder | null> {
+export async function placeOrder(db: AppDb, slug: string, request: PlaceOrderRequest, khqr: PaymentProvider | null): Promise<PlacedOrder | null> {
   try {
-    return await withPublicStore(db, slug, (tx, storeId) => placeInStore(tx, storeId, request));
+    return await withPublicStore(db, slug, (tx, storeId) => placeInStore(tx, storeId, request, khqr));
   } catch (error) {
     // Two copies of the same checkout arrived together and the other one won: answer with its order.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -69,7 +72,7 @@ async function findByKey(tx: Tx, key: string): Promise<PlacedOrder | null> {
   return order ? { token: row.token, orderNumber: order.orderNumber, created: false } : null;
 }
 
-async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest): Promise<PlacedOrder> {
+async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest, khqr: PaymentProvider | null): Promise<PlacedOrder> {
   const existing = await findByKey(tx, request.idempotencyKey);
   if (existing) return existing;
 
@@ -81,15 +84,15 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
   const [openRow] = await tx.$queryRaw<{ open: boolean }[]>`SELECT app_public_store_open() AS open`;
   if (!openRow?.open) throw new AppException(409, "store_closed");
   const { settings: delivery, configured } = await readDeliverySettings(tx, storeId);
-  // No delivery saved, or no way at all to pay (cash off, and KHQR only arrives in step 5): the shop isn't open for orders.
-  if (!configured || !store.allowCod) throw new AppException(409, "not_accepting_orders");
+  const bakongAccountId = await publicKhqrAccount(tx, khqr);
+  // No delivery saved, or no way at all to pay (cash off, and no KHQR): the shop isn't open for orders.
+  if (!configured || (!store.allowCod && !bakongAccountId)) throw new AppException(409, "not_accepting_orders");
 
   const checkout = parseCheckout(request.checkout, store.allowCod);
   const errors: Record<string, FormErrorCode> = {};
 
-  // Cash only until KHQR (step 5): a Bakong ID doesn't make KHQR available yet.
   const methods = getAvailablePaymentMethods({
-    khqrReady: false,
+    khqrReady: bakongAccountId !== null,
     payWayReady: false,
     storeAllowsCod: store.allowCod,
     area: checkout.area,
@@ -159,11 +162,20 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest)
     select: { id: true, orderNumber: true },
   });
   await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, byId) });
-  // Pro and Advance: a cash order takes its stock now; too little left refuses the whole order (docs/blueprint.md "Stock").
-  if (takesStockWhenPlaced(checkout.paymentMethod) && tracksStock(await publicStorePlan(tx))) await takeOrderStock(tx, order.id, request.lines.map((line) => line.variantId));
+  // Pro and Advance: a cash order takes its stock now, a KHQR order holds it until paid;
+  // too little left refuses the whole order (docs/blueprint.md "Stock").
+  if (tracksStock(await publicStorePlan(tx))) {
+    const lineVariantIds = request.lines.map((line) => line.variantId);
+    if (takesStockWhenPlaced(checkout.paymentMethod)) await takeOrderStock(tx, order.id, lineVariantIds);
+    else await reserveOrderStock(tx, order.id, lineVariantIds);
+  }
+  if (checkout.paymentMethod === "khqr" && khqr && bakongAccountId) {
+    await startKhqrPayment(tx, khqr, { storeId, orderId: order.id, amountMinor: total.total, currency: checkout.currency, bakongAccountId });
+  }
   await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status, actor: "buyer" }] });
   // The seller's Telegram alert, sent by the worker — written with the order, so it can't be lost or sent for an order that failed.
-  await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
+  // A KHQR order alerts the seller once it's paid (the worker), not before: until then there's nothing to do.
+  if (checkout.paymentMethod === "cod") await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
   return { token, orderNumber: order.orderNumber, created: true };
 }
 

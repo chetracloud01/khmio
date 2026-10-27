@@ -1,6 +1,8 @@
 import type { Prisma, Tx } from "@khmio/db";
+import type { PaymentProvider } from "@khmio/payments";
 import type { DeliverySettings } from "@khmio/shared";
 import { readDeliverySettings } from "../delivery/delivery";
+import { publicKhqrAccount } from "../payments/khqr";
 import { productInclude, toProductDto, type ProductRow } from "../products/products";
 import { publicStorePlan, readPublicStock } from "../stock/stock";
 
@@ -37,9 +39,11 @@ export interface PublicShopRows {
   open: boolean;
   /** Free stock per tracked option (Pro, Advance); empty on other plans. */
   stock: Record<string, number>;
+  /** KHQR is on (KHQR_PROVIDER) and the shop set its Bakong account. */
+  khqrReady: boolean;
 }
 
-export async function readPublicShop(tx: Tx, storeId: string): Promise<PublicShopRows> {
+export async function readPublicShop(tx: Tx, storeId: string, khqr: PaymentProvider | null): Promise<PublicShopRows> {
   const [openRow] = await tx.$queryRaw<{ open: boolean }[]>`SELECT app_public_store_open() AS open`;
   const [store, categories, products, delivery] = await Promise.all([
     tx.store.findUniqueOrThrow({ where: { id: storeId }, select: publicStoreSelect }),
@@ -48,7 +52,8 @@ export async function readPublicShop(tx: Tx, storeId: string): Promise<PublicSho
     readDeliverySettings(tx, storeId),
   ]);
   const stock = await readPublicStock(tx, storeId, await publicStorePlan(tx));
-  return { store, categories, products, delivery, open: openRow?.open ?? false, stock };
+  const khqrReady = (await publicKhqrAccount(tx, khqr)) !== null;
+  return { store, categories, products, delivery, open: openRow?.open ?? false, stock, khqrReady };
 }
 
 /** What leaves the API for the shop page: never wholesale prices or drivers. */
@@ -64,7 +69,7 @@ export function toPublicShop(rows: PublicShopRows, photoUrl: (key: string) => st
     delivery: { zones, pickup, province },
     // Ordering needs delivery saved at least once; which payment methods fit is worked out per checkout
     // (packages/shared getAvailablePaymentMethods). KHQR joins in step 5.
-    ordering: { deliveryConfigured: rows.delivery.configured, khqrReady: false },
+    ordering: { deliveryConfigured: rows.delivery.configured, khqrReady: rows.khqrReady },
     // A paused shop: the page shows "temporarily closed" and orders are refused.
     open: rows.open,
     // "Sold out" / "Only N left" and the cart's limit, per tracked option; an option not in it sells without a limit.
