@@ -31,6 +31,7 @@ const rows = (overrides: Partial<PublicShopRows> = {}): PublicShopRows => ({
     configured: true,
   },
   open: true,
+  stock: {},
   ...overrides,
 });
 
@@ -64,5 +65,12 @@ describe("the buyer's shop page", () => {
   it("says whether it can take orders: delivery saved, and not paused", () => {
     expect(toPublicShop(rows(), photoUrl)).toMatchObject({ ordering: { deliveryConfigured: true, khqrReady: false }, open: true });
     expect(toPublicShop(rows({ open: false, delivery: { ...rows().delivery, configured: false } }), photoUrl)).toMatchObject({ ordering: { deliveryConfigured: false }, open: false });
+  });
+});
+
+describe("stock on the shop page", () => {
+  it("sends free stock only for tracked options, as counted", () => {
+    expect(toPublicShop(rows({ stock: { "variant-1": 3 } }), photoUrl).stock).toEqual({ "variant-1": 3 });
+    expect(toPublicShop(rows(), photoUrl).stock).toEqual({});
   });
 });

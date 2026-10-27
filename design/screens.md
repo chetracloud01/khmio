@@ -240,6 +240,16 @@ Phone first; sidebar from tablet width; tables on desktop.
 ### S11. Verification (KYC) — Built · L
 ### S12. Plan and billing — Built · L
 ### S13. Stock — Built · L (Pro, Advance)
+- **Live, part 1 (Pro, main branch):** `/m/stock` from the Products page:
+  each product option with its count, "Not tracked" until the seller starts
+  it from a count, Low / Out marks, stock in and corrections (reason; "Other"
+  needs a note), stop tracking, and the latest changes (sales and returns
+  name their order). Online cash orders and counter sales take stock in the
+  same transaction and are refused when too little is left; cancel and void
+  put it back. Buyers see "Sold out" and "Only N left", and the cart and the
+  counter stop at what's left. Lower plans see their counts, locked.
+- Part 2 (Advance): several warehouses and branches, transfers, which
+  location the shop and each counter sell from, KHQR reservations.
 
 ### S14. Customers — New · 2
 - Buyers with order count, total spent, last order; buyer detail with history.

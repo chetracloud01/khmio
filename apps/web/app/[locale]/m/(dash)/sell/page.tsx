@@ -1,6 +1,6 @@
 "use client";
 
-import { getMinimumPlanFor, planHasFeature, type Currency } from "@khmio/shared";
+import { canAddMore, getMinimumPlanFor, planHasFeature, type Currency } from "@khmio/shared";
 import { BottomSheet, Button, SegmentedControl } from "@khmio/ui";
 import { ArrowRight, History } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -9,14 +9,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
 import { ProductTile } from "@/components/buyer/product-tile";
+import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
 import { CounterCart } from "@/components/counter/counter-cart";
 import { formatMoney } from "@/components/order-ui";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
-import { api, type Catalog, catalogSchema, type CounterSaleResult, type Product, productSchema } from "@/lib/api";
+import { api, type Catalog, catalogSchema, type CounterSaleResult, type Product, productSchema, stockPageSchema } from "@/lib/api";
 import { startingVariant, usdValue } from "@/lib/product-price";
+import { productStock, variantStock } from "@/lib/shop-stock";
 import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
 import { PayStep, SaleDone } from "./pay-step";
@@ -27,16 +29,27 @@ type Step = "sell" | "pay" | "done";
 export default function SellPage() {
   const t = useTranslations("Counter");
   const { store } = useMerchant();
-  const [data, setData] = useState<{ products: Product[]; catalog: Catalog } | null>(null);
+  const [data, setData] = useState<{ products: Product[]; catalog: Catalog; stock: Record<string, number> } | null>(null);
   const [failed, setFailed] = useState(false);
   const allowed = planHasFeature(store.plan, "counterSales");
+  const followsStock = planHasFeature(store.plan, "stock");
   const load = useCallback(() => {
     setFailed(false);
-    Promise.all([api("/products", z.array(productSchema)), api("/catalog", catalogSchema)]).then(
-      ([products, catalog]) => setData({ products, catalog }),
+    Promise.all([
+      api("/products", z.array(productSchema)),
+      api("/catalog", catalogSchema),
+      // Pro and Advance: the main branch's counts, so the screen stops at the stock on the shelf (the API checks again).
+      followsStock ? api("/stock", stockPageSchema) : Promise.resolve(null),
+    ]).then(
+      ([products, catalog, stockPage]) =>
+        setData({
+          products,
+          catalog,
+          stock: Object.fromEntries((stockPage?.items ?? []).flatMap((item) => (item.onHand === null ? [] : [[item.variantId, item.onHand]]))),
+        }),
       () => setFailed(true),
     );
-  }, []);
+  }, [followsStock]);
   useEffect(() => {
     if (allowed) load();
   }, [allowed, load]);
@@ -50,13 +63,13 @@ export default function SellPage() {
   }
   if (failed) return <PageOffline onRetry={load} />;
   if (!data) return <PageLoading />;
-  return <Sell products={data.products} catalog={data.catalog} />;
+  return <Sell products={data.products} catalog={data.catalog} stock={data.stock} onSold={load} />;
 }
 
 // Sell in the shop (design/screens.md P1–P3): tap products into the sale,
 // charge in one currency, take cash or the shop's own QR, then the receipt.
 // Hidden products can be sold here too: the shop may keep some off its page.
-function Sell({ products, catalog }: { products: Product[]; catalog: Catalog }) {
+function Sell({ products, catalog, stock, onSold }: { products: Product[]; catalog: Catalog; stock: Record<string, number>; onSold: () => void }) {
   const t = useTranslations("Counter");
   const tShop = useTranslations("Storefront");
   const locale = useLocale();
@@ -66,9 +79,12 @@ function Sell({ products, catalog }: { products: Product[]; catalog: Catalog }) 
   const [currency, setCurrency] = useState<Currency>(store.defaultCurrency);
   const [choosing, setChoosing] = useState<Product | null>(null);
   const [done, setDone] = useState<CounterSaleResult | null>(null);
-  const sale = useCounterSale(products, quantities, currency, store);
+  const sale = useCounterSale(products, quantities, currency, store, stock);
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   const rate = store.usdToKhrRate;
+  // The same stock rules as the shop page (lib/shop-stock), read from the main branch's counts.
+  const shelf = { stock };
+  const stockLabels: StockLabels ={ soldOut: tShop("soldOut"), onlyLeft: (count) => tShop("onlyLeft", { count }) };
 
   const browseAccessors = useMemo<BrowseAccessors<Product>>(
     () => ({
@@ -104,6 +120,8 @@ function Sell({ products, catalog }: { products: Product[]; catalog: Catalog }) 
           setQuantities({});
           setDone(null);
           setStep("sell");
+          // The counts moved with the sale.
+          onSold();
         }}
       />
     );
@@ -159,8 +177,12 @@ function Sell({ products, catalog }: { products: Product[]; catalog: Catalog }) 
               const optionCount = product.hasOptions ? product.variants.length : 0;
               const variant = startingVariant(product, rate);
               const only = product.variants[0];
+              const { soldOut, single } = productStock(shelf, product);
               return (
                 <ProductTile
+                  soldOut={soldOut}
+                  canAddMore={!single || !only || canAddMore(single, quantities[only.id] ?? 0)}
+                  note={single?.kind === "low" ? <StockNote state={single} labels={stockLabels} /> : undefined}
                   key={product.id}
                   view={browse.view}
                   title={title}
@@ -205,13 +227,17 @@ function Sell({ products, catalog }: { products: Product[]; catalog: Catalog }) 
               <Button
                 variant="secondary"
                 fullWidth
+                disabled={!canAddMore(variantStock(shelf, variant.id), quantities[variant.id] ?? 0)}
                 onClick={() => {
                   setQuantity(variant.id, (quantities[variant.id] ?? 0) + 1);
                   setChoosing(null);
                 }}
                 className="min-h-[56px] justify-between"
               >
-                <span className="font-medium">{text(variant.labelKm, variant.labelEn)}</span>
+                <span className="flex flex-col items-start">
+                  <span className="font-medium">{text(variant.labelKm, variant.labelEn)}</span>
+                  <StockNote state={variantStock(shelf, variant.id)} labels={stockLabels} />
+                </span>
                 <span className="flex items-center gap-2 text-sm tabular-nums">
                   {quantities[variant.id] ? <span className="rounded-full bg-brand px-2 py-0.5 text-xs font-bold text-on-brand">{quantities[variant.id]}</span> : null}
                   {formatMoney(salePrice(choosing, variant, currency, rate), currency)}

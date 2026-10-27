@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PaymentMethod } from "./checkout";
 
 // Stock is a ledger: every change is one movement, and a location's stock is
 // the sum of its movements (docs/blueprint.md "Subscription tiers").
@@ -38,7 +39,10 @@ const quantitySchema = z
   .min(1, "quantity_invalid")
   .max(MAX_STOCK_QUANTITY, "quantity_invalid");
 
-const noteSchema = z.string().trim().max(200, "too_long").optional();
+/** A stock change's note: a short line ("Box fell off the shelf"), not a story. */
+export const MAX_STOCK_NOTE_LENGTH = 200;
+
+const noteSchema = z.string().trim().max(MAX_STOCK_NOTE_LENGTH, "too_long").optional();
 
 const locationSchema = z.object({
   type: stockLocationTypeSchema,
@@ -61,18 +65,43 @@ export const stockMovementInputSchema = z
     reason: stockAdjustmentReasonSchema.optional(),
     ...itemFields,
   })
-  .superRefine((movement, ctx) => {
-    const isAdjustment = movement.type === "adjust_in" || movement.type === "adjust_out";
-    if (isAdjustment && !movement.reason) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "reason_required", path: ["reason"] });
-    }
-    // "Other" says nothing on its own — the note is what explains it later.
-    if (isAdjustment && movement.reason === "other" && !movement.note) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["note"] });
-    }
-  });
+  .superRefine(requireAdjustmentReason);
 
 export type StockMovementInput = z.infer<typeof stockMovementInputSchema>;
+
+/** An adjustment says why; "Other" says nothing on its own, so the note is what explains it later. */
+function requireAdjustmentReason(movement: { type: string; reason?: StockAdjustmentReason; note?: string }, ctx: z.RefinementCtx): void {
+  const isAdjustment = movement.type === "adjust_in" || movement.type === "adjust_out";
+  if (isAdjustment && !movement.reason) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "reason_required", path: ["reason"] });
+  }
+  if (isAdjustment && movement.reason === "other" && !movement.note) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["note"] });
+  }
+}
+
+/**
+ * A change to one product option's stock at the shop's main branch (the live
+ * Stock page, design/screens.md S13): stock arriving, or a correction with its
+ * reason. Sales and their returns are written by orders, never typed.
+ */
+export const stockChangeInputSchema = z
+  .object({
+    variantId: z.string().uuid("required"),
+    type: z.enum(["purchase", "adjust_in", "adjust_out"]),
+    quantity: quantitySchema,
+    reason: stockAdjustmentReasonSchema.optional(),
+    note: noteSchema,
+  })
+  .superRefine(requireAdjustmentReason);
+export type StockChangeInput = z.infer<typeof stockChangeInputSchema>;
+
+/** Start tracking one product option's stock, from a count (0 = sold out until stock arrives). */
+export const stockTrackInputSchema = z.object({
+  variantId: z.string().uuid("required"),
+  onHand: z.number({ invalid_type_error: "quantity_invalid" }).int("quantity_invalid").min(0, "quantity_invalid").max(MAX_STOCK_QUANTITY, "quantity_invalid"),
+});
+export type StockTrackInput = z.infer<typeof stockTrackInputSchema>;
 
 /** Moving stock from one location to another (Advance plan). */
 export const stockTransferInputSchema = z
@@ -119,6 +148,22 @@ export function getBuyerStockState(tracksStock: boolean, onHand: number): BuyerS
 export function maxOrderQuantity(state: BuyerStockState): number | null {
   if (state.kind === "untracked") return null;
   return state.kind === "sold_out" ? 0 : state.available;
+}
+
+/**
+ * Whether an online order takes its stock the moment it's placed: only when
+ * it's paid in cash. An order waiting for KHQR or PayWay must hold its stock
+ * instead (reserved, given back if it's never paid — Stock part 2), or an
+ * unpaid order would keep the stock forever.
+ */
+export function takesStockWhenPlaced(method: PaymentMethod): boolean {
+  return method === "cod";
+}
+
+/** Whether one more of this item can go in the cart. */
+export function canAddMore(state: BuyerStockState, inCart: number): boolean {
+  const max = maxOrderQuantity(state);
+  return max === null || inCart < max;
 }
 
 /** Whole units typed in a quantity box → number. Blank or anything but digits → NaN. */

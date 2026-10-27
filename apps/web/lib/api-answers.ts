@@ -11,6 +11,8 @@ import {
   orderPaymentMethodSchema,
   planIdSchema,
   SELLER_ORDER_ACTIONS,
+  stockAdjustmentReasonSchema,
+  stockMovementTypeSchema,
   subscriptionStatusSchema,
 } from "@khmio/shared";
 import { z } from "zod";
@@ -162,6 +164,8 @@ export const publicShopSchema = z.object({
   ordering: z.object({ deliveryConfigured: z.boolean(), khqrReady: z.boolean() }),
   /** false = the shop is paused: "temporarily closed", no orders. */
   open: z.boolean(),
+  /** Pro and Advance: free stock per tracked option; an option not in it sells without a limit. */
+  stock: z.record(z.string(), z.number()),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 
@@ -366,6 +370,43 @@ export const counterDaySchema = z.object({
   totals: z.object({ all: counterDaySumsSchema, cash: counterDaySumsSchema, shopQr: counterDaySumsSchema }),
 });
 export type CounterDay = z.infer<typeof counterDaySchema>;
+
+/** GET /stock (and every stock change): each live product option with its count at the main branch, and the latest changes. */
+export const stockPageSchema = z.object({
+  /** Pro and Advance write; on a lower plan the counts are shown, locked. */
+  tracksStock: z.boolean(),
+  /** At or below this many, an option is marked low. */
+  lowAt: z.number(),
+  items: z.array(
+    z.object({
+      variantId: z.string(),
+      productId: z.string(),
+      titleKm: z.string(),
+      titleEn: z.string(),
+      optionKm: z.string(),
+      optionEn: z.string(),
+      sku: z.string(),
+      /** null = not tracked: sells without a limit. */
+      onHand: z.number().nullable(),
+      low: z.boolean(),
+    }),
+  ),
+  movements: z.array(
+    z.object({
+      id: z.string(),
+      variantId: z.string(),
+      type: stockMovementTypeSchema,
+      quantity: z.number(),
+      reason: stockAdjustmentReasonSchema.nullable(),
+      note: z.string(),
+      createdAt: z.string(),
+      orderId: z.string().nullable(),
+      orderNumber: z.number().nullable(),
+      inStore: z.boolean(),
+    }),
+  ),
+});
+export type StockPage = z.infer<typeof stockPageSchema>;
 
 /** POST /public/track: the order link for a tracking code and phone. */
 export const trackedOrderSchema = z.object({ token: z.string() });

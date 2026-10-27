@@ -1,6 +1,6 @@
 "use client";
 
-import type { Currency } from "@khmio/shared";
+import { canAddMore, type Currency } from "@khmio/shared";
 import { Button, IconButton, PriceTag, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -12,6 +12,7 @@ import { CartPanel } from "@/components/buyer/cart-panel";
 import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
 import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
 import { QuantityControl } from "@/components/buyer/quantity-control";
+import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import { ShopHero } from "@/components/buyer/shop-hero";
 import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-sheet";
 import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
@@ -23,6 +24,7 @@ import { withShop } from "@/lib/buyer-back";
 import { cartLines, cartTotal, useShopCart } from "@/lib/cart";
 import { discounted, startingVariant, usdValue } from "@/lib/product-price";
 import { isTakingOrders } from "@/lib/shop-ordering";
+import { productStock, variantStock } from "@/lib/shop-stock";
 import { BuyerOrderLinks } from "@/components/invoice/track-order-card";
 import { LanguageSwitch } from "@/components/language-switch";
 import { PhotoThumb } from "@/components/photo-thumb";
@@ -291,8 +293,12 @@ function ShopProductTile({
   const t = useTranslations("Storefront");
   const variant = startingVariant(product, shop.store.usdToKhrRate);
   const optionCount = product.hasOptions ? product.variants.length : 0;
+  const stock = productStock(shop, product);
   return (
     <ProductTile
+      soldOut={stock.soldOut}
+      canAddMore={!stock.single || canAddMore(stock.single, quantity)}
+      note={stock.single?.kind === "low" ? <StockNote state={stock.single} labels={stockLabels(t)} /> : undefined}
       view={view}
       title={title}
       photo={product.photos[0] ? <PhotoThumb photo={product.photos[0]} lazy className="h-full w-full object-cover" /> : null}
@@ -314,6 +320,11 @@ function ShopProductTile({
       onAdjust={onAdjust}
     />
   );
+}
+
+/** "Sold out" / "Only 3 left" in the shop page's words. */
+function stockLabels(t: (key: "soldOut" | "onlyLeft", values?: { count: number }) => string): StockLabels {
+  return { soldOut: t("soldOut"), onlyLeft: (count) => t("onlyLeft", { count }) };
 }
 
 /** The product's own page, as a sheet over the shop: photos, description, and each option with its own quantity. */
@@ -385,15 +396,18 @@ function ProductSheet({
             {product.variants.map((variant) => {
               const label = product.hasOptions ? (locale === "km" ? variant.labelKm || variant.labelEn : variant.labelEn || variant.labelKm) : title;
               const quantity = quantities[variant.id] ?? 0;
+              const stock = variantStock(shop, variant.id);
               return (
                 <li key={variant.id} className="flex min-h-touch items-center justify-between gap-3 rounded-DEFAULT border border-border px-3 py-2">
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{label}</span>
                     <VariantPrice product={product} variant={variant} currency={currency} />
+                    <StockNote state={stock} labels={stockLabels(t)} />
                   </span>
                   {ordering && (
                     <QuantityControl
                       quantity={quantity}
+                      canAddMore={canAddMore(stock, quantity)}
                       addLabel={t("addTitle", { title: label })}
                       decreaseLabel={t("decrease", { title: label })}
                       increaseLabel={t("increase", { title: label })}

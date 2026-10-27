@@ -2,6 +2,7 @@ import type { Prisma, Tx } from "@khmio/db";
 import type { DeliverySettings } from "@khmio/shared";
 import { readDeliverySettings } from "../delivery/delivery";
 import { productInclude, toProductDto, type ProductRow } from "../products/products";
+import { publicStorePlan, readPublicStock } from "../stock/stock";
 
 // The buyer's shop page (GET /public/stores/:slug), read inside
 // withPublicStore: the database itself shows only the store's public face,
@@ -34,6 +35,8 @@ export interface PublicShopRows {
   delivery: { settings: DeliverySettings; configured: boolean };
   /** app_public_store_open(): false while the shop is paused. */
   open: boolean;
+  /** Free stock per tracked option (Pro, Advance); empty on other plans. */
+  stock: Record<string, number>;
 }
 
 export async function readPublicShop(tx: Tx, storeId: string): Promise<PublicShopRows> {
@@ -44,7 +47,8 @@ export async function readPublicShop(tx: Tx, storeId: string): Promise<PublicSho
     tx.product.findMany({ where: { deletedAt: null, isVisible: true }, include: productInclude, orderBy: { createdAt: "desc" } }),
     readDeliverySettings(tx, storeId),
   ]);
-  return { store, categories, products, delivery, open: openRow?.open ?? false };
+  const stock = await readPublicStock(tx, storeId, await publicStorePlan(tx));
+  return { store, categories, products, delivery, open: openRow?.open ?? false, stock };
 }
 
 /** What leaves the API for the shop page: never wholesale prices or drivers. */
@@ -63,5 +67,7 @@ export function toPublicShop(rows: PublicShopRows, photoUrl: (key: string) => st
     ordering: { deliveryConfigured: rows.delivery.configured, khqrReady: false },
     // A paused shop: the page shows "temporarily closed" and orders are refused.
     open: rows.open,
+    // "Sold out" / "Only N left" and the cart's limit, per tracked option; an option not in it sells without a limit.
+    stock: rows.stock,
   };
 }

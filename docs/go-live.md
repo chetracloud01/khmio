@@ -173,6 +173,7 @@ admin Settings, set the alert chat.
 - [ ] Shop details › Getting paid: upload the payment QR from your bank app (follow "How to get your payment QR").
 - [ ] **Sell in shop** (Home's first tile): a cash sale → the change shown → Receipt at 80 mm → Print or Share works; a **Shop QR** sale (pay yourself a small amount, tick only after it shows in the bank app); no Telegram alert for either.
 - [ ] Today's sales: cash and shop QR totals are right → Void one → it's crossed out and not counted; Orders → filter **In shop** shows both.
+- [ ] **Stock** (a Pro shop: Products → Stock): start tracking one product at 2 → the buyer's shop shows "Only 2 left" → sell 2 in the shop → it shows **Sold out** and the cart can't add it → void that sale → the count is back to 2 and the history says "Back from #…". A correction with reason "Other" needs a note; Stop tracking asks first.
 - [ ] Admin: login with the authenticator code → the shop is listed → extend its trial → it's in the audit log.
 - [ ] Worker log: `database backup done` after 03:00 the next night, or run it now:
       Railway → worker → SSH → `pnpm db:backup`.

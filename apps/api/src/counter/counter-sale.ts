@@ -1,8 +1,9 @@
 import { merchantActor, writeAudit, type Prisma, type Tx } from "@khmio/db";
-import { cashChange, computeOrderTotal, startOfPhnomPenhDay, type CounterSaleInput, type Currency, type OrderTotal } from "@khmio/shared";
+import { cashChange, computeOrderTotal, startOfPhnomPenhDay, type CounterSaleInput, type Currency, type OrderTotal, type PlanId } from "@khmio/shared";
 import { AppException, InvalidInputException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
 import { newOrderToken, orderItemRows, orderTotalLines, readOrderVariants } from "../orders/place-order";
+import { returnOrderStock, takeOrderStock, tracksStock } from "../stock/stock";
 
 // Selling in the shop (design/screens.md P1–P4): a sale at the counter is an
 // order with channel "in_store", completed the moment it's made, inside the
@@ -31,7 +32,7 @@ export function counterCashAmounts(payment: CounterSaleInput["payment"], total: 
 }
 
 /** Rings up one sale. The same key twice gives back the first sale, never a second one. */
-export async function recordCounterSale(tx: Tx, context: MerchantStore, input: CounterSaleInput): Promise<RecordedSale> {
+export async function recordCounterSale(tx: Tx, context: MerchantStore, input: CounterSaleInput, plan: PlanId): Promise<RecordedSale> {
   const { storeId, merchantId } = context;
   const existing = await tx.order.findFirst({ where: { storeId, idempotencyKey: input.idempotencyKey }, select: recordedSaleSelect });
   if (existing) return { ...existing, created: false };
@@ -89,6 +90,8 @@ export async function recordCounterSale(tx: Tx, context: MerchantStore, input: C
     select: recordedSaleSelect,
   });
   await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, byId) });
+  // Pro and Advance: the sale takes its stock; too little left refuses it, as online.
+  if (tracksStock(plan)) await takeOrderStock(tx, order.id, input.lines.map((line) => line.variantId));
   await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status: "completed", actor: "merchant", actorMerchantId: merchantId }] });
   await writeAudit(tx, merchantActor(context), { action: "counter.sale_recorded", entity: "order", entityId: order.id });
   return { ...order, created: true };
@@ -101,6 +104,7 @@ export async function voidCounterSale(tx: Tx, context: MerchantStore, orderId: s
     data: { status: "cancelled", cancelReason: "counter_void" },
   });
   if (count === 0) throw new AppException(409, "action_not_allowed");
+  await returnOrderStock(tx, orderId);
   await tx.orderStatusEvent.createMany({ data: [{ storeId: context.storeId, orderId, status: "cancelled", actor: "merchant", actorMerchantId: context.merchantId }] });
   await writeAudit(tx, merchantActor(context), { action: "counter.sale_voided", entity: "order", entityId: orderId });
 }

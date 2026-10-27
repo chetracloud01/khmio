@@ -12,6 +12,8 @@ export interface CounterCartLine {
   quantity: number;
   /** As shown: "$3.00". */
   lineTotal: string;
+  /** false at the stock left (Pro, Advance): + is off. */
+  canIncrease?: boolean;
 }
 
 export interface CounterCartTotals {
@@ -63,6 +65,7 @@ export function CounterCart({
                 increaseLabel={t("increase", { title: line.title })}
                 onDecrease={() => onQuantity(line.key, line.quantity - 1)}
                 onIncrease={() => onQuantity(line.key, line.quantity + 1)}
+                increaseDisabled={line.canIncrease === false}
                 className="w-32 shrink-0"
               />
             </li>

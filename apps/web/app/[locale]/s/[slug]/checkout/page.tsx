@@ -29,7 +29,7 @@ import { focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
 import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { formatMoney } from "@/components/order-ui";
 import { api, ApiError, placedOrderSchema, type PublicShop } from "@/lib/api";
-import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, useShopCart, type BuyerDetails } from "@/lib/cart";
+import { cartLines, cartTotal, readBuyerDetails, saveBuyerDetails, type BuyerDetails, useCartFitsShop, useShopCart } from "@/lib/cart";
 import { newId } from "@/lib/new-id";
 import { isTakingOrders, paymentMethodsFor } from "@/lib/shop-ordering";
 import { usePublicShop } from "@/lib/use-public-shop";
@@ -42,6 +42,8 @@ export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
   const { shop, state, reload } = usePublicShop(slug);
   const cart = useShopCart(slug);
+  // Stock ran low or something stopped being sold while the buyer was away: the cart follows (the order is checked again by the API).
+  useCartFitsShop(shop, cart);
   if (state === "loading" || !cart.ready) return <BuyerLoading />;
   if (state !== "ready" || !shop) return <BuyerProblem kind={state === "not_found" ? "not_found" : "offline"} onRetry={reload} />;
   return <CheckoutForm shop={shop} cart={cart} onShopChanged={reload} />;

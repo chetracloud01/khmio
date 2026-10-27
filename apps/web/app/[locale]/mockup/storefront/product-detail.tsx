@@ -9,7 +9,8 @@ import { getDiscountedUnitAmount, getUnitKhr, getUnitUsdCents, lineKey, type Moc
 import { useCart } from "../cart-context";
 import { useOnlineStock } from "../online-stock";
 import { shareOrCopyLink } from "@/components/share-link";
-import { Stepper, StockNote } from "../shared-ui";
+import { StockNote } from "@/components/buyer/stock-note";
+import { Stepper } from "../shared-ui";
 import { useStoreSettings } from "../store-settings-context";
 
 /** Swipe on a phone, arrows with a mouse. Products without photos show their colour block. */

@@ -792,7 +792,23 @@
     "transferredTo": "Moved to {location}",
     "transferredFrom": "Moved from {location}",
     "onlineSellsFrom": "Online orders take stock from {location}.",
-    "change": "Change"
+    "change": "Change",
+    "description": "How many of each product option are at your shop. Orders and sales in the shop take stock off by themselves.",
+    "backToProducts": "Products",
+    "lockedTitle": "Stock is on Pro and Advance",
+    "lockedBody": "Count each product, show \"Sold out\" and \"Only 3 left\" to buyers, and let every order and sale in the shop take stock off by itself. Your counts stay here, locked, until then.",
+    "notTracked": "Not tracked",
+    "saleOnline": "Order #{number}",
+    "saleInShop": "Sold in shop #{number}",
+    "returnedFrom": "Back from #{number}",
+    "onHandNow": "On hand now:",
+    "changeKind": "What happened",
+    "startTracking": "Start tracking",
+    "stopTracking": "Stop tracking",
+    "stopTrackingHint": "It then sells without a limit again. Its history stays.",
+    "stopTrackingConfirm": "Stop tracking this item? Its count will be cleared.",
+    "trackHint": "Count how many you have now. From then on buyers see \"Sold out\" at 0 and \"Only 3 left\", and orders can't take more than you have.",
+    "countNow": "How many you have now"
   },
   "Plans": {
     "free": "Free",
@@ -1329,7 +1345,9 @@
     "link_invalid": "Use a page of this site (starting with /) or an address starting with https://",
     "map_link_invalid": "Paste a link starting with https:// — in Google Maps, tap Share, then Copy link.",
     "ends_before_start": "The end must be after the start.",
-    "cash_short": "Less than the total — check the cash received."
+    "cash_short": "Less than the total — check the cash received.",
+    "sold_out": "Sold out — there's no more of this.",
+    "not_enough_stock": "There isn't that much in stock."
   },
   "Theme": {
     "button": "Theme and colours",

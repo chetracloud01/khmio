@@ -2,7 +2,7 @@
 
 import { canAddProduct } from "@khmio/shared";
 import { Button, ConfirmDialog, Notice, PageHeader, Switch } from "@khmio/ui";
-import { EyeOff, ImageOff, Plus } from "lucide-react";
+import { Boxes, EyeOff, ImageOff, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,7 @@ import { z } from "zod";
 // delete (soft — old orders keep pointing at the product).
 export default function ProductsPage() {
   const t = useTranslations("ProductsList");
+  const tStock = useTranslations("Stock");
   const tApp = useTranslations("App");
   const tStore = useTranslations("Storefront");
   const locale = useLocale();
@@ -216,7 +217,15 @@ export default function ProductsPage() {
         title={t("title")}
         description={t("description")}
         actions={
-          atLimit ? (
+          <div className="flex items-center gap-2">
+            {/* Counts at the main branch (Pro, Advance); lower plans see them locked. */}
+            <Link href={`/${locale}/m/stock`}>
+              <Button variant="secondary">
+                <Boxes className="h-4 w-4" aria-hidden="true" />
+                {tStock("title")}
+              </Button>
+            </Link>
+          {atLimit ? (
             <Button variant="primary" disabled>
               <Plus className="h-4 w-4" aria-hidden="true" />
               {t("addProduct")}
@@ -229,7 +238,8 @@ export default function ProductsPage() {
                 {t("addProduct")}
               </Button>
             </Link>
-          )
+          )}
+          </div>
         }
       />
 

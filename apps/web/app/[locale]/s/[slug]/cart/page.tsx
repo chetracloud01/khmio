@@ -1,17 +1,17 @@
 "use client";
 
-import { approximateIn, type Currency } from "@khmio/shared";
+import { approximateIn, canAddMore, type Currency } from "@khmio/shared";
 import { Button, Notice } from "@khmio/ui";
 import { ImageOff, Plus, ShoppingBag } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { BuyerBottomBar, BuyerColumns, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { QuantityStepper } from "@/components/buyer/quantity-control";
 import { formatMoney } from "@/components/order-ui";
-import { cartLines, cartTotal, sellableVariantIds, useShopCart } from "@/lib/cart";
+import { cartLines, cartTotal, useCartFitsShop, useShopCart } from "@/lib/cart";
+import { variantStock } from "@/lib/shop-stock";
 import { isTakingOrders } from "@/lib/shop-ordering";
 import { usePublicShop } from "@/lib/use-public-shop";
 import { BuyerLoading, BuyerProblem } from "../buyer-states";
@@ -28,17 +28,8 @@ export default function CartPage() {
   const { slug } = useParams<{ slug: string }>();
   const { shop, state, reload } = usePublicShop(slug);
   const cart = useShopCart(slug);
-  const [dropped, setDropped] = useState(false);
-
-  // Something in the cart is no longer sold (hidden, deleted, option removed): take it out and say so.
-  useEffect(() => {
-    if (!shop || !cart.ready) return;
-    const sellable = sellableVariantIds(shop);
-    if (Object.keys(cart.quantities).some((id) => !sellable.has(id))) {
-      cart.keepOnly(sellable);
-      setDropped(true);
-    }
-  }, [shop, cart]);
+  // Something in the cart is no longer sold, or there's less stock left: put it right and say so.
+  const dropped = useCartFitsShop(shop, cart);
 
   if (state === "loading" || !cart.ready) return <BuyerLoading />;
   if (state !== "ready" || !shop) return <BuyerProblem kind={state === "not_found" ? "not_found" : "offline"} onRetry={reload} />;
@@ -158,6 +149,7 @@ export default function CartPage() {
                       increaseLabel={tStore("increase", { title })}
                       onDecrease={() => cart.setQuantity(line.variant.id, line.quantity - 1)}
                       onIncrease={() => cart.setQuantity(line.variant.id, line.quantity + 1)}
+                      increaseDisabled={!canAddMore(variantStock(shop, line.variant.id), line.quantity)}
                       className="shrink-0"
                     />
                   </li>

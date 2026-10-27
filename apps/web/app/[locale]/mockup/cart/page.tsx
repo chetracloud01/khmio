@@ -12,7 +12,8 @@ import { useCart } from "../cart-context";
 import { useClampCartToStock, useOnlineStock } from "../online-stock";
 import { useShopIdentity } from "../shop-identity";
 import { useShopProducts } from "../shop-products";
-import { canAddMore, StockNote } from "../shared-ui";
+import { canAddMore } from "@khmio/shared";
+import { StockNote } from "@/components/buyer/stock-note";
 import { useStoreSettings } from "../store-settings-context";
 import { useCheckoutTotal } from "../use-checkout-total";
 

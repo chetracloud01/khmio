@@ -16,6 +16,7 @@ import { OrdersController } from "./orders/orders.controller";
 import { ProductsController } from "./products/products.controller";
 import { PublicController } from "./public/public.controller";
 import { rateLimiterProvider } from "./security/rate-limit";
+import { StockController } from "./stock/stock.controller";
 import { StoreController } from "./store/store.controller";
 import { StoresController } from "./stores/stores.controller";
 import { WaitlistController } from "./website/waitlist.controller";
@@ -31,6 +32,7 @@ import { WaitlistController } from "./website/waitlist.controller";
     DeliveryController,
     OrdersController,
     CounterController,
+    StockController,
     AdminAuthController,
     AdminController,
     FilesController,

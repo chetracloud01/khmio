@@ -1,10 +1,11 @@
 "use client";
 
-import { approximateIn, computeOrderTotal, formatKhr, formatUsd, type Currency } from "@khmio/shared";
+import { approximateIn, canAddMore, computeOrderTotal, formatKhr, formatUsd, type Currency } from "@khmio/shared";
 import { useLocale, useTranslations } from "next-intl";
 import type { CounterCartLine, CounterCartTotals } from "@/components/counter/counter-cart";
 import { formatMoney } from "@/components/order-ui";
 import type { Product, ProductVariant } from "@/lib/api";
+import { variantStock } from "@/lib/shop-stock";
 
 /** One product option's price in the sale's currency, after the product's discount — the same rule as the sale's total. */
 export function salePrice(product: Product, variant: ProductVariant, currency: Currency, usdToKhrRate: number): number {
@@ -17,7 +18,13 @@ export function salePrice(product: Product, variant: ProductVariant, currency: C
  * uses to save it (packages/shared computeOrderTotal; no delivery). Only a
  * preview: the server works it out again from the catalog.
  */
-export function useCounterSale(products: Product[], quantities: Record<string, number>, currency: Currency, store: { usdToKhrRate: number; vatPercent: number }) {
+export function useCounterSale(
+  products: Product[],
+  quantities: Record<string, number>,
+  currency: Currency,
+  store: { usdToKhrRate: number; vatPercent: number },
+  stock: Record<string, number>,
+) {
   const t = useTranslations("Counter");
   const locale = useLocale();
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
@@ -43,6 +50,7 @@ export function useCounterSale(products: Product[], quantities: Record<string, n
     option: product.hasOptions ? text(variant.labelKm, variant.labelEn) : undefined,
     quantity,
     lineTotal: formatMoney(total.lines[index]?.lineTotal ?? 0, currency),
+    canIncrease: canAddMore(variantStock({ stock }, variant.id), quantity),
   }));
   const totals: CounterCartTotals = {
     subtotal: formatMoney(total.subtotal, currency),

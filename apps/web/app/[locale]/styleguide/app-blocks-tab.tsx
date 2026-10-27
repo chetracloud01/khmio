@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn } from "@/components/data-grid";
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks } from "@/components/form-ui";
 import { ShopHero } from "@/components/buyer/shop-hero";
+import { StockNote } from "@/components/buyer/stock-note";
 import { CashPayment } from "@/components/counter/cash-payment";
 import { CounterCart } from "@/components/counter/counter-cart";
 import { PaymentQrField } from "@/components/counter/payment-qr-field";
@@ -166,6 +167,12 @@ export function AppBlocksTab() {
           </Demo>
           <Demo name={["PaymentQrField", "PaymentQrGuide"]}>
             <PaymentQrField previewUrl={null} onFile={() => undefined} onRemove={() => undefined} />
+          </Demo>
+          <Demo name="StockNote">
+            <div className="flex flex-col gap-1">
+              <StockNote state={{ kind: "low", available: 3 }} labels={{ soldOut: tShop("soldOut"), onlyLeft: (count) => tShop("onlyLeft", { count }) }} />
+              <StockNote state={{ kind: "sold_out" }} labels={{ soldOut: tShop("soldOut"), onlyLeft: (count) => tShop("onlyLeft", { count }) }} />
+            </div>
           </Demo>
           <Demo name="UpgradePrompt">
             <UpgradePrompt title={tCounterDemo("upgradeTitle")} body={tCounterDemo("upgradeBody")} plan="basic" href="#" />

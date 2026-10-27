@@ -44,6 +44,8 @@ export const FORM_ERROR_CODES = [
   "link_invalid",
   "map_link_invalid",
   "cash_short",
+  "sold_out",
+  "not_enough_stock",
   "ends_before_start",
 ] as const;
 

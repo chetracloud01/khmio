@@ -3,6 +3,7 @@ import { decideOrderAction, formatTrackingCode, getDispatchRoute, getSellerActio
 import { NotFoundException } from "@nestjs/common";
 import { AppException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
+import { returnOrderStock } from "../stock/stock";
 
 // The seller moving an order on (roadmap step 6). Every change goes through
 // packages/shared decideOrderAction — the same rule the screens and the
@@ -76,6 +77,8 @@ export async function runSellerAction(tx: Tx, context: MerchantStore, orderId: s
     },
   });
   if (count === 0) throw new AppException(409, "action_not_allowed");
+  // A cancelled order's stock goes back on the shelf (nothing happens if it took none).
+  if (decision.status === "cancelled") await returnOrderStock(tx, order.id);
   await tx.orderStatusEvent.create({ data: { storeId: context.storeId, orderId: order.id, status: decision.status, actor: "merchant", actorMerchantId: context.merchantId } });
   // Buyers following the order on Telegram hear about it (sent by the worker).
   await tx.outboxEvent.createMany({ data: [{ storeId: context.storeId, kind: "order_status_changed", payload: { orderId: order.id, status: decision.status } }] });

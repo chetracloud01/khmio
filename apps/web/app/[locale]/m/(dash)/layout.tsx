@@ -190,6 +190,7 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           label: tDash("navProducts"),
           icon: Package,
           mobile: true,
+          alsoActiveOn: [`${base}/stock`],
         },
         {
           href: `${base}/orders`,

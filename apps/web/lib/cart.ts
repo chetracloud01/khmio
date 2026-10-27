@@ -1,9 +1,10 @@
 "use client";
 
-import { computeOrderTotal, currencySchema, deliveryAreaSchema, fulfilmentSchema, MAX_LINE_QUANTITY, type Currency, type OrderTotal } from "@khmio/shared";
+import { computeOrderTotal, currencySchema, deliveryAreaSchema, fulfilmentSchema, MAX_LINE_QUANTITY, maxOrderQuantity, type Currency, type OrderTotal } from "@khmio/shared";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import type { Product, ProductVariant, PublicShop } from "./api";
+import { variantStock } from "./shop-stock";
 import { readStored, writeStored } from "./device-storage";
 
 // The buyer's cart and details, kept on their phone (no buyer login). One
@@ -59,13 +60,10 @@ export function useShopCart(slug: string) {
   const setCurrency = useCallback((currency: Currency) => update((previous) => ({ ...previous, currency })), [update]);
   const clear = useCallback(() => update((previous) => ({ ...previous, quantities: {} })), [update]);
   /** Drops lines the shop no longer sells (hidden, deleted, or the option removed). */
-  const keepOnly = useCallback(
-    (variantIds: Set<string>) =>
-      update((previous) => ({ ...previous, quantities: Object.fromEntries(Object.entries(previous.quantities).filter(([id]) => variantIds.has(id))) })),
-    [update],
-  );
+  /** Swaps in quantities already checked against the shop (fitCartToShop). */
+  const replaceQuantities = useCallback((quantities: Record<string, number>) => update((previous) => ({ ...previous, quantities })), [update]);
 
-  return { ready, quantities: cart.quantities, currency: cart.currency, setQuantity, setCurrency, clear, keepOnly };
+  return { ready, quantities: cart.quantities, currency: cart.currency, setQuantity, setCurrency, clear, replaceQuantities };
 }
 
 /**
@@ -96,9 +94,41 @@ export function cartLines(shop: PublicShop, quantities: Record<string, number>):
   );
 }
 
-/** Every variant id the shop sells right now — to spot cart lines that are gone. */
-export function sellableVariantIds(shop: PublicShop): Set<string> {
-  return new Set(shop.products.flatMap((product) => product.variants.map((variant) => variant.id)));
+/**
+ * The cart as the shop can sell it now: options no longer sold (hidden,
+ * deleted, removed) taken out, and tracked ones cut to the stock left (sold
+ * out = taken out). `changed` says whether the buyer should be told.
+ */
+export function fitCartToShop(shop: { products: { variants: { id: string }[] }[]; stock: PublicShop["stock"] }, quantities: Record<string, number>): { quantities: Record<string, number>; changed: boolean } {
+  const sellable = new Set(shop.products.flatMap((product) => product.variants.map((variant) => variant.id)));
+  const fitted = Object.fromEntries(
+    Object.entries(quantities).flatMap(([variantId, quantity]) => {
+      if (!sellable.has(variantId)) return [];
+      const max = maxOrderQuantity(variantStock(shop, variantId));
+      const kept = max === null ? quantity : Math.min(quantity, max);
+      return kept > 0 ? [[variantId, kept]] : [];
+    }),
+  );
+  const changed = Object.keys(quantities).length !== Object.keys(fitted).length || Object.entries(fitted).some(([id, quantity]) => quantities[id] !== quantity);
+  return { quantities: fitted, changed };
+}
+
+/**
+ * Keeps a shop's cart sellable while its page is open (cart, checkout): what
+ * changed is put right at once, and `adjusted` turns on so the page can say so.
+ */
+export function useCartFitsShop(shop: PublicShop | null, cart: ReturnType<typeof useShopCart>): boolean {
+  const [adjusted, setAdjusted] = useState(false);
+  const { ready, quantities, replaceQuantities } = cart;
+  useEffect(() => {
+    if (!shop || !ready) return;
+    const fitted = fitCartToShop(shop, quantities);
+    if (fitted.changed) {
+      replaceQuantities(fitted.quantities);
+      setAdjusted(true);
+    }
+  }, [shop, ready, quantities, replaceQuantities]);
+  return adjusted;
 }
 
 /** The same total the API will charge (packages/shared computeOrderTotal), for showing before the order is placed. */

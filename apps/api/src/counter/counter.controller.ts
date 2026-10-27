@@ -18,8 +18,9 @@ export class CounterController {
     const input = counterSaleInputSchema.parse(body);
     const run = () =>
       withContext(this.app, context, async (tx) => {
-        assertPlanFeature(await assertStoreWritable(tx, context.storeId), "counterSales");
-        return recordCounterSale(tx, context, input);
+        const plan = await assertStoreWritable(tx, context.storeId);
+        assertPlanFeature(plan, "counterSales");
+        return recordCounterSale(tx, context, input, plan);
       });
     try {
       return await run();

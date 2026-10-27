@@ -1,11 +1,12 @@
 "use client";
 
-import { maxOrderQuantity, type BuyerStockState, type Currency } from "@khmio/shared";
+import { canAddMore, type BuyerStockState, type Currency } from "@khmio/shared";
 import { cn, PriceTag } from "@khmio/ui";
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
 import { QuantityStepper } from "@/components/buyer/quantity-control";
+import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import {
   getStartingVariant,
   getUnitKhr,
@@ -13,19 +14,6 @@ import {
   lineKey,
   type MockProduct,
 } from "@/mock/mock-data";
-
-/** Buyer-facing stock text, already translated. */
-export interface StockLabels {
-  soldOut: string;
-  onlyLeft: (count: number) => string;
-}
-
-/** "Sold out" or "Only 3 left" under an item; nothing when stock isn't tracked or there's plenty. */
-export function StockNote({ state, labels }: { state: BuyerStockState; labels: StockLabels }) {
-  if (state.kind === "sold_out") return <span className="text-xs font-semibold text-danger">{labels.soldOut}</span>;
-  if (state.kind === "low") return <span className="text-xs font-medium text-warning">{labels.onlyLeft(state.available)}</span>;
-  return null;
-}
 
 export function Stepper({
   qty,
@@ -57,12 +45,6 @@ export function Stepper({
       className={className}
     />
   );
-}
-
-/** Whether one more of this item can go in the cart. */
-export function canAddMore(state: BuyerStockState, inCart: number): boolean {
-  const max = maxOrderQuantity(state);
-  return max === null || inCart < max;
 }
 
 export function ProductCard({
