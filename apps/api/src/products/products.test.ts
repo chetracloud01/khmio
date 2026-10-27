@@ -59,3 +59,39 @@ describe("a product as the seller sees it", () => {
     expect(dto.hasOptions).toBe(false);
   });
 });
+
+describe("a product with option groups", () => {
+  const AT = new Date("2026-10-27T03:00:00Z");
+  const group = (id: string, kind: "variant" | "choice", values: { id: string; labelEn: string; extraUsdCents?: number }[], sortOrder: number) => ({
+    id,
+    storeId: "store-1",
+    productId: "product-1",
+    kind,
+    nameKm: id,
+    nameEn: id,
+    pick: "one" as const,
+    required: kind === "choice",
+    sortOrder,
+    createdAt: AT,
+    updatedAt: AT,
+    values: values.map((value, index) => ({ id: value.id, storeId: "store-1", groupId: id, labelKm: value.labelEn, labelEn: value.labelEn, extraUsdCents: value.extraUsdCents ?? null, extraKhr: null, sortOrder: index, createdAt: AT })),
+  });
+  const base = productRow();
+  const variant = { ...base.variants[0]!, isDefault: false, labelEn: "M · Red", values: [{ valueId: "red" }, { valueId: "m" }] };
+  const row = productRow({
+    variants: [variant],
+    optionGroups: [group("Size", "variant", [{ id: "m", labelEn: "M" }], 0), group("Colour", "variant", [{ id: "red", labelEn: "Red" }], 1), group("Sugar", "choice", [{ id: "less", labelEn: "Less", extraUsdCents: 0 }], 2)],
+  });
+
+  it("sends its variant groups, and each variant's values in the groups' order", () => {
+    const dto = toProductDto(row, photoUrl);
+    expect(dto.variantGroups.map((entry) => entry.id)).toEqual(["Size", "Colour"]);
+    expect(dto.variants[0]?.valueIds).toEqual(["m", "red"]);
+  });
+
+  it("sends its choice groups with their rules and extra prices", () => {
+    expect(toProductDto(row, photoUrl).choiceGroups).toEqual([
+      { id: "Sugar", nameKm: "Sugar", nameEn: "Sugar", pick: "one", required: true, values: [{ id: "less", labelKm: "Less", labelEn: "Less", extraUsdCents: 0, extraKhr: null }] },
+    ]);
+  });
+});

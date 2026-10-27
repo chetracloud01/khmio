@@ -12,6 +12,7 @@ export const storeSelect = {
   slug: true,
   name: true,
   businessType: true,
+  modules: true,
   phone: true,
   area: true,
   description: true,

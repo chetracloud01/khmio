@@ -1,13 +1,14 @@
 "use client";
 
-import { canAddMore, getMinimumPlanFor, planHasFeature, type Currency } from "@khmio/shared";
-import { BottomSheet, Button, SegmentedControl } from "@khmio/ui";
+import { canAddMore, cartLineKey, getMinimumPlanFor, hasModule, planHasFeature, type Currency } from "@khmio/shared";
+import { BottomSheet, Button, Notice, SegmentedControl, Select } from "@khmio/ui";
 import { ArrowRight, History } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
+import { ItemPicker, type PickedItem } from "@/components/buyer/item-picker";
 import { ProductTile } from "@/components/buyer/product-tile";
 import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import { useProductBrowse, type BrowseAccessors } from "@/components/buyer/use-product-browse";
@@ -16,7 +17,20 @@ import { formatMoney } from "@/components/order-ui";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
-import { api, type Catalog, catalogSchema, type CounterSaleResult, type Product, productSchema, stockPageSchema } from "@/lib/api";
+import {
+  api,
+  type Catalog,
+  catalogSchema,
+  type CounterSaleResult,
+  type DineTable,
+  dineTablesSchema,
+  type JobCard,
+  jobCardSchema,
+  type Product,
+  productSchema,
+  stockPageSchema,
+} from "@/lib/api";
+import { variantQuantity } from "@/lib/cart";
 import { startingVariant, usdValue } from "@/lib/product-price";
 import { productStock, variantStock } from "@/lib/shop-stock";
 import { useMerchant } from "../merchant-context";
@@ -29,10 +43,11 @@ type Step = "sell" | "pay" | "done";
 export default function SellPage() {
   const t = useTranslations("Counter");
   const { store } = useMerchant();
-  const [data, setData] = useState<{ products: Product[]; catalog: Catalog; stock: Record<string, number> } | null>(null);
+  const [data, setData] = useState<{ products: Product[]; catalog: Catalog; stock: Record<string, number>; tables: DineTable[] } | null>(null);
   const [failed, setFailed] = useState(false);
   const allowed = planHasFeature(store.plan, "counterSales");
   const followsStock = planHasFeature(store.plan, "stock");
+  const tablesOn = hasModule(store.modules, "tables");
   const load = useCallback(() => {
     setFailed(false);
     Promise.all([
@@ -40,16 +55,19 @@ export default function SellPage() {
       api("/catalog", catalogSchema),
       // Pro and Advance: the main branch's counts, so the screen stops at the stock on the shelf (the API checks again).
       followsStock ? api("/stock", stockPageSchema) : Promise.resolve(null),
+      // A restaurant (Features › tables): a sale can be for one of its tables.
+      tablesOn ? api("/tables", dineTablesSchema) : Promise.resolve({ tables: [] }),
     ]).then(
-      ([products, catalog, stockPage]) =>
+      ([products, catalog, stockPage, own]) =>
         setData({
           products,
           catalog,
           stock: Object.fromEntries((stockPage?.items ?? []).flatMap((item) => (item.onHand === null ? [] : [[item.variantId, item.onHand]]))),
+          tables: own.tables,
         }),
       () => setFailed(true),
     );
-  }, [followsStock]);
+  }, [followsStock, tablesOn]);
   useEffect(() => {
     if (allowed) load();
   }, [allowed, load]);
@@ -63,23 +81,54 @@ export default function SellPage() {
   }
   if (failed) return <PageOffline onRetry={load} />;
   if (!data) return <PageLoading />;
-  return <Sell products={data.products} catalog={data.catalog} stock={data.stock} onSold={load} />;
+  return <Sell products={data.products} catalog={data.catalog} stock={data.stock} tables={data.tables} onSold={load} />;
 }
 
 // Sell in the shop (design/screens.md P1–P3): tap products into the sale,
 // charge in one currency, take cash or the shop's own QR, then the receipt.
 // Hidden products can be sold here too: the shop may keep some off its page.
-function Sell({ products, catalog, stock, onSold }: { products: Product[]; catalog: Catalog; stock: Record<string, number>; onSold: () => void }) {
+function Sell({
+  products,
+  catalog,
+  stock,
+  tables,
+  onSold,
+}: {
+  products: Product[];
+  catalog: Catalog;
+  stock: Record<string, number>;
+  /** Empty when the shop doesn't use tables. */
+  tables: DineTable[];
+  onSold: () => void;
+}) {
   const t = useTranslations("Counter");
   const tShop = useTranslations("Storefront");
   const locale = useLocale();
   const { store } = useMerchant();
   const [step, setStep] = useState<Step>("sell");
+  // Keyed like the shop's cart: an option, or an option with its choices (packages/shared cartLineKey).
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  // "" = not for a table.
+  const [tableId, setTableId] = useState("");
+  // "Bill and hand over" from a job card (?jobCard=…): its parts and labour come in as the sale.
+  const [billing, setBilling] = useState<JobCard | null>(null);
+  useEffect(() => {
+    const jobCardId = new URLSearchParams(window.location.search).get("jobCard");
+    if (!jobCardId || !hasModule(store.modules, "jobCards")) return;
+    api(`/job-cards/${encodeURIComponent(jobCardId)}`, jobCardSchema).then(
+      (card) => {
+        setBilling(card);
+        setQuantities(Object.fromEntries(card.lines.map((line) => [cartLineKey(line.variantId), line.quantity])));
+        setNotes(Object.fromEntries(card.lines.filter((line) => line.note).map((line) => [cartLineKey(line.variantId), line.note])));
+      },
+      () => setBilling(null),
+    );
+  }, [store.modules]);
   const [currency, setCurrency] = useState<Currency>(store.defaultCurrency);
   const [choosing, setChoosing] = useState<Product | null>(null);
   const [done, setDone] = useState<CounterSaleResult | null>(null);
-  const sale = useCounterSale(products, quantities, currency, store, stock);
+  const sale = useCounterSale(products, quantities, notes, currency, store, stock);
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   const rate = store.usdToKhrRate;
   // The same stock rules as the shop page (lib/shop-stock), read from the main branch's counts.
@@ -100,9 +149,16 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
   );
   const browse = useProductBrowse(products, browseAccessors, `${store.slug}-counter`);
 
-  const setQuantity = (variantId: string, quantity: number) =>
-    setQuantities((current) => ({ ...Object.fromEntries(Object.entries(current).filter(([key]) => key !== variantId)), ...(quantity > 0 ? { [variantId]: quantity } : {}) }));
-  const inSale = (product: Product) => product.variants.reduce((sum, variant) => sum + (quantities[variant.id] ?? 0), 0);
+  const setQuantity = (lineKey: string, quantity: number) =>
+    setQuantities((current) => ({ ...Object.fromEntries(Object.entries(current).filter(([key]) => key !== lineKey)), ...(quantity > 0 ? { [lineKey]: quantity } : {}) }));
+  const inSale = (product: Product) => product.variants.reduce((sum, variant) => sum + variantQuantity(quantities, variant.id), 0);
+  /** From the picker: adds to the line for that option and those choices, keeping a note if one was written. */
+  const addPicked = (item: PickedItem) => {
+    const key = cartLineKey(item.variantId, item.choiceIds);
+    setQuantity(key, (quantities[key] ?? 0) + item.quantity);
+    if (item.note) setNotes((current) => ({ ...current, [key]: item.note }));
+    setChoosing(null);
+  };
 
   const charge = (
     <Button variant="primary" fullWidth disabled={sale.total.itemCount === 0} onClick={() => setStep("pay")}>
@@ -118,6 +174,9 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
         receiptHref={`/${locale}/m/orders/${done.id}/invoice`}
         onNewSale={() => {
           setQuantities({});
+          setNotes({});
+          setTableId("");
+          setBilling(null);
           setDone(null);
           setStep("sell");
           // The counts moved with the sale.
@@ -132,6 +191,9 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
       <PayStep
         currency={currency}
         quantities={quantities}
+        notes={notes}
+        tableId={tableId || undefined}
+        jobCardId={billing?.id}
         sale={sale}
         onQuantity={setQuantity}
         onBack={() => setStep("sell")}
@@ -150,7 +212,17 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
           <h1 className="text-xl font-bold">{t("title")}</h1>
           <p className="text-sm text-muted">{t("subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {tables.length > 0 && (
+            <Select
+              label={t("table")}
+              value={tableId}
+              placeholder={t("noTable")}
+              onChange={(event) => setTableId(event.target.value)}
+              options={tables.map((table) => ({ value: table.id, label: table.name }))}
+              className="min-w-40"
+            />
+          )}
           <SegmentedControl
             mode="choice"
             label={t("saleCurrency")}
@@ -167,6 +239,12 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
           </Link>
         </div>
       </header>
+
+      {billing && (
+        <Notice tone="info" role="status">
+          {t("billingJobCard", { number: billing.number, plate: billing.vehicle.plate })}
+        </Notice>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="flex min-w-0 flex-col gap-3">
@@ -189,6 +267,7 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
                   photo={product.photos[0] ? <PhotoThumb photo={product.photos[0]} lazy className="h-full w-full object-cover" /> : null}
                   discountPercent={product.discountPercent}
                   optionCount={optionCount}
+                  picksFirst={product.choiceGroups.length > 0}
                   price={variant ? formatMoney(salePrice(product, variant, currency, rate), currency) : null}
                   quantity={inSale(product)}
                   ordering
@@ -201,7 +280,7 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
                     inCart: t("inSale", { count: inSale(product) }),
                     soldOut: tShop("soldOut"),
                   }}
-                  onOpen={() => (optionCount > 0 ? setChoosing(product) : only && setQuantity(only.id, (quantities[only.id] ?? 0) + 1))}
+                  onOpen={() => (optionCount > 0 || product.choiceGroups.length > 0 ? setChoosing(product) : only && setQuantity(only.id, (quantities[only.id] ?? 0) + 1))}
                   onAdjust={(delta) => only && setQuantity(only.id, (quantities[only.id] ?? 0) + delta)}
                 />
               );
@@ -221,6 +300,19 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
       </div>
 
       <BottomSheet open={choosing !== null} onClose={() => setChoosing(null)} closeLabel={t("close")} title={choosing ? text(choosing.titleKm, choosing.titleEn) : ""}>
+        {/* Groups or choices: the same picker as the shop page. Otherwise one tap per option. */}
+        {choosing && (choosing.variantGroups.length > 0 || choosing.choiceGroups.length > 0) ? (
+          <ItemPicker
+            key={choosing.id}
+            product={choosing}
+            currency={currency}
+            usdToKhrRate={rate}
+            stockOf={(variantId) => variantStock(shelf, variantId)}
+            inCartOf={(variantId) => variantQuantity(quantities, variantId)}
+            stockLabels={stockLabels}
+            onAdd={addPicked}
+          />
+        ) : (
         <ul className="flex flex-col gap-2">
           {choosing?.variants.map((variant) => (
             <li key={variant.id}>
@@ -246,6 +338,7 @@ function Sell({ products, catalog, stock, onSold }: { products: Product[]; catal
             </li>
           ))}
         </ul>
+        )}
       </BottomSheet>
     </div>
   );

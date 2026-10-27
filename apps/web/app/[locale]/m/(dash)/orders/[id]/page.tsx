@@ -5,6 +5,7 @@ import {
   type Driver,
   formatKhmerPhoneLocal,
   type FormErrorCode,
+  hasModule,
   isCashOrder,
   isPlainOrderAction,
   type OrderActionRequest,
@@ -21,10 +22,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useFormErrorText } from "@/components/form-ui";
-import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
+import { formatMoney, LineDetails, OrderStatusPill, PreferredTime, useChoiceLabels, useOrderText } from "@/components/order-ui";
+import { LineFields } from "@/components/orders/line-fields";
 import { OrderContactBar } from "@/components/seller-app";
 import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, deliveryResponseSchema, type SellerOrderDetail, sellerOrderDetailSchema } from "@/lib/api";
+import { api, ApiError, type CustomField, customFieldsAnswerSchema, deliveryResponseSchema, type SellerOrderDetail, sellerOrderDetailSchema } from "@/lib/api";
+import { useMerchant } from "../../merchant-context";
 import { PageLoading, PageOffline } from "../../page-states";
 
 const OTHER_DRIVER = "__other__";
@@ -35,18 +38,27 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<SellerOrderDetail | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [lineFields, setLineFields] = useState<CustomField[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "not_found" | "offline">("loading");
+  const { store } = useMerchant();
+  const fieldsOn = hasModule(store.modules, "customFields");
 
   const load = useCallback(() => {
     setState("loading");
-    Promise.all([api(`/orders/${id}`, sellerOrderDetailSchema), api("/delivery", deliveryResponseSchema)])
-      .then(([detail, delivery]) => {
+    Promise.all([
+      api(`/orders/${id}`, sellerOrderDetailSchema),
+      api("/delivery", deliveryResponseSchema),
+      // Each item's own fields (an IMEI), only while the shop uses them.
+      fieldsOn ? api("/custom-fields", customFieldsAnswerSchema) : Promise.resolve({ fields: [] }),
+    ])
+      .then(([detail, delivery, own]) => {
         setOrder(detail);
         setDrivers(delivery.settings.drivers);
+        setLineFields(own.fields.filter((field) => field.target === "orderLine"));
         setState("ready");
       })
       .catch((error: unknown) => setState(error instanceof ApiError && (error.status === 404 || error.status === 400) ? "not_found" : "offline"));
-  }, [id]);
+  }, [id, fieldsOn]);
   useEffect(load, [load]);
 
   if (state === "offline") return <PageOffline onRetry={load} />;
@@ -61,7 +73,7 @@ export default function OrderDetailPage() {
     );
   }
   if (!order) return <PageLoading />;
-  return <OrderDetail order={order} drivers={drivers} onChanged={setOrder} onReload={load} />;
+  return <OrderDetail order={order} drivers={drivers} lineFields={lineFields} onChanged={setOrder} onReload={load} />;
 }
 
 // The seller's order screen (design/screens.md S5). Which buttons show comes
@@ -70,11 +82,14 @@ export default function OrderDetailPage() {
 function OrderDetail({
   order,
   drivers,
+  lineFields,
   onChanged,
   onReload,
 }: {
   order: SellerOrderDetail;
   drivers: Driver[];
+  /** The shop's own fields for each item sold (empty when it doesn't use them). */
+  lineFields: CustomField[];
   onChanged: (order: SellerOrderDetail) => void;
   onReload: () => void;
 }) {
@@ -85,6 +100,7 @@ function OrderDetail({
   const errorText = useFormErrorText();
   const locale = useLocale();
   const { paymentLabel, placeLabel, timeAgo, clockTime, statusLabel, actionLabel } = useOrderText();
+  const choiceLabels = useChoiceLabels();
 
   const actions = order.actions;
   const primary = actions.find((action) => action !== "cancel" && action !== "fail_delivery");
@@ -315,6 +331,8 @@ function OrderDetail({
 
       <Card className="flex flex-col gap-2 p-4">
         <h2 className="font-semibold">{t("items")}</h2>
+        <PreferredTime at={order.preferredAt} />
+        {order.tableName && <p className="text-sm font-medium">{t("tableName", { name: order.tableName })}</p>}
         {order.items.map((item, index) => {
           const option = text(item.variantLabelKm, item.variantLabelEn);
           return (
@@ -322,6 +340,10 @@ function OrderDetail({
               <span className="min-w-0">
                 <span className="font-semibold tabular-nums">{item.quantity} ×</span> {text(item.titleKm, item.titleEn)}
                 {option && <span className="text-muted"> – {option}</span>}
+                <LineDetails choices={choiceLabels(item.choices)} note={item.note} />
+                {lineFields.length > 0 && item.id && (
+                  <LineFields orderId={order.id} itemId={item.id} values={item.customValues ?? {}} fields={lineFields} onSaved={onChanged} />
+                )}
               </span>
               <span className="shrink-0 tabular-nums">{formatMoney(item.lineTotalMinor, order.currency)}</span>
             </div>

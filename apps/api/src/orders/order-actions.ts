@@ -4,6 +4,7 @@ import { NotFoundException } from "@nestjs/common";
 import { AppException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
 import { returnOrderStock } from "../stock/stock";
+import { orderItemSelect, toOrderItem } from "./order-lines";
 
 // The seller moving an order on (roadmap step 6). Every change goes through
 // packages/shared decideOrderAction — the same rule the screens and the
@@ -34,13 +35,14 @@ export const orderDetailSelect = {
   pickupHours: true,
   buyerName: true,
   buyerPhone: true,
+  // A booking: when the buyer would like it done.
+  preferredAt: true,
+  // Dine-in: the table it was for ("" = none).
+  tableName: true,
   cancelReason: true,
   cancelNote: true,
   createdAt: true,
-  items: {
-    select: { variantId: true, titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
-    orderBy: { createdAt: "asc" },
-  },
+  items: { select: orderItemSelect, orderBy: { createdAt: "asc" } },
   events: { select: { status: true, actor: true, at: true }, orderBy: { at: "asc" } },
   dispatches: {
     select: { route: true, driverName: true, driverPhone: true, busCompany: true, ticketNumber: true, dispatchedAt: true, pickedUpAt: true, deliveredAt: true, failedAt: true },
@@ -52,7 +54,13 @@ type OrderDetailRow = Prisma.OrderGetPayload<{ select: typeof orderDetailSelect 
 
 /** The order as the seller's detail page shows it: with the steps the seller may take now and how it must be sent. */
 export function toOrderDetail(order: OrderDetailRow, storeSlug: string) {
-  return { ...order, trackingCode: formatTrackingCode(storeSlug, order.trackingCode), actions: getSellerActions(order), route: getDispatchRoute(order) };
+  return {
+    ...order,
+    items: order.items.map(toOrderItem),
+    trackingCode: formatTrackingCode(storeSlug, order.trackingCode),
+    actions: getSellerActions(order),
+    route: getDispatchRoute(order),
+  };
 }
 
 export async function readOrderDetail(tx: Tx, orderId: string) {

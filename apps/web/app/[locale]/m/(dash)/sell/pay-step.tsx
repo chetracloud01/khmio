@@ -13,7 +13,7 @@ import { formatMoney } from "@/components/order-ui";
 import { api, ApiError, type CounterSaleResult, counterSaleResultSchema } from "@/lib/api";
 import { newId } from "@/lib/new-id";
 import { useMerchant } from "../merchant-context";
-import type { useCounterSale } from "./use-counter-sale";
+import { saleRequestLines, type useCounterSale } from "./use-counter-sale";
 
 type Method = "cash" | "shop_qr";
 
@@ -25,15 +25,24 @@ type Method = "cash" | "shop_qr";
 export function PayStep({
   currency,
   quantities,
+  notes,
+  tableId,
+  jobCardId,
   sale,
   onQuantity,
   onBack,
   onDone,
 }: {
   currency: Currency;
+  /** Line key (an option, or with its choices) → how many. */
   quantities: Record<string, number>;
+  notes: Record<string, string>;
+  /** Dine-in: the table this sale is for. */
+  tableId?: string;
+  /** A garage: the job card this sale bills (it's handed over with the sale). */
+  jobCardId?: string;
   sale: ReturnType<typeof useCounterSale>;
-  onQuantity: (variantId: string, quantity: number) => void;
+  onQuantity: (lineKey: string, quantity: number) => void;
   onBack: () => void;
   onDone: (result: CounterSaleResult) => void;
 }) {
@@ -66,10 +75,12 @@ export function PayStep({
         body: {
           idempotencyKey,
           currency,
-          lines: Object.entries(quantities).map(([variantId, quantity]) => ({ variantId, quantity })),
+          lines: saleRequestLines(quantities, notes),
           payment: method === "cash" ? { method, receivedMinor: received } : { method, sellerConfirmed: true },
           buyerName: buyerName.trim(),
           buyerPhone,
+          ...(tableId ? { tableId } : {}),
+          ...(jobCardId ? { jobCardId } : {}),
         },
       });
       onDone(result);

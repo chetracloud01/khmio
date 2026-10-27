@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { TrackingCodeCard } from "@/components/invoice/tracking-code-card";
-import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
+import { formatMoney, LineDetails, OrderStatusPill, PreferredTime, useChoiceLabels, useOrderText } from "@/components/order-ui";
 import { api, ApiError, apiSend, type PublicOrder, telegramLinkSchema } from "@/lib/api";
 import { addToShopCart } from "@/lib/cart";
 import { rememberOrder } from "@/lib/my-orders";
@@ -26,6 +26,7 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
   const tInvoice = useTranslations("Invoice");
   const tBuyer = useTranslations("MyOrders");
   const { paymentLabel, placeLabel, clockTime } = useOrderText();
+  const choiceLabels = useChoiceLabels();
   const router = useRouter();
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -126,6 +127,7 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
               {tCheckout("otherProvince")}
             </p>
           )}
+          <PreferredTime at={order.preferredAt} />
           <p className="text-muted">{paymentLabel(order)}</p>
           {order.dispatch && order.dispatch.route !== "pickup" && (
             <p className="flex items-start gap-2 border-t border-border pt-2">
@@ -271,6 +273,7 @@ export function OrderView({ order, token }: { order: PublicOrder | null; token: 
                       {item.quantity} × {title}
                     </span>
                     {option && <span className="block text-muted">{option}</span>}
+                    <LineDetails choices={choiceLabels(item.choices)} note={item.note} />
                   </span>
                   <span className="shrink-0 tabular-nums">{formatMoney(item.lineTotalMinor, order.currency)}</span>
                 </li>

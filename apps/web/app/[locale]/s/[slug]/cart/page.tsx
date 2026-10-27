@@ -9,8 +9,8 @@ import { useParams } from "next/navigation";
 import { BuyerBottomBar, BuyerColumns, BuyerShell, BuyerSteps, BuyerTopBar } from "@/components/buyer-shell";
 import { CurrencyChoice } from "@/components/buyer/currency-choice";
 import { QuantityStepper } from "@/components/buyer/quantity-control";
-import { formatMoney } from "@/components/order-ui";
-import { cartLines, cartTotal, useCartFitsShop, useShopCart } from "@/lib/cart";
+import { formatMoney, LineDetails } from "@/components/order-ui";
+import { cartLines, cartTotal, useCartFitsShop, useShopCart, variantQuantity } from "@/lib/cart";
 import { variantStock } from "@/lib/shop-stock";
 import { isTakingOrders } from "@/lib/shop-ordering";
 import { usePublicShop } from "@/lib/use-public-shop";
@@ -36,7 +36,7 @@ export default function CartPage() {
 
   const shopHref = `/${locale}/s/${slug}`;
   const currency: Currency = cart.currency ?? shop.store.defaultCurrency;
-  const lines = cartLines(shop, cart.quantities);
+  const lines = cartLines(shop, cart.quantities, cart.notes);
   const total = lines.length ? cartTotal(shop, lines, currency, null) : null;
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
   const lineTitle = (line: (typeof lines)[number]) => {
@@ -130,7 +130,7 @@ export default function CartPage() {
                 const title = lineTitle(line);
                 const priced = total.lines[index];
                 return (
-                  <li key={line.variant.id} className="flex items-center gap-3 border-b border-border py-3 first:pt-0">
+                  <li key={line.key} className="flex items-center gap-3 border-b border-border py-3 first:pt-0">
                     {line.product.photos[0] ? (
                       <PhotoThumb photo={line.product.photos[0]} className="h-16 w-16 shrink-0 rounded-DEFAULT object-cover" />
                     ) : (
@@ -140,6 +140,7 @@ export default function CartPage() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="line-clamp-2 text-sm font-medium leading-normal">{title}</p>
+                      <LineDetails choices={line.choices.map(({ value }) => text(value.labelKm, value.labelEn))} note={line.note} />
                       <p className="text-sm font-semibold">{priced ? formatMoney(priced.lineTotal, currency) : ""}</p>
                     </div>
                     <QuantityStepper
@@ -147,9 +148,10 @@ export default function CartPage() {
                       binAtOne
                       decreaseLabel={line.quantity === 1 ? tStore("remove") : tStore("decrease", { title })}
                       increaseLabel={tStore("increase", { title })}
-                      onDecrease={() => cart.setQuantity(line.variant.id, line.quantity - 1)}
-                      onIncrease={() => cart.setQuantity(line.variant.id, line.quantity + 1)}
-                      increaseDisabled={!canAddMore(variantStock(shop, line.variant.id), line.quantity)}
+                      onDecrease={() => cart.setQuantity(line.key, line.quantity - 1)}
+                      onIncrease={() => cart.setQuantity(line.key, line.quantity + 1)}
+                      // Stock counts every line of this option together, whatever its choices.
+                      increaseDisabled={!canAddMore(variantStock(shop, line.variant.id), variantQuantity(cart.quantities, line.variant.id))}
                       className="shrink-0"
                     />
                   </li>

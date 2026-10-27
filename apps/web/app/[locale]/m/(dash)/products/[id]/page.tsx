@@ -1,20 +1,26 @@
 "use client";
 
 import {
+  choicePickSchema,
+  hasModule,
   khrInputText,
+  MAX_CHOICE_GROUPS,
   MAX_PRODUCT_DESCRIPTION_LENGTH,
   MAX_PRODUCT_PHOTOS,
+  MAX_VARIANT_GROUPS,
   parseKhrInput,
   parseUsdInput,
   planHasFeature,
   productInputSchema,
   toFieldErrors,
   usdInputText,
+  variantLabel,
+  type CustomValue,
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
 import { Button, Card, FileButton, IconButton, Input, MoneyInput, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
-import { History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Grid3x3, History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -23,8 +29,32 @@ import type { ChangeEvent } from "react";
 import { z } from "zod";
 import { ACCEPTED_IMAGE_TYPES, compressImageToBlob } from "@/components/compress-image";
 import { FormActions, FormSection, focusFirstInvalidField, useFormErrorText } from "@/components/form-ui";
+import {
+  choiceGroupDrafts,
+  nextDraftId,
+  rowsForCombinations,
+  toChoiceGroupInput,
+  toVariantGroupInput,
+  variantGroupDrafts,
+  type OptionGroupDraft,
+} from "@/components/product-form/option-groups";
+import { OptionGroupsEditor } from "@/components/product-form/option-groups-editor";
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, apiSend, type Catalog, type CatalogName, catalogNameSchema, catalogSchema, type Product, productSchema, uploadPhoto } from "@/lib/api";
+import { CustomFieldInput, valuesForSave } from "@/components/custom-fields/custom-field-input";
+import {
+  api,
+  ApiError,
+  apiSend,
+  type Catalog,
+  type CatalogName,
+  catalogNameSchema,
+  catalogSchema,
+  type CustomField,
+  customFieldsAnswerSchema,
+  type Product,
+  productSchema,
+  uploadPhoto,
+} from "@/lib/api";
 import { readStored, writeStored } from "@/lib/device-storage";
 import { useMerchant } from "../../merchant-context";
 
@@ -37,6 +67,8 @@ const variantDraftSchema = z.object({
   id: z.string(),
   labelKm: z.string(),
   labelEn: z.string(),
+  /** With variant groups: this row's value in each group. */
+  valueIds: z.array(z.string()).default([]),
   sku: z.string(),
   retailUsd: z.string(),
   retailKhr: z.string(),
@@ -53,12 +85,14 @@ interface PhotoSlot {
   status: "uploading" | "ready" | "failed";
 }
 
-let draftCounter = 0;
-/** Unique across page loads too: a restored draft keeps the option ids it was saved with. */
-function nextDraftId(): string {
-  draftCounter += 1;
-  return `draft-${Date.now()}-${draftCounter}`;
-}
+const groupDraftSchema = z.object({
+  id: z.string(),
+  nameKm: z.string(),
+  nameEn: z.string(),
+  pick: choicePickSchema,
+  required: z.boolean(),
+  values: z.array(z.object({ id: z.string(), labelKm: z.string(), labelEn: z.string(), extraUsd: z.string(), extraKhr: z.string() })),
+});
 
 // A new product is kept on this device while it's being typed, so a phone
 // call or a closed tab doesn't lose it — photos too, as their uploaded keys.
@@ -77,6 +111,8 @@ const productDraftSchema = z.object({
   wholesaleKhr: z.string(),
   discountPercent: z.string(),
   variantDrafts: z.array(variantDraftSchema),
+  variantGroups: z.array(groupDraftSchema),
+  choiceGroups: z.array(groupDraftSchema),
   photos: z.array(z.object({ key: z.string(), url: z.string() })),
 });
 type ProductDraft = z.infer<typeof productDraftSchema>;
@@ -161,16 +197,23 @@ export default function ProductFormPage() {
   const isNew = params.id === "new";
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
+  const [fields, setFields] = useState<CustomField[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "not_found" | "offline">("loading");
   // "Discard draft" starts the form again from blank.
   const [resetCount, setResetCount] = useState(0);
 
   const load = () => {
     setState("loading");
-    Promise.all([api("/catalog", catalogSchema), isNew ? Promise.resolve(null) : api(`/products/${params.id}`, productSchema)])
-      .then(([names, existing]) => {
+    Promise.all([
+      api("/catalog", catalogSchema),
+      isNew ? Promise.resolve(null) : api(`/products/${params.id}`, productSchema),
+      // The shop's own product fields (Features › customFields); none to show when it's off.
+      api("/custom-fields", customFieldsAnswerSchema),
+    ])
+      .then(([names, existing, own]) => {
         setCatalog(names);
         setProduct(existing);
+        setFields(own.fields.filter((field) => field.target === "product"));
         setState("ready");
       })
       .catch((error: unknown) => setState(error instanceof ApiError && (error.status === 404 || error.status === 400) ? "not_found" : "offline"));
@@ -215,12 +258,13 @@ export default function ProductFormPage() {
       key={`${params.id}-${resetCount}`}
       catalog={catalog}
       existing={product}
+      fields={fields}
       onReset={() => setResetCount((count) => count + 1)}
     />
   );
 }
 
-function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existing: Product | null; onReset: () => void }) {
+function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog; existing: Product | null; fields: CustomField[]; onReset: () => void }) {
   const t = useTranslations("ProductForm");
   const tApp = useTranslations("App");
   const locale = useLocale();
@@ -232,6 +276,11 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
   // Hidden, not cleared: wholesale prices already saved stay on the server
   // (the API keeps them on plans without wholesale) and return after an upgrade.
   const canWholesale = planHasFeature(store.plan, "wholesalePrice");
+  // Features for my business: switched off, the groups are hidden and kept as they are by the API.
+  const optionsOn = hasModule(store.modules, "options");
+  const choicesOn = hasModule(store.modules, "choices");
+  const fieldsOn = hasModule(store.modules, "customFields") && fields.length > 0;
+  const servicesOn = hasModule(store.modules, "services");
 
   const [categories, setCategories] = useState<CatalogName[]>(catalog.categories);
   const [brands, setBrands] = useState<CatalogName[]>(catalog.brands);
@@ -244,6 +293,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
   const [descriptionKm, setDescriptionKm] = useState(existing?.descriptionKm ?? "");
   const [descriptionEn, setDescriptionEn] = useState(existing?.descriptionEn ?? "");
   const [visible, setVisible] = useState(existing?.isVisible ?? true);
+  const [isService, setIsService] = useState(existing?.kind === "service");
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? catalog.categories[0]?.id ?? "");
   const [brandId, setBrandId] = useState(existing?.brandId ?? "");
   const [uomId, setUomId] = useState(existing ? (existing.unitId ?? "") : (catalog.defaultUnitId ?? ""));
@@ -258,6 +308,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
           id: variant.id,
           labelKm: variant.labelKm,
           labelEn: variant.labelEn,
+          valueIds: variant.valueIds,
           sku: variant.sku,
           retailUsd: usdInputText(variant.priceUsdCents),
           retailKhr: khrInputText(variant.priceKhr),
@@ -266,6 +317,9 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
         }))
       : [],
   );
+  const [variantGroups, setVariantGroups] = useState<OptionGroupDraft[]>(variantGroupDrafts(existing?.variantGroups ?? []));
+  const [choiceGroups, setChoiceGroups] = useState<OptionGroupDraft[]>(choiceGroupDrafts(existing?.choiceGroups ?? []));
+  const [customValues, setCustomValues] = useState<Record<string, CustomValue>>(existing?.customValues ?? {});
   const [adding, setAdding] = useState<"categories" | "brands" | "units" | null>(null);
   const [addingBusy, setAddingBusy] = useState(false);
   const [addingError, setAddingError] = useState<string>();
@@ -277,6 +331,8 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
   const formRef = useRef<HTMLDivElement>(null);
 
   const hasVariants = variantDrafts.length > 0;
+  // With variant groups, each row is a combination of their values and is named by them.
+  const grouped = optionsOn && variantGroups.length > 0;
   const uploading = photos.some((photo) => photo.status === "uploading");
   const readyPhotos = photos.filter((photo): photo is PhotoSlot & { key: string } => photo.status === "ready" && !!photo.key);
 
@@ -297,6 +353,10 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
     wholesaleKhr,
     discountPercent,
     variantDrafts,
+    variantGroups,
+    choiceGroups,
+    customValues,
+    isService,
   });
   const [savedSnapshot] = useState(snapshot);
   const dirty = snapshot !== savedSnapshot;
@@ -324,6 +384,8 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
     text(draft.wholesaleKhr, setWholesaleKhr);
     text(draft.discountPercent, setDiscountPercent);
     if (Array.isArray(draft.variantDrafts)) setVariantDrafts(draft.variantDrafts);
+    if (Array.isArray(draft.variantGroups)) setVariantGroups(draft.variantGroups);
+    if (Array.isArray(draft.choiceGroups)) setChoiceGroups(draft.choiceGroups);
     if (Array.isArray(draft.photos)) setPhotos(draft.photos.map((photo) => ({ id: photo.key, key: photo.key, url: photo.url, status: "ready" })));
     setDraftRestored(true);
     // Runs once, when the form opens.
@@ -349,6 +411,8 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
         wholesaleKhr,
         discountPercent,
         variantDrafts,
+        variantGroups,
+        choiceGroups,
         photos: readyPhotos.map(({ key, url }) => ({ key, url })),
       };
       writeStored(draftStorageKey(store.slug), draft); // not kept this time when storage refuses
@@ -423,8 +487,27 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
   function addVariantRow() {
     setVariantDrafts((previous) => [
       ...previous,
-      { id: nextDraftId(), labelKm: "", labelEn: "", sku: "", retailUsd: "", retailKhr: "", wholesaleUsd: "", wholesaleKhr: "" },
+      { id: nextDraftId(), labelKm: "", labelEn: "", valueIds: [], sku: "", retailUsd: "", retailKhr: "", wholesaleUsd: "", wholesaleKhr: "" },
     ]);
+  }
+
+  /** "Make all combinations": one row per combination of the groups' values, keeping the prices already typed. */
+  function makeCombinations() {
+    setVariantDrafts((previous) =>
+      rowsForCombinations(variantGroups, previous, (valueIds, copyFrom) => ({
+        id: nextDraftId(),
+        labelKm: "",
+        labelEn: "",
+        valueIds,
+        sku: "",
+        retailUsd: copyFrom?.retailUsd ?? "",
+        retailKhr: copyFrom?.retailKhr ?? "",
+        wholesaleUsd: copyFrom?.wholesaleUsd ?? "",
+        wholesaleKhr: copyFrom?.wholesaleKhr ?? "",
+      })),
+    );
+    // Messages are keyed by position, so they'd point at the wrong option now.
+    setErrors({});
   }
 
   function updateVariantRow(id: string, patch: Partial<VariantDraft>) {
@@ -448,10 +531,16 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
       descriptionKm,
       descriptionEn,
       isVisible: visible,
+      // Only while services are on; switched off, the API keeps the kind the product has.
+      kind: servicesOn && isService ? "service" : "item",
       categoryId,
       brandId: brandId || undefined,
       uomId: uomId || undefined,
       discountPercent: parseDiscountInput(discountPercent),
+      // Only while the module is on: switched off, the API keeps what the product has.
+      variantGroups: grouped ? toVariantGroupInput(variantGroups) : [],
+      choiceGroups: choicesOn ? toChoiceGroupInput(choiceGroups) : [],
+      customValues: fieldsOn ? valuesForSave(fields, customValues) : {},
       ...(hasVariants
         ? {
             options: variantDrafts.map((row) => ({
@@ -459,6 +548,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
               sku: row.sku,
               labelKm: row.labelKm,
               labelEn: row.labelEn,
+              ...(grouped ? { valueIds: row.valueIds } : {}),
               retailPriceUsdCents: parseUsdInput(row.retailUsd),
               retailPriceKhr: parseKhrInput(row.retailKhr),
               ...wholesale(row.wholesaleUsd, row.wholesaleKhr),
@@ -715,6 +805,34 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
           </div>
         </FormSection>
 
+        {fieldsOn && (
+          <FormSection stacked title={t("moreDetailsTitle")} description={t("moreDetailsHelp")}>
+            {fields.map((field) => (
+              <CustomFieldInput
+                key={field.id}
+                field={field}
+                value={customValues[field.id]}
+                onChange={(value) => {
+                  setCustomValues((current) => {
+                    const next = { ...current };
+                    if (value === undefined) delete next[field.id];
+                    else next[field.id] = value;
+                    return next;
+                  });
+                  clearErrors(`customValues.${field.id}`);
+                }}
+                error={error(`customValues.${field.id}`)}
+              />
+            ))}
+          </FormSection>
+        )}
+
+        {servicesOn && (
+          <FormSection stacked title={t("kindTitle")} description={t("kindHelp")}>
+            <Switch checked={isService} onChange={setIsService} label={t("isServiceLabel")} description={t("isServiceHint")} />
+          </FormSection>
+        )}
+
         <FormSection stacked title={t("visibilityTitle")} description={t("visibilityHelp")}>
           <Switch checked={visible} onChange={setVisible} label={t("visibleLabel")} description={visible ? t("visibleOn") : t("visibleOff")} />
         </FormSection>
@@ -770,11 +888,36 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
           </FormSection>
         )}
 
-        <FormSection stacked title={t("variantsTitle")} description={t("variantsHint")}>
+        <FormSection stacked title={t("variantsTitle")} description={t(optionsOn ? "variantGroupsHint" : "variantsHint")}>
+          {optionsOn && (
+            <>
+              <OptionGroupsEditor
+                kind="variant"
+                field="variantGroups"
+                groups={variantGroups}
+                onChange={setVariantGroups}
+                max={MAX_VARIANT_GROUPS}
+                error={error}
+                usdToKhrRate={rate}
+              />
+              {variantGroups.length > 0 && (
+                <Button variant="secondary" onClick={makeCombinations} className="self-start">
+                  <Grid3x3 className="h-4 w-4" aria-hidden="true" />
+                  {t("makeCombinations")}
+                </Button>
+              )}
+            </>
+          )}
           {variantDrafts.map((row, index) => {
             const key = (field: string) => `options.${index}.${field}`;
             return (
               <div key={row.id} className="flex flex-col gap-2 rounded-DEFAULT border border-border p-3">
+                {grouped ? (
+                  <div>
+                    <p className="font-medium">{variantLabel(variantGroups, row.valueIds, locale === "km" ? "km" : "en") || t("combinationMissing")}</p>
+                    {error(key("valueIds")) && <p className="text-sm text-danger">{error(key("valueIds"))}</p>}
+                  </div>
+                ) : (
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     label={t("optionLabelKm")}
@@ -795,6 +938,7 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
                     error={error(key("labelEn"))}
                   />
                 </div>
+                )}
                 <Input
                   label={t("optionSku")}
                   value={row.sku}
@@ -862,11 +1006,20 @@ function ProductForm({ catalog, existing, onReset }: { catalog: Catalog; existin
               </div>
             );
           })}
-          <Button variant="secondary" onClick={addVariantRow} className="self-start">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            {t("addOption")}
-          </Button>
+          {/* With groups, rows come from "Make all combinations"; one typed by hand would have no values. */}
+          {!grouped && (
+            <Button variant="secondary" onClick={addVariantRow} className="self-start">
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              {t("addOption")}
+            </Button>
+          )}
         </FormSection>
+
+        {choicesOn && (
+          <FormSection stacked title={t("choicesTitle")} description={t("choicesHint")}>
+            <OptionGroupsEditor kind="choice" field="choiceGroups" groups={choiceGroups} onChange={setChoiceGroups} max={MAX_CHOICE_GROUPS} error={error} usdToKhrRate={rate} />
+          </FormSection>
+        )}
 
         {saveError && (
           <Notice tone="danger" role="alert" className="mb-3">

@@ -1,11 +1,13 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { orderActionRequestSchema } from "@khmio/shared";
-import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Query, UseGuards } from "@nestjs/common";
+import { lineFieldsRequestSchema, orderActionRequestSchema } from "@khmio/shared";
+import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
 import { assertStoreWritable } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
+import { assertModule } from "../modules/modules";
 import { readSellerInvoice } from "./invoice";
+import { saveLineFields } from "./line-fields";
 import { readOrderDetail, runSellerAction } from "./order-actions";
 import { parseOrderListQuery, readOrderList, readOrderListPage, readStoreSlug } from "./order-list";
 import { sellerSummary } from "./summary";
@@ -62,6 +64,18 @@ export class OrdersController {
     return withContext(this.app, context, async (tx) => {
       await assertStoreWritable(tx, context.storeId);
       return runSellerAction(tx, context, id, request);
+    });
+  }
+
+  /** The shop's own fields for one item sold (Features › customFields), e.g. the IMEI handed over. */
+  @Put(":id/items/:itemId/fields")
+  async lineFields(@CurrentStore() context: MerchantStore, @Param("id", ParseUUIDPipe) id: string, @Param("itemId", ParseUUIDPipe) itemId: string, @Body() body: unknown) {
+    const { values } = lineFieldsRequestSchema.parse(body);
+    return withContext(this.app, context, async (tx) => {
+      await assertStoreWritable(tx, context.storeId);
+      await assertModule(tx, context.storeId, "customFields");
+      await saveLineFields(tx, context, { orderId: id, itemId }, values);
+      return readOrderDetail(tx, id);
     });
   }
 }

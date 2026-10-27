@@ -4,22 +4,21 @@ import type { PaymentProvider } from "@khmio/payments";
 import {
   checkoutInputSchema,
   computeOrderTotal,
+  bookingProblem,
   getAvailablePaymentMethods,
-  getDeliveryQuote,
   getInitialOrderStatus,
+  getOrderQuote,
   placeOrderRequestSchema,
   takesStockWhenPlaced,
+  hasModule,
   toFieldErrors,
   type CheckoutInput,
   type FormErrorCode,
-  type OrderLineInput,
-  type OrderTotal,
   type PlaceOrderRequest,
 } from "@khmio/shared";
-
-type OrderLineRequest = PlaceOrderRequest["lines"][number];
 import { readDeliverySettings } from "../delivery/delivery";
 import { AppException, InvalidInputException } from "../errors";
+import { orderItemRows, orderTotalLines, readOrderLines } from "./order-lines";
 import { publicKhqrAccount, startKhqrPayment } from "../payments/khqr";
 import { publicStorePlan, reserveOrderStock, takeOrderStock, tracksStock } from "../stock/stock";
 
@@ -78,15 +77,19 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest,
 
   const store = await tx.store.findUniqueOrThrow({
     where: { id: storeId },
-    select: { allowCod: true, usdToKhrRate: true, vatPercent: true, pickupAddress: true, pickupHours: true },
+    select: { allowCod: true, usdToKhrRate: true, vatPercent: true, pickupAddress: true, pickupHours: true, modules: true },
   });
   // A paused shop keeps its page but takes no orders (blueprint "Subscription life cycle").
   const [openRow] = await tx.$queryRaw<{ open: boolean }[]>`SELECT app_public_store_open() AS open`;
   if (!openRow?.open) throw new AppException(409, "store_closed");
   const { settings: delivery, configured } = await readDeliverySettings(tx, storeId);
   const bakongAccountId = await publicKhqrAccount(tx, khqr);
-  // No delivery saved, or no way at all to pay (cash off, and no KHQR): the shop isn't open for orders.
-  if (!configured || (!store.allowCod && !bakongAccountId)) throw new AppException(409, "not_accepting_orders");
+  // The buyer can only see visible, not-deleted products (step 3 public read), so anything else is simply missing.
+  const lines = await readOrderLines(tx, request.lines, hasModule(store.modules, "choices"));
+  // Only services (Features › services): a booking, done at the shop or at the buyer's place.
+  const serviceOnly = hasModule(store.modules, "services") && lines.serviceOnly;
+  // No delivery saved (a booking needs none), or no way at all to pay (cash off, and no KHQR): the shop isn't open for orders.
+  if ((!configured && !serviceOnly) || (!store.allowCod && !bakongAccountId)) throw new AppException(409, "not_accepting_orders");
 
   const checkout = parseCheckout(request.checkout, store.allowCod);
   const errors: Record<string, FormErrorCode> = {};
@@ -107,18 +110,17 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest,
     districtId: checkout.fulfilment === "delivery" && checkout.area === "phnom_penh" ? checkout.districtId : undefined,
     provinceId: checkout.fulfilment === "delivery" && checkout.area === "province" ? checkout.provinceId : undefined,
   };
-  const quote = getDeliveryQuote(delivery, choice);
+  const quote = getOrderQuote(delivery, choice, serviceOnly);
   if (quote.status !== "ok") {
     errors[checkout.fulfilment === "pickup" ? "fulfilment" : checkout.area === "province" ? "provinceId" : "districtId"] = "delivery_unavailable";
   }
-
-  // The buyer can only see visible, not-deleted products (step 3 public read), so anything else is simply missing.
-  const { byId, missing } = await readOrderVariants(tx, request.lines);
-  Object.assign(errors, missing);
+  const booking = serviceOnly ? bookingProblem(checkout.preferredAt, new Date()) : null;
+  if (booking) errors.preferredAt = booking;
+  Object.assign(errors, lines.errors);
   if (Object.keys(errors).length > 0) throw new InvalidInputException(errors);
 
   const total = computeOrderTotal({
-    lines: orderTotalLines(request.lines, byId),
+    lines: orderTotalLines(request.lines, lines),
     currency: checkout.currency,
     usdToKhrRate: store.usdToKhrRate,
     vatPercent: store.vatPercent,
@@ -157,11 +159,12 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest,
       pickupHours: checkout.fulfilment === "pickup" ? store.pickupHours : "",
       buyerName: checkout.name,
       buyerPhone: checkout.phone,
+      preferredAt: serviceOnly && checkout.preferredAt ? new Date(checkout.preferredAt) : null,
       idempotencyKey: request.idempotencyKey,
     },
     select: { id: true, orderNumber: true },
   });
-  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, byId) });
+  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, lines, { currency: checkout.currency, usdToKhrRate: store.usdToKhrRate }) });
   // Pro and Advance: a cash order takes its stock now, a KHQR order holds it until paid;
   // too little left refuses the whole order (docs/blueprint.md "Stock").
   if (tracksStock(await publicStorePlan(tx))) {
@@ -177,58 +180,6 @@ async function placeInStore(tx: Tx, storeId: string, request: PlaceOrderRequest,
   // A KHQR order alerts the seller once it's paid (the worker), not before: until then there's nothing to do.
   if (checkout.paymentMethod === "cod") await tx.outboxEvent.createMany({ data: [{ storeId, kind: "order_placed", payload: { orderId: order.id } }] });
   return { token, orderNumber: order.orderNumber, created: true };
-}
-
-const orderVariantInclude = { product: { select: { titleKm: true, titleEn: true, discountPercent: true } } } satisfies Prisma.ProductVariantInclude;
-type OrderVariant = Prisma.ProductVariantGetPayload<{ include: typeof orderVariantInclude }>;
-
-/**
- * The product options an order or a counter sale names, read with whatever
- * the caller's database role may see (a buyer: visible products only; the
- * seller: their own, not deleted). Any that can't be found come back as a
- * "product_unavailable" error under its line.
- */
-export async function readOrderVariants(tx: Tx, lines: OrderLineRequest[]): Promise<{ byId: Map<string, OrderVariant>; missing: Record<string, FormErrorCode> }> {
-  const variants = await tx.productVariant.findMany({
-    where: { id: { in: lines.map((line) => line.variantId) }, deletedAt: null, product: { deletedAt: null } },
-    include: orderVariantInclude,
-  });
-  const byId = new Map(variants.map((variant) => [variant.id, variant]));
-  const missing: Record<string, FormErrorCode> = {};
-  lines.forEach((line, index) => {
-    if (!byId.has(line.variantId)) missing[`lines.${index}`] = "product_unavailable";
-  });
-  return { byId, missing };
-}
-
-/** The lines for computeOrderTotal, priced from the catalog — never from the browser. Every line must be in `byId`. */
-export function orderTotalLines(lines: OrderLineRequest[], byId: Map<string, OrderVariant>): OrderLineInput[] {
-  return lines.flatMap((line) => {
-    const variant = byId.get(line.variantId);
-    return variant ? [{ key: line.variantId, quantity: line.quantity, priceUsdCents: variant.priceUsdCents, priceKhr: variant.priceKhr, discountPercent: variant.product.discountPercent }] : [];
-  });
-}
-
-/** The order's lines as saved: names and prices copied, so the order never changes when the product does. */
-export function orderItemRows(storeId: string, orderId: string, total: OrderTotal, byId: Map<string, OrderVariant>): Prisma.OrderItemCreateManyInput[] {
-  return total.lines.flatMap((line) => {
-    const variant = byId.get(line.key);
-    if (!variant) return [];
-    return [
-      {
-        storeId,
-        orderId,
-        variantId: variant.id,
-        titleKm: variant.product.titleKm,
-        titleEn: variant.product.titleEn,
-        variantLabelKm: variant.isDefault ? "" : variant.labelKm,
-        variantLabelEn: variant.isDefault ? "" : variant.labelEn,
-        unitPriceMinor: line.unitPrice,
-        quantity: line.quantity,
-        lineTotalMinor: line.lineTotal,
-      },
-    ];
-  });
 }
 
 /** The buyer's form, checked with the store's own cash-on-delivery setting added. Field names come back as the form's own. */

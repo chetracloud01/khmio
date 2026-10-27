@@ -21,6 +21,7 @@ import {
   LoadingBlocks,
   MoneyInput,
   Notice,
+  OptionChips,
   PageHeader,
   PillInput,
   PillInputButton,
@@ -59,6 +60,8 @@ export function KitTab() {
   const [switchOn, setSwitchOn] = useState(true);
   const [ticked, setTicked] = useState(false);
   const [fulfilment, setFulfilment] = useState("delivery");
+  const [size, setSize] = useState<string[]>(["M"]);
+  const [addOns, setAddOns] = useState<string[]>(["shot"]);
   const [area, setArea] = useState("phnom_penh");
   const [business, setBusiness] = useState<string | null>(null);
   const [payment, setPayment] = useState<string | null>("khqr");
@@ -287,6 +290,21 @@ export function KitTab() {
               options={[
                 { value: "phnom_penh", label: t("selectPhnomPenh") },
                 { value: "province", label: t("areaProvince") },
+              ]}
+            />
+          </Demo>
+          {/* Small chips that wrap: pick one (radio buttons) or any number (checkboxes), with an optional second line. */}
+          <Demo name="OptionChips">
+            <OptionChips label={t("chipsSizeLabel")} mode="one" value={size} onChange={setSize} options={["S", "M", "L", "XL"].map((value) => ({ value, label: value }))} />
+            <OptionChips
+              label={t("chipsAddOnsLabel")}
+              mode="many"
+              value={addOns}
+              onChange={setAddOns}
+              options={[
+                { value: "shot", label: t("chipShot"), detail: "+$0.50" },
+                { value: "pearls", label: t("chipPearls"), detail: "+1,000៛" },
+                { value: "cream", label: t("chipCream"), disabled: true },
               ]}
             />
           </Demo>

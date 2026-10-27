@@ -27,6 +27,7 @@ const order = (overrides: Partial<OrderRow> = {}): OrderRow => ({
   pickupAddress: "",
   pickupHours: "",
   buyerName: "Sokha",
+  preferredAt: null,
   cancelReason: null,
   createdAt: AT,
   items: [],

@@ -1,6 +1,7 @@
 import type { AppDb, Prisma, Tx } from "@khmio/db";
 import { canBuyerCancel, formatTrackingCode } from "@khmio/shared";
 import { invoiceOrderSelect, invoiceStoreSelect, toInvoice } from "../orders/invoice";
+import { orderItemSelect, toBuyerOrderItem } from "../orders/order-lines";
 
 // The buyer's own order, reached by its link alone (no login), read and
 // written inside withPublicOrder: the database shows only that one order.
@@ -27,13 +28,12 @@ export const publicOrderSelect = {
   pickupAddress: true,
   pickupHours: true,
   buyerName: true,
+  // A booking: when the buyer would like it done.
+  preferredAt: true,
   cancelReason: true,
   createdAt: true,
-  items: {
-    // variantId: "Order again" puts the same options back in the buyer's cart.
-    select: { variantId: true, titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
-    orderBy: { createdAt: "asc" },
-  },
+  // variantId: "Order again" puts the same options back in the buyer's cart.
+  items: { select: orderItemSelect, orderBy: { createdAt: "asc" } },
   events: { select: { status: true, at: true }, orderBy: { at: "asc" } },
   // How it was sent: the driver's name or the bus ticket — the driver's phone stays with the shop.
   dispatches: { select: { route: true, driverName: true, busCompany: true, ticketNumber: true, dispatchedAt: true }, orderBy: { dispatchedAt: "desc" }, take: 1 },
@@ -62,10 +62,11 @@ export async function readPublicOrder(tx: Tx, storeId: string, photoUrl: (key: s
 /** The order page's data. The buyer's phone stays off it: the link may be forwarded. */
 export function toPublicOrder(order: PublicOrderRow, store: PublicOrderStoreRow, followers: number, photoUrl: (key: string) => string, testBank: boolean) {
   const { logoKey, ...shop } = store;
-  const { dispatches, trackingCode, paymentAttempts, ...rest } = order;
+  const { dispatches, trackingCode, paymentAttempts, items, ...rest } = order;
   const attempt = order.status === "awaiting_payment" ? paymentAttempts[0] : undefined;
   return {
     ...rest,
+    items: items.map(toBuyerOrderItem),
     trackingCode: formatTrackingCode(store.slug, trackingCode),
     dispatch: dispatches[0] ?? null,
     /** The KHQR to pay while the order waits for it; null otherwise. testBankRef: what "pay (test)" pays at the stand-in bank. */

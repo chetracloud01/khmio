@@ -43,7 +43,9 @@ export type ErrorBody =
         // Cloudflare Turnstile said this checkout isn't from a person (or no token was sent).
         | "bot_check_failed"
         // Admin "Backup now" while a backup is already waiting or running.
-        | "backup_running";
+        | "backup_running"
+        // The shop switched off the module this needs (packages/shared business-modules.ts).
+        | "module_off";
     };
 
 const CODE_BY_STATUS: Record<number, Exclude<ErrorBody["error"], "invalid_input">> = {
@@ -67,7 +69,7 @@ export class InvalidInputException extends Error {
 export class AppException extends Error {
   constructor(
     public readonly status: number,
-    public readonly code: "no_store" | "plan_limit" | "store_paused" | "not_accepting_orders" | "action_not_allowed" | "admin_not_configured" | "code_locked" | "store_closed" | "telegram_not_configured" | "bot_check_failed" | "backup_running",
+    public readonly code: "no_store" | "plan_limit" | "store_paused" | "not_accepting_orders" | "action_not_allowed" | "admin_not_configured" | "code_locked" | "store_closed" | "telegram_not_configured" | "bot_check_failed" | "backup_running" | "module_off",
   ) {
     super(code);
   }

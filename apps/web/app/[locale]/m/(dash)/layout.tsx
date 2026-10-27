@@ -1,6 +1,7 @@
 "use client";
 
-import { ExternalLink, LayoutDashboard, Package, ShoppingBag, Store } from "lucide-react";
+import { hasModule } from "@khmio/shared";
+import { CarFront, ChefHat, ExternalLink, LayoutDashboard, Package, ShoppingBag, Store } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -205,8 +206,12 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           label: t("navShop"),
           icon: Store,
           mobile: true,
-          alsoActiveOn: [`${base}/shop-details`, `${base}/display`, `${base}/delivery`, `${base}/telegram-alerts`],
+          alsoActiveOn: [`${base}/shop-details`, `${base}/display`, `${base}/delivery`, `${base}/telegram-alerts`, `${base}/features`, `${base}/custom-fields`, `${base}/tables`],
         },
+        // A restaurant's Kitchen screen (Features › tables): beside the four on a laptop; on a phone it's in My shop.
+        ...(hasModule(store.modules, "tables") ? [{ href: `${base}/kitchen`, label: tDash("navKitchen"), icon: ChefHat, mobile: false }] : []),
+        // A garage's job cards (Features › jobCards), the same way.
+        ...(hasModule(store.modules, "jobCards") ? [{ href: `${base}/job-cards`, label: tDash("navJobCards"), icon: CarFront, mobile: false }] : []),
       ]}
       banner={store.paused && <p className="bg-danger/10 px-4 py-2 text-sm font-medium text-danger">{tDash("bannerPaused")}</p>}
     >

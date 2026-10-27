@@ -8,6 +8,7 @@ const rows = (overrides: Partial<StoreDetailsRows> = {}, store: Partial<StoreDet
     slug: "sokha-coffee",
     name: "Sokha Coffee",
     businessType: "shop",
+    modules: ["options", "customFields"],
     phone: "85512345678",
     area: "phnom_penh",
     description: "",

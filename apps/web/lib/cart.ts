@@ -1,9 +1,20 @@
 "use client";
 
-import { computeOrderTotal, currencySchema, deliveryAreaSchema, fulfilmentSchema, MAX_LINE_QUANTITY, maxOrderQuantity, type Currency, type OrderTotal } from "@khmio/shared";
+import {
+  computeOrderTotal,
+  currencySchema,
+  deliveryAreaSchema,
+  fulfilmentSchema,
+  MAX_LINE_QUANTITY,
+  maxOrderQuantity,
+  parseCartLineKey,
+  pickChoices,
+  type Currency,
+  type OrderTotal,
+} from "@khmio/shared";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import type { Product, ProductVariant, PublicShop } from "./api";
+import type { ChoiceGroup, Product, ProductVariant, PublicShop } from "./api";
 import { variantStock } from "./shop-stock";
 import { readStored, writeStored } from "./device-storage";
 
@@ -16,15 +27,17 @@ const cartKey = (slug: string) => `khmio:cart:${slug}`;
 const BUYER_KEY = "khmio:buyer";
 
 const storedCartSchema = z.object({
-  /** variant id → how many. */
+  /** line key (packages/shared cartLineKey: the variant, or the variant with its choices) → how many. */
   quantities: z.record(z.number()),
+  /** line key → the buyer's note on that item. */
+  notes: z.record(z.string()).catch({}).default({}),
   currency: currencySchema.nullable().catch(null),
 });
 export type StoredCart = z.infer<typeof storedCartSchema>;
 
 /** The cart for one shop. `ready` is false until it has been read from the phone. */
 export function useShopCart(slug: string) {
-  const [cart, setCart] = useState<StoredCart>({ quantities: {}, currency: null });
+  const [cart, setCart] = useState<StoredCart>({ quantities: {}, notes: {}, currency: null });
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -44,26 +57,44 @@ export function useShopCart(slug: string) {
     [slug],
   );
 
-  /** Sets how many of a variant are in the cart; 0 removes it. */
+  /** Sets how many of a line (a variant, or a variant with choices: cartLineKey) are in the cart; 0 removes it and its note. */
   const setQuantity = useCallback(
-    (variantId: string, quantity: number) =>
+    (lineKey: string, quantity: number) =>
       update((previous) => {
         const quantities = { ...previous.quantities };
+        const notes = { ...previous.notes };
         const clamped = Math.max(0, Math.min(MAX_LINE_QUANTITY, Math.round(quantity)));
-        if (clamped === 0) delete quantities[variantId];
-        else quantities[variantId] = clamped;
-        return { ...previous, quantities };
+        if (clamped === 0) {
+          delete quantities[lineKey];
+          delete notes[lineKey];
+        } else quantities[lineKey] = clamped;
+        return { ...previous, quantities, notes };
       }),
     [update],
   );
 
+  /** Adds to a line (from the product sheet), with the buyer's note if they wrote one. */
+  const addLine = useCallback(
+    (lineKey: string, quantity: number, note: string) =>
+      update((previous) => ({
+        ...previous,
+        quantities: { ...previous.quantities, [lineKey]: Math.min(MAX_LINE_QUANTITY, (previous.quantities[lineKey] ?? 0) + quantity) },
+        notes: note.trim() ? { ...previous.notes, [lineKey]: note.trim() } : previous.notes,
+      })),
+    [update],
+  );
+
   const setCurrency = useCallback((currency: Currency) => update((previous) => ({ ...previous, currency })), [update]);
-  const clear = useCallback(() => update((previous) => ({ ...previous, quantities: {} })), [update]);
-  /** Drops lines the shop no longer sells (hidden, deleted, or the option removed). */
+  const clear = useCallback(() => update((previous) => ({ ...previous, quantities: {}, notes: {} })), [update]);
   /** Swaps in quantities already checked against the shop (fitCartToShop). */
   const replaceQuantities = useCallback((quantities: Record<string, number>) => update((previous) => ({ ...previous, quantities })), [update]);
 
-  return { ready, quantities: cart.quantities, currency: cart.currency, setQuantity, setCurrency, clear, replaceQuantities };
+  return { ready, quantities: cart.quantities, notes: cart.notes, currency: cart.currency, setQuantity, addLine, setCurrency, clear, replaceQuantities };
+}
+
+/** How many of one variant the cart holds, whatever choices each line has (stock counts them together). */
+export function variantQuantity(quantities: Record<string, number>, variantId: string): number {
+  return Object.entries(quantities).reduce((sum, [key, quantity]) => (parseCartLineKey(key).variantId === variantId ? sum + quantity : sum), 0);
 }
 
 /**
@@ -75,41 +106,67 @@ export function addToShopCart(slug: string, lines: { variantId: string; quantity
   const stored = readStored(cartKey(slug), storedCartSchema);
   const quantities = { ...stored?.quantities };
   for (const line of lines) quantities[line.variantId] = Math.min(MAX_LINE_QUANTITY, (quantities[line.variantId] ?? 0) + line.quantity);
-  writeStored(cartKey(slug), { quantities, currency: stored?.currency ?? null });
+  writeStored(cartKey(slug), { quantities, notes: stored?.notes ?? {}, currency: stored?.currency ?? null });
 }
 
 export interface CartLine {
+  /** cartLineKey: the variant, with its choices if any. */
+  key: string;
   product: Product;
   variant: ProductVariant;
+  /** The choices picked, in the product's own order. */
+  choices: { group: ChoiceGroup; value: ChoiceGroup["values"][number] }[];
+  choiceIds: string[];
   quantity: number;
+  note: string;
 }
 
-/** The cart's lines, in the shop's product order, for the variants the shop still sells. */
-export function cartLines(shop: PublicShop, quantities: Record<string, number>): CartLine[] {
+/** A cart line's choices if they're all still offered and fit the product's rules; null = the line can't be sold as it is. */
+function lineChoices(product: { choiceGroups?: ChoiceGroup[] }, choiceIds: string[]): CartLine["choices"] | null {
+  const groups = product.choiceGroups ?? [];
+  const picked = pickChoices(groups, choiceIds);
+  return picked.ok ? picked.picked.map(({ group, value }) => ({ group: groups.find((entry) => entry.id === group.id) ?? group, value })) : null;
+}
+
+/** The cart's lines, in the shop's product order, for what the shop still sells as it is. */
+export function cartLines(shop: PublicShop, quantities: Record<string, number>, notes: Record<string, string> = {}): CartLine[] {
+  const keys = Object.keys(quantities).map((key) => ({ key, ...parseCartLineKey(key) }));
   return shop.products.flatMap((product) =>
-    product.variants.flatMap((variant) => {
-      const quantity = quantities[variant.id] ?? 0;
-      return quantity > 0 ? [{ product, variant, quantity }] : [];
-    }),
+    product.variants.flatMap((variant) =>
+      keys.flatMap(({ key, variantId, choiceIds }) => {
+        const quantity = quantities[key] ?? 0;
+        const choices = variantId === variant.id && quantity > 0 ? lineChoices(product, choiceIds) : null;
+        return choices ? [{ key, product, variant, choices, choiceIds, quantity, note: notes[key] ?? "" }] : [];
+      }),
+    ),
   );
 }
 
 /**
  * The cart as the shop can sell it now: options no longer sold (hidden,
- * deleted, removed) taken out, and tracked ones cut to the stock left (sold
- * out = taken out). `changed` says whether the buyer should be told.
+ * deleted, removed) and choices no longer offered taken out, and tracked
+ * ones cut to the stock left — all lines of one variant together (sold out =
+ * taken out). `changed` says whether the buyer should be told.
  */
-export function fitCartToShop(shop: { products: { variants: { id: string }[] }[]; stock: PublicShop["stock"] }, quantities: Record<string, number>): { quantities: Record<string, number>; changed: boolean } {
-  const sellable = new Set(shop.products.flatMap((product) => product.variants.map((variant) => variant.id)));
+export function fitCartToShop(
+  shop: { products: { variants: { id: string }[]; choiceGroups?: ChoiceGroup[] }[]; stock: PublicShop["stock"] },
+  quantities: Record<string, number>,
+): { quantities: Record<string, number>; changed: boolean } {
+  const productOf = new Map(shop.products.flatMap((product) => product.variants.map((variant) => [variant.id, product] as const)));
+  const left = new Map<string, number | null>();
   const fitted = Object.fromEntries(
-    Object.entries(quantities).flatMap(([variantId, quantity]) => {
-      if (!sellable.has(variantId)) return [];
-      const max = maxOrderQuantity(variantStock(shop, variantId));
+    Object.entries(quantities).flatMap(([key, quantity]) => {
+      const { variantId, choiceIds } = parseCartLineKey(key);
+      const product = productOf.get(variantId);
+      if (!product || !lineChoices(product, choiceIds)) return [];
+      if (!left.has(variantId)) left.set(variantId, maxOrderQuantity(variantStock(shop, variantId)));
+      const max = left.get(variantId) ?? null;
       const kept = max === null ? quantity : Math.min(quantity, max);
-      return kept > 0 ? [[variantId, kept]] : [];
+      if (max !== null) left.set(variantId, max - kept);
+      return kept > 0 ? [[key, kept]] : [];
     }),
   );
-  const changed = Object.keys(quantities).length !== Object.keys(fitted).length || Object.entries(fitted).some(([id, quantity]) => quantities[id] !== quantity);
+  const changed = Object.keys(quantities).length !== Object.keys(fitted).length || Object.entries(fitted).some(([key, quantity]) => quantities[key] !== quantity);
   return { quantities: fitted, changed };
 }
 
@@ -135,11 +192,12 @@ export function useCartFitsShop(shop: PublicShop | null, cart: ReturnType<typeof
 export function cartTotal(shop: PublicShop, lines: CartLine[], currency: Currency, deliveryFee: Parameters<typeof computeOrderTotal>[0]["deliveryFee"]): OrderTotal {
   return computeOrderTotal({
     lines: lines.map((line) => ({
-      key: line.variant.id,
+      key: line.key,
       quantity: line.quantity,
       priceUsdCents: line.variant.priceUsdCents,
       priceKhr: line.variant.priceKhr,
       discountPercent: line.product.discountPercent,
+      extras: line.choices.map(({ value }) => ({ priceUsdCents: value.extraUsdCents, priceKhr: value.extraKhr })),
     })),
     currency,
     usdToKhrRate: shop.store.usdToKhrRate,

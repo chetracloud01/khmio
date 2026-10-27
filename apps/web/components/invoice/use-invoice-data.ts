@@ -49,7 +49,11 @@ export function useInvoiceData(invoice: OrderInvoice): InvoiceData {
         key: String(index),
         // Each name as it was saved with the order; English falls back to Khmer.
         title: km ? item.titleKm : item.titleEn || item.titleKm,
-        option: (km ? item.variantLabelKm : item.variantLabelEn || item.variantLabelKm) || undefined,
+        // The option, the choices picked and the buyer's note, on the line under the name.
+        option:
+          [km ? item.variantLabelKm : item.variantLabelEn || item.variantLabelKm, ...item.choices.map((choice) => (km ? choice.labelKm : choice.labelEn || choice.labelKm)), item.note && `“${item.note}”`]
+            .filter(Boolean)
+            .join(" · ") || undefined,
         quantity: item.quantity,
         unitPrice: item.unitPriceMinor,
         lineTotal: item.lineTotalMinor,

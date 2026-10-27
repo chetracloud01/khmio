@@ -19,6 +19,7 @@ import { cn, StatusPill, type Tone } from "@khmio/ui";
 import {
   AlertTriangle,
   BellRing,
+  CalendarClock,
   CircleCheckBig,
   HandCoins,
   Hourglass,
@@ -162,6 +163,42 @@ export function useOrderText() {
   }
 
   return { statusLabel, actionLabel, paymentLabel, placeLabel, timeAgo, clockTime };
+}
+
+/** A booking's preferred time (only services), as the seller's and the buyer's order pages show it. Nothing for other orders. */
+export function PreferredTime({ at, className }: { at: string | null; className?: string }) {
+  const t = useTranslations("Orders");
+  const { date, clockTime } = useDateText();
+  if (!at) return null;
+  return (
+    <p className={cn("flex items-center gap-2 text-sm", className)}>
+      <CalendarClock className="h-4 w-4 shrink-0 text-muted" aria-hidden="true" />
+      <span>
+        <span className="font-medium">{t("preferredAt")}</span> {date(at)} {clockTime(at)}
+      </span>
+    </p>
+  );
+}
+
+/** An order line's frozen choices in the reader's language: ["Less sugar", "+1 shot"]. */
+export function useChoiceLabels() {
+  const locale = useLocale();
+  return (choices: readonly { labelKm: string; labelEn: string }[]) => choices.map((choice) => (locale === "km" ? choice.labelKm || choice.labelEn : choice.labelEn || choice.labelKm));
+}
+
+/**
+ * Under a line's name: the choices picked and the buyer's note — the cart,
+ * checkout, the order pages, the invoice and the counter alike. Nothing
+ * when there's neither.
+ */
+export function LineDetails({ choices, note, className }: { choices: readonly string[]; note: string; className?: string }) {
+  if (!choices.length && !note) return null;
+  return (
+    <span className={cn("block text-xs leading-normal text-muted", className)}>
+      {choices.length > 0 && <span className="block">{choices.join(" · ")}</span>}
+      {note && <span className="block italic">“{note}”</span>}
+    </span>
+  );
 }
 
 export function OrderStatusPill({ order, className }: { order: Pick<OrderFactsForText, "status" | "fulfilment">; className?: string }) {

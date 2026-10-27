@@ -2,10 +2,13 @@
 
 import {
   approximateIn,
+  bookingProblem,
   checkoutInputSchema,
   deliveryFeeIn,
   getDeliverableDistrictIds,
   getDeliveryQuote,
+  getOrderQuote,
+  isServiceOnly,
   PHNOM_PENH_DISTRICTS,
   placeName,
   PROVINCES,
@@ -35,8 +38,8 @@ import { isTakingOrders, paymentMethodsFor } from "@/lib/shop-ordering";
 import { usePublicShop } from "@/lib/use-public-shop";
 import { BuyerLoading, BuyerProblem } from "../buyer-states";
 
-type Field = "name" | "phone" | "districtId" | "provinceId" | "paymentMethod" | "fulfilment";
-const FIELDS: readonly Field[] = ["name", "phone", "districtId", "provinceId", "paymentMethod", "fulfilment"];
+type Field = "name" | "phone" | "districtId" | "provinceId" | "paymentMethod" | "fulfilment" | "preferredAt";
+const FIELDS: readonly Field[] = ["name", "phone", "districtId", "provinceId", "paymentMethod", "fulfilment", "preferredAt"];
 
 export default function CheckoutPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -87,7 +90,13 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   const deliversInPhnomPenh = delivery.zones.length > 0;
   const deliversToProvinces = delivery.province.enabled;
   const canDeliver = deliversInPhnomPenh || deliversToProvinces;
-  const canPickup = delivery.pickup.enabled;
+  const lines = cartLines(shop, cart.quantities, cart.notes);
+  // Only services (packages/shared services.ts): a booking — a preferred time, done at the shop or at the buyer's place.
+  const booking = isServiceOnly(lines.map((line) => line.product.kind));
+  const canPickup = delivery.pickup.enabled || booking;
+  const [preferredAt, setPreferredAt] = useState("");
+  // The browser's datetime box gives local time; the API gets it with its offset.
+  const preferredAtIso = preferredAt && Number.isFinite(Date.parse(preferredAt)) ? new Date(preferredAt).toISOString() : undefined;
 
   const set = useCallback(<K extends keyof BuyerDetails>(field: K, value: BuyerDetails[K]) => setDetails((previous) => ({ ...previous, [field]: value })), []);
 
@@ -115,13 +124,16 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
   });
   const cheapestZoneFee = delivery.zones.length ? Math.min(...delivery.zones.map((zone) => deliveryFeeIn(zone, currency, rate))) : null;
 
-  const quote = getDeliveryQuote(delivery, {
-    fulfilment: details.fulfilment,
-    area: details.area,
-    districtId: details.districtId || undefined,
-    provinceId: details.provinceId || undefined,
-  });
-  const lines = cartLines(shop, cart.quantities);
+  const quote = getOrderQuote(
+    delivery,
+    {
+      fulfilment: details.fulfilment,
+      area: details.area,
+      districtId: details.districtId || undefined,
+      provinceId: details.provinceId || undefined,
+    },
+    booking,
+  );
   const total = lines.length ? cartTotal(shop, lines, currency, quote.status === "ok" ? quote.fee : null) : null;
   const canTakeOrder = isTakingOrders(shop) && methods.length > 0 && (canDeliver || canPickup) && quote.status !== "unavailable";
 
@@ -137,12 +149,15 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
       provinceId: details.provinceId || undefined,
       landmark: details.fulfilment === "pickup" ? "" : details.landmark,
       paymentMethod,
+      ...(booking && preferredAtIso ? { preferredAt: preferredAtIso } : {}),
     };
   }
   function formErrors(): Partial<Record<Field, FormErrorCode>> {
     const result = checkoutInputSchema.safeParse({ ...checkoutForm(), storeAllowsCod: shop.store.allowCod });
-    if (result.success) return {};
-    const found = toFieldErrors(result.error);
+    const found: Record<string, FormErrorCode> = result.success ? {} : toFieldErrors(result.error);
+    // A booking's time: the same rule the API checks it with.
+    const bookingError = booking ? bookingProblem(preferredAtIso, new Date()) : null;
+    if (bookingError) found.preferredAt = bookingError;
     return Object.fromEntries(FIELDS.flatMap((field) => (found[field] ? [[field, found[field]]] : [])));
   }
   const checkField = (field: Field) => setErrors((previous) => ({ ...previous, [field]: formErrors()[field] }));
@@ -167,7 +182,7 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
         method: "POST",
         body: {
           idempotencyKey,
-          lines: lines.map((line) => ({ variantId: line.variant.id, quantity: line.quantity })),
+          lines: lines.map((line) => ({ variantId: line.variant.id, quantity: line.quantity, choiceIds: line.choiceIds, note: line.note })),
           checkout: checkoutForm(),
           ...(botToken ? { botCheck: botToken } : {}),
         },
@@ -232,11 +247,12 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
     {
       value: "delivery",
       icon: Truck,
-      title: t("delivery"),
+      // A booking is done at the buyer's place rather than delivered.
+      title: booking ? t("atMyPlace") : t("delivery"),
       detail: cheapestZoneFee === null ? feeText(delivery.province) : cheapestZoneFee === 0 ? t("free") : t("feeFrom", { fee: formatMoney(cheapestZoneFee, currency) }),
       show: canDeliver,
     },
-    { value: "pickup", icon: Store, title: t("pickup"), detail: t("free"), show: canPickup },
+    { value: "pickup", icon: Store, title: booking ? t("atTheShop") : t("pickup"), detail: t("free"), show: canPickup },
   ];
   const methodLabel = (method: PaymentMethod) => (method === "cod" ? (details.fulfilment === "pickup" ? t("payAtPickup") : tApp("payCashOnDelivery")) : method === "khqr" ? "KHQR" : "ABA PayWay");
 
@@ -358,7 +374,20 @@ function CheckoutForm({ shop, cart, onShopChanged }: { shop: PublicShop; cart: R
           />
         </BuyerSection>
 
-        <BuyerSection number={2} title={t("sectionHow")}>
+        <BuyerSection number={2} title={booking ? t("sectionWhen") : t("sectionHow")}>
+          {booking && (
+            <Input
+              label={t("preferredAt")}
+              type="datetime-local"
+              value={preferredAt}
+              onChange={(e) => {
+                setPreferredAt(e.target.value);
+                clearError("preferredAt");
+              }}
+              onBlur={() => checkField("preferredAt")}
+              error={errorText(errors.preferredAt)}
+            />
+          )}
           <ChoiceCards
             label={t("sectionHow")}
             value={details.fulfilment}

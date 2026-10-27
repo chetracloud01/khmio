@@ -1,6 +1,7 @@
 import type { Prisma, Tx } from "@khmio/db";
 import type { PaymentProvider } from "@khmio/payments";
-import type { DeliverySettings } from "@khmio/shared";
+import { hasModule, type CustomFieldDefinition, type DeliverySettings } from "@khmio/shared";
+import { customFieldSelect, toCustomField } from "../custom-fields/custom-fields";
 import { readDeliverySettings } from "../delivery/delivery";
 import { publicKhqrAccount } from "../payments/khqr";
 import { productInclude, toProductDto, type ProductRow } from "../products/products";
@@ -27,6 +28,8 @@ export const publicStoreSelect = {
   facebookLink: true,
   // Where the Map button goes; empty = search the pickup address.
   mapUrl: true,
+  // Which parts the page offers (choices); not sent on.
+  modules: true,
 } satisfies Prisma.StoreSelect;
 type PublicStoreRow = Prisma.StoreGetPayload<{ select: typeof publicStoreSelect }>;
 
@@ -41,6 +44,8 @@ export interface PublicShopRows {
   stock: Record<string, number>;
   /** KHQR is on (KHQR_PROVIDER) and the shop set its Bakong account. */
   khqrReady: boolean;
+  /** The shop's own product fields it shows buyers (the database hides the rest). */
+  customFields: CustomFieldDefinition[];
 }
 
 export async function readPublicShop(tx: Tx, storeId: string, khqr: PaymentProvider | null): Promise<PublicShopRows> {
@@ -53,18 +58,32 @@ export async function readPublicShop(tx: Tx, storeId: string, khqr: PaymentProvi
   ]);
   const stock = await readPublicStock(tx, storeId, await publicStorePlan(tx));
   const khqrReady = (await publicKhqrAccount(tx, khqr)) !== null;
-  return { store, categories, products, delivery, open: openRow?.open ?? false, stock, khqrReady };
+  const customFields = hasModule(store.modules, "customFields")
+    ? (await tx.customFieldDefinition.findMany({ where: { target: "product", public: true }, select: customFieldSelect, orderBy: { sortOrder: "asc" } })).map(toCustomField)
+    : [];
+  return { store, categories, products, delivery, open: openRow?.open ?? false, stock, khqrReady, customFields };
 }
 
 /** What leaves the API for the shop page: never wholesale prices or drivers. */
 export function toPublicShop(rows: PublicShopRows, photoUrl: (key: string) => string) {
-  const { logoKey, ...store } = rows.store;
+  const { logoKey, modules, ...store } = rows.store;
   const { zones, pickup, province } = rows.delivery.settings;
+  const choicesOn = hasModule(modules, "choices");
+  // Services off: the API takes no bookings, so the page treats every product as an item too.
+  const servicesOn = hasModule(modules, "services");
+  const publicFieldIds = new Set(rows.customFields.map((field) => field.id));
   return {
     store: { ...store, logoUrl: logoKey ? photoUrl(logoKey) : null },
     categories: rows.categories,
-    // Wholesale prices are never shown to buyers.
-    products: rows.products.map((product) => toProductDto(product, photoUrl)),
+    // Wholesale prices are never shown to buyers; choices only while the shop takes them (an order with one would be refused);
+    // of the shop's own fields, only the values of the public ones.
+    products: rows.products.map((product) => {
+      const dto = toProductDto(product, photoUrl);
+      const customValues = Object.fromEntries(Object.entries(dto.customValues).filter(([id]) => publicFieldIds.has(id)));
+      return { ...dto, choiceGroups: choicesOn ? dto.choiceGroups : [], customValues, kind: servicesOn ? dto.kind : "item" };
+    }),
+    /** The public fields' names and pick-lists, to show their values. */
+    customFields: rows.customFields,
     // Drivers are hidden from buyers by the database too; only zones, pickup and provinces go out.
     delivery: { zones, pickup, province },
     // Ordering needs delivery saved at least once; which payment methods fit is worked out per checkout

@@ -35,6 +35,8 @@ export const checkoutInputSchema = z
     provinceId: z.string().optional(),
     landmark: z.string().trim().max(200, "too_long"),
     paymentMethod: paymentMethodSchema,
+    /** A cart of only services: the time the buyer would like (checked with the cart by services.ts bookingProblem). */
+    preferredAt: z.string().max(40).optional(),
     /** Whether this store accepts cash on delivery at all (a store setting, not typed by the buyer). */
     storeAllowsCod: z.boolean(),
   })

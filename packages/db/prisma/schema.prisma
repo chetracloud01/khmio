@@ -52,6 +52,16 @@ enum BusinessType {
   other
 }
 
+/// What a shop's kind of business needs beyond the core (packages/shared business-modules.ts).
+enum BusinessModule {
+  options
+  choices
+  customFields
+  services
+  tables
+  jobCards
+}
+
 enum DeliveryArea {
   phnom_penh
   province
@@ -131,6 +141,47 @@ enum StockAdjustmentReason {
   lost
   returned
   other
+}
+
+/// An option group either makes variants (Size × Colour) or adds choices at order time (Sugar, Add-ons).
+enum OptionGroupKind {
+  variant
+  choice
+}
+
+/// A choice group lets the buyer pick one value, or any number.
+enum ChoicePick {
+  one
+  many
+}
+
+/// A job card's life: booked in, being worked on, ready to collect, handed over (billed) or cancelled.
+enum JobCardStatus {
+  open
+  in_progress
+  ready
+  handed_over
+  cancelled
+}
+
+/// A product is an item, or a service: no stock, nothing to deliver (packages/shared services.ts).
+enum ProductKind {
+  item
+  service
+}
+
+/// Where a shop's own field sits (packages/shared custom-fields.ts).
+enum CustomFieldTarget {
+  product
+  orderLine
+}
+
+enum CustomFieldType {
+  text
+  number
+  date
+  yesNo
+  pick
 }
 
 /// One try to pay an order online (packages/shared payment-attempts.ts).
@@ -291,44 +342,46 @@ model StoreMember {
 
 /// A shop. The plan is not here — it lives on subscriptions only.
 model Store {
-  id                      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  slug                    String       @unique
+  id                      String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug                    String           @unique
   name                    String
-  businessType            BusinessType @map("business_type")
+  businessType            BusinessType     @map("business_type")
+  /// Switched-on modules; a new shop gets its business type's set (BUSINESS_TYPE_MODULES).
+  modules                 BusinessModule[] @default([])
   /// 855…; empty until the seller adds it (needed before sharing the shop link).
-  phone                   String       @default("")
-  area                    DeliveryArea @default(phnom_penh)
-  description             String       @default("")
-  logoKey                 String?      @map("logo_key")
-  languages               String[]     @default(["km", "en"])
-  defaultCurrency         Currency     @default(USD) @map("default_currency")
-  usdToKhrRate            Int          @default(4100) @map("usd_to_khr_rate")
-  allowCod                Boolean      @default(true) @map("allow_cod")
+  phone                   String           @default("")
+  area                    DeliveryArea     @default(phnom_penh)
+  description             String           @default("")
+  logoKey                 String?          @map("logo_key")
+  languages               String[]         @default(["km", "en"])
+  defaultCurrency         Currency         @default(USD) @map("default_currency")
+  usdToKhrRate            Int              @default(4100) @map("usd_to_khr_rate")
+  allowCod                Boolean          @default(true) @map("allow_cod")
   /// Most small sellers don't charge VAT, so a new store starts at 0%.
-  vatPercent              Int          @default(0) @map("vat_percent")
-  onlineStockLocationId   String?      @map("online_stock_location_id") @db.Uuid
-  pickupEnabled           Boolean      @default(false) @map("pickup_enabled")
-  pickupAddress           String       @default("") @map("pickup_address")
-  pickupHours             String       @default("") @map("pickup_hours")
-  provinceDeliveryEnabled Boolean      @default(false) @map("province_delivery_enabled")
-  provinceFeeUsdCents     Int?         @map("province_fee_usd_cents")
-  provinceFeeKhr          Int?         @map("province_fee_khr")
-  provinceNote            String       @default("") @map("province_note")
-  deliveryConfiguredAt    DateTime?    @map("delivery_configured_at") @db.Timestamptz(6)
-  linkSharedAt            DateTime?    @map("link_shared_at") @db.Timestamptz(6)
+  vatPercent              Int              @default(0) @map("vat_percent")
+  onlineStockLocationId   String?          @map("online_stock_location_id") @db.Uuid
+  pickupEnabled           Boolean          @default(false) @map("pickup_enabled")
+  pickupAddress           String           @default("") @map("pickup_address")
+  pickupHours             String           @default("") @map("pickup_hours")
+  provinceDeliveryEnabled Boolean          @default(false) @map("province_delivery_enabled")
+  provinceFeeUsdCents     Int?             @map("province_fee_usd_cents")
+  provinceFeeKhr          Int?             @map("province_fee_khr")
+  provinceNote            String           @default("") @map("province_note")
+  deliveryConfiguredAt    DateTime?        @map("delivery_configured_at") @db.Timestamptz(6)
+  linkSharedAt            DateTime?        @map("link_shared_at") @db.Timestamptz(6)
   /// On invoices (design/screens.md B7); empty = not shown.
-  taxNumber               String       @default("") @map("tax_number")
-  invoiceNote             String       @default("") @map("invoice_note")
-  telegramLink            String       @default("") @map("telegram_link")
-  facebookLink            String       @default("") @map("facebook_link")
+  taxNumber               String           @default("") @map("tax_number")
+  invoiceNote             String           @default("") @map("invoice_note")
+  telegramLink            String           @default("") @map("telegram_link")
+  facebookLink            String           @default("") @map("facebook_link")
   /// Copied from Google Maps on Shop details; the buyer's Map button opens it (design/screens.md S10). Empty = search the pickup address.
-  mapUrl                  String       @default("") @map("map_url")
+  mapUrl                  String           @default("") @map("map_url")
   /// The seller's own payment QR picture (a storage key, like the logo), shown to buyers paying at the counter. Empty = none.
-  paymentQrKey            String       @default("") @map("payment_qr_key")
+  paymentQrKey            String           @default("") @map("payment_qr_key")
   /// The last order number given out; the next order takes this + 1 (app_next_order_number()).
-  lastOrderNumber         Int          @default(0) @map("last_order_number")
-  createdAt               DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastOrderNumber         Int              @default(0) @map("last_order_number")
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   members             StoreMember[]
   paymentConfigs      StorePaymentConfig[]
@@ -342,12 +395,20 @@ model Store {
   customers           Customer[]
   orders              Order[]
   alertChats          StoreAlertChat[]
-  onlineStockLocation StockLocation?       @relation("StoreOnlineLocation", fields: [onlineStockLocationId], references: [id], onDelete: SetNull)
-  stockLocations      StockLocation[]      @relation("StoreLocations")
+  onlineStockLocation StockLocation?          @relation("StoreOnlineLocation", fields: [onlineStockLocationId], references: [id], onDelete: SetNull)
+  stockLocations      StockLocation[]         @relation("StoreLocations")
   stockLevels         StockLevel[]
   stockMovements      StockMovement[]
   stockReservations   StockReservation[]
   paymentAttempts     PaymentAttempt[]
+  optionGroups        ProductOptionGroup[]
+  optionValues        ProductOptionValue[]
+  variantValues       ProductVariantValue[]
+  customFields        CustomFieldDefinition[]
+  dineTables          DineTable[]
+  vehicles            Vehicle[]
+  jobCards            JobCard[]
+  jobCardLines        JobCardLine[]
 
   @@map("stores")
 }
@@ -444,29 +505,34 @@ model Brand {
 
 /// What the shop sells. Prices live on its variants: every product has at least one.
 model Product {
-  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  storeId         String    @map("store_id") @db.Uuid
-  categoryId      String    @map("category_id") @db.Uuid
-  brandId         String?   @map("brand_id") @db.Uuid
-  unitId          String?   @map("unit_id") @db.Uuid
-  titleKm         String    @map("title_km")
-  titleEn         String    @map("title_en")
-  descriptionKm   String    @default("") @map("description_km")
-  descriptionEn   String    @default("") @map("description_en")
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId         String      @map("store_id") @db.Uuid
+  categoryId      String      @map("category_id") @db.Uuid
+  brandId         String?     @map("brand_id") @db.Uuid
+  unitId          String?     @map("unit_id") @db.Uuid
+  titleKm         String      @map("title_km")
+  titleEn         String      @map("title_en")
+  descriptionKm   String      @default("") @map("description_km")
+  descriptionEn   String      @default("") @map("description_en")
   /// 0–90; null = no discount.
-  discountPercent Int?      @map("discount_percent")
+  discountPercent Int?        @map("discount_percent")
   /// False = kept in the dashboard, not shown in the shop.
-  isVisible       Boolean   @default(true) @map("is_visible")
-  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  isVisible       Boolean     @default(true) @map("is_visible")
+  /// An item, or a service (Features › services).
+  kind            ProductKind @default(item)
+  /// The shop's own fields (custom_field_definitions, target product): field id → value.
+  customValues    Json        @default("{}") @map("custom_values")
+  deletedAt       DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  store    Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  category Category         @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  brand    Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  unit     Unit?            @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  variants ProductVariant[]
-  photos   ProductPhoto[]
+  store        Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category     Category             @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand        Brand?               @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  unit         Unit?                @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  variants     ProductVariant[]
+  photos       ProductPhoto[]
+  optionGroups ProductOptionGroup[]
 
   @@index([storeId, deletedAt])
   @@map("products")
@@ -492,13 +558,177 @@ model ProductVariant {
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  product           Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product           Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
   stockLevels       StockLevel[]
   stockMovements    StockMovement[]
   stockReservations StockReservation[]
+  /// One value per variant group: "M" and "Red" make this the M · Red variant.
+  values            ProductVariantValue[]
+  jobCardLines      JobCardLine[]
 
   @@index([productId])
   @@map("product_variants")
+}
+
+/// A product's group of options (packages/shared product-options.ts): "Size" making variants, or "Sugar" picked at order time.
+model ProductOptionGroup {
+  id        String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId   String          @map("store_id") @db.Uuid
+  productId String          @map("product_id") @db.Uuid
+  kind      OptionGroupKind
+  nameKm    String          @map("name_km")
+  nameEn    String          @default("") @map("name_en")
+  /// Choice groups only: one value or any number.
+  pick      ChoicePick      @default(one)
+  /// Choice groups only: the buyer must pick before adding to the cart.
+  required  Boolean         @default(false)
+  sortOrder Int             @default(0) @map("sort_order")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store   Store                @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
+  values  ProductOptionValue[]
+
+  @@index([productId])
+  @@map("product_option_groups")
+}
+
+/// One value of an option group: "M", "Red", "Less sugar", "+1 shot" (with its extra price).
+model ProductOptionValue {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId       String   @map("store_id") @db.Uuid
+  groupId       String   @map("group_id") @db.Uuid
+  labelKm       String   @map("label_km")
+  labelEn       String   @default("") @map("label_en")
+  /// Choice values only: added to one unit's price; both empty = free.
+  extraUsdCents Int?     @map("extra_usd_cents")
+  extraKhr      Int?     @map("extra_khr")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  store    Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  group    ProductOptionGroup    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  variants ProductVariantValue[]
+
+  @@index([groupId])
+  @@map("product_option_values")
+}
+
+/// A garage's car (Features › jobCards): found again by its plate.
+model Vehicle {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId    String   @map("store_id") @db.Uuid
+  /// As printed on the plate, upper-case: "PP 2A-1234".
+  plate      String
+  makeModel  String   @default("") @map("make_model")
+  ownerName  String   @default("") @map("owner_name")
+  /// 855…; "" = not given.
+  ownerPhone String   @default("") @map("owner_phone")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store    Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  jobCards JobCard[]
+
+  @@index([storeId])
+  @@map("vehicles")
+}
+
+/// One visit of one car (packages/shared job-cards.ts): what's wrong, and the parts and labour for it.
+model JobCard {
+  id        String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId   String        @map("store_id") @db.Uuid
+  vehicleId String        @map("vehicle_id") @db.Uuid
+  /// 1, 2, 3… per shop.
+  number    Int
+  status    JobCardStatus @default(open)
+  complaint String        @default("")
+  mileageKm Int?          @map("mileage_km")
+  /// The counter sale it was billed with ("Bill and hand over").
+  orderId   String?       @map("order_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store   Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  vehicle Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  order   Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  lines   JobCardLine[]
+
+  @@unique([storeId, number])
+  @@index([storeId, status])
+  @@map("job_cards")
+}
+
+/// A part or a piece of labour on a job card: one of the shop's products (labour is a service).
+model JobCardLine {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId   String   @map("store_id") @db.Uuid
+  jobCardId String   @map("job_card_id") @db.Uuid
+  variantId String   @map("variant_id") @db.Uuid
+  quantity  Int
+  note      String   @default("")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  store   Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  jobCard JobCard        @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([jobCardId])
+  @@map("job_card_lines")
+}
+
+/// A restaurant's table (Features › tables): a sale at the counter can be for one.
+model DineTable {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId   String   @map("store_id") @db.Uuid
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("dine_tables")
+}
+
+/// A field the shop added itself: on its products, or on each item sold.
+model CustomFieldDefinition {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId   String            @map("store_id") @db.Uuid
+  target    CustomFieldTarget
+  type      CustomFieldType
+  labelKm   String            @map("label_km")
+  labelEn   String            @default("") @map("label_en")
+  /// "pick" only: [{ id, labelKm, labelEn }].
+  options   Json              @default("[]")
+  required  Boolean           @default(false)
+  /// Product fields only: shown on the shop page.
+  public    Boolean           @default(false)
+  sortOrder Int               @default(0) @map("sort_order")
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@map("custom_field_definitions")
+}
+
+/// Which values make a variant: one per variant group.
+model ProductVariantValue {
+  variantId String @map("variant_id") @db.Uuid
+  valueId   String @map("value_id") @db.Uuid
+  storeId   String @map("store_id") @db.Uuid
+
+  store   Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variant ProductVariant     @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  value   ProductOptionValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+
+  @@id([variantId, valueId])
+  @@index([valueId])
+  @@map("product_variant_values")
 }
 
 /// A warehouse or a branch (docs/blueprint.md "Stock"). Every shop has one main branch (a trigger makes it); Advance adds more.
@@ -730,6 +960,12 @@ model Order {
   buyerPhone        String             @map("buyer_phone")
   cancelReason      OrderCancelReason? @map("cancel_reason")
   cancelNote        String             @default("") @map("cancel_note")
+  /// Dine-in (Features › tables): the table's name, copied when the sale was made; "" = not for a table.
+  tableName         String             @default("") @map("table_name")
+  /// When the kitchen marked the order made (Kitchen screen); null = still to make.
+  kitchenDoneAt     DateTime?          @map("kitchen_done_at") @db.Timestamptz(6)
+  /// A cart of only services: when the buyer would like it done (null = not a booking).
+  preferredAt       DateTime?          @map("preferred_at") @db.Timestamptz(6)
   /// Pro and Advance: stock was taken for this order.
   stockTaken        Boolean            @default(false) @map("stock_taken")
   /// Pro and Advance: stock is held for this order while it waits to be paid online (stock_reservations).
@@ -754,6 +990,7 @@ model Order {
   stockMovements    StockMovement[]
   stockReservations StockReservation[]
   paymentAttempts   PaymentAttempt[]
+  jobCards          JobCard[]
 
   @@unique([storeId, orderNumber])
   @@unique([storeId, idempotencyKey])
@@ -814,6 +1051,12 @@ model OrderItem {
   unitPriceMinor Int      @map("unit_price_minor")
   quantity       Int
   lineTotalMinor Int      @map("line_total_minor")
+  /// The choices picked (packages/shared product-options.ts OrderLineChoice[]), frozen like the title: [] = none.
+  choices        Json     @default("[]")
+  /// The buyer's note on this item ("no onions").
+  note           String   @default("")
+  /// The shop's own fields for each item sold (target orderLine), e.g. the IMEI handed over: field id → value.
+  customValues   Json     @default("{}") @map("custom_values")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)

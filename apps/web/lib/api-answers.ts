@@ -1,15 +1,22 @@
 import {
+  businessModuleSchema,
   businessTypeSchema,
+  choicePickSchema,
   currencySchema,
+  customFieldTargetSchema,
+  customFieldTypeSchema,
   deliveryAreaSchema,
   deliverySettingsShape,
   orderFulfilmentSchema,
+  orderLineChoicesSchema,
   invoiceStateSchema,
+  jobCardStatusSchema,
   orderCancelReasonSchema,
   orderStatusSchema,
   orderChannelSchema,
   orderPaymentMethodSchema,
   planIdSchema,
+  productKindSchema,
   SELLER_ORDER_ACTIONS,
   stockAdjustmentReasonSchema,
   stockMovementTypeSchema,
@@ -58,11 +65,16 @@ export const catalogSchema = z.object({
 });
 export type Catalog = z.infer<typeof catalogSchema>;
 
+/** GET and PUT /store/modules: the shop's switched-on modules. */
+export const storeModulesSchema = z.object({ modules: z.array(businessModuleSchema) });
+
 /** GET /store: the shop details page, the plan in force and the setup checklist's facts. */
 export const storeDetailsSchema = z.object({
   slug: z.string(),
   name: z.string(),
   businessType: businessTypeSchema,
+  /** The shop's switched-on modules (packages/shared business-modules.ts). */
+  modules: z.array(businessModuleSchema),
   phone: z.string(),
   area: deliveryAreaSchema,
   description: z.string(),
@@ -109,6 +121,8 @@ export const productVariantSchema = z.object({
   sku: z.string(),
   labelKm: z.string(),
   labelEn: z.string(),
+  /** With variant groups: one value id per group, in the groups' order. */
+  valueIds: z.array(z.string()),
   priceUsdCents: z.number().nullable(),
   priceKhr: z.number().nullable(),
   /** Only on plans with wholesale prices. */
@@ -116,6 +130,23 @@ export const productVariantSchema = z.object({
   wholesalePriceKhr: z.number().nullish(),
 });
 export type ProductVariant = z.infer<typeof productVariantSchema>;
+
+const optionValueShape = { id: z.string(), labelKm: z.string(), labelEn: z.string() };
+
+/** Size, Colour…: every variant is one value of each (packages/shared product-options.ts). */
+export const variantGroupSchema = z.object({ id: z.string(), nameKm: z.string(), nameEn: z.string(), values: z.array(z.object(optionValueShape)) });
+export type VariantGroup = z.infer<typeof variantGroupSchema>;
+
+/** Sugar, Add-ons…: picked when ordering, each value with an optional extra price per unit. */
+export const choiceGroupSchema = z.object({
+  id: z.string(),
+  nameKm: z.string(),
+  nameEn: z.string(),
+  pick: choicePickSchema,
+  required: z.boolean(),
+  values: z.array(z.object({ ...optionValueShape, extraUsdCents: z.number().nullable(), extraKhr: z.number().nullable() })),
+});
+export type ChoiceGroup = z.infer<typeof choiceGroupSchema>;
 
 /** A product as GET /products and the shop page return it. */
 export const productSchema = z.object({
@@ -133,8 +164,87 @@ export const productSchema = z.object({
   /** false = one hidden default variant carries the price. */
   hasOptions: z.boolean(),
   variants: z.array(productVariantSchema),
+  variantGroups: z.array(variantGroupSchema),
+  choiceGroups: z.array(choiceGroupSchema),
+  /** The shop's own fields, field id → value (on the shop page: the public ones only). */
+  customValues: z.record(z.union([z.string(), z.number(), z.boolean()])),
+  /** A service: no stock, nothing to deliver; a cart of only services is a booking. */
+  kind: productKindSchema,
 });
 export type Product = z.infer<typeof productSchema>;
+
+/** One of the shop's own fields (packages/shared custom-fields.ts). */
+export const customFieldSchema = z.object({
+  id: z.string(),
+  target: customFieldTargetSchema,
+  type: customFieldTypeSchema,
+  labelKm: z.string(),
+  labelEn: z.string(),
+  options: z.array(z.object({ id: z.string(), labelKm: z.string(), labelEn: z.string() })),
+  required: z.boolean(),
+  public: z.boolean(),
+});
+export type CustomField = z.infer<typeof customFieldSchema>;
+
+/** GET and PUT /custom-fields. */
+export const customFieldsAnswerSchema = z.object({ fields: z.array(customFieldSchema) });
+
+/** GET and PUT /tables: a restaurant's tables (Features › tables). */
+export const dineTablesSchema = z.object({ tables: z.array(z.object({ id: z.string(), name: z.string() })) });
+export type DineTable = z.infer<typeof dineTablesSchema>["tables"][number];
+
+/** GET /kitchen (and "Done"): today's orders still to make, oldest first — no prices. */
+export const kitchenSchema = z.object({
+  orders: z.array(
+    z.object({
+      id: z.string(),
+      orderNumber: z.number(),
+      channel: orderChannelSchema,
+      fulfilment: orderFulfilmentSchema,
+      tableName: z.string(),
+      createdAt: z.string(),
+      items: z.array(
+        z.object({ titleKm: z.string(), titleEn: z.string(), variantLabelKm: z.string(), variantLabelEn: z.string(), quantity: z.number(), choices: orderLineChoicesSchema, note: z.string() }),
+      ),
+    }),
+  ),
+});
+export type KitchenOrder = z.infer<typeof kitchenSchema>["orders"][number];
+
+/** A garage's car (Features › jobCards). */
+export const vehicleSchema = z.object({ id: z.string(), plate: z.string(), makeModel: z.string(), ownerName: z.string(), ownerPhone: z.string() });
+export type Vehicle = z.infer<typeof vehicleSchema>;
+export const vehiclesSchema = z.object({ vehicles: z.array(vehicleSchema) });
+
+/** One job card: the car, what's wrong, and its parts and labour (each one of the shop's products). */
+export const jobCardSchema = z.object({
+  id: z.string(),
+  number: z.number(),
+  status: jobCardStatusSchema,
+  complaint: z.string(),
+  mileageKm: z.number().nullable(),
+  /** The counter sale it was billed with. */
+  orderId: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  vehicle: vehicleSchema,
+  lines: z.array(
+    z.object({
+      id: z.string(),
+      variantId: z.string(),
+      quantity: z.number(),
+      note: z.string(),
+      titleKm: z.string(),
+      titleEn: z.string(),
+      optionKm: z.string(),
+      optionEn: z.string(),
+      /** A service product: labour rather than a part. */
+      labour: z.boolean(),
+    }),
+  ),
+});
+export type JobCard = z.infer<typeof jobCardSchema>;
+export const jobCardsSchema = z.object({ jobCards: z.array(jobCardSchema) });
 
 /** GET /public/stores/:slug: everything the buyer's shop page shows. */
 export const publicShopSchema = z.object({
@@ -166,6 +276,8 @@ export const publicShopSchema = z.object({
   open: z.boolean(),
   /** Pro and Advance: free stock per tracked option; an option not in it sells without a limit. */
   stock: z.record(z.string(), z.number()),
+  /** The shop's own product fields it shows buyers, to put names on products' values. */
+  customFields: z.array(customFieldSchema),
 });
 export type PublicShop = z.infer<typeof publicShopSchema>;
 
@@ -217,6 +329,13 @@ const orderItemShape = {
   unitPriceMinor: z.number(),
   quantity: z.number(),
   lineTotalMinor: z.number(),
+  /** The choices picked, frozen with the order ("Less sugar", "+1 shot"). */
+  choices: orderLineChoicesSchema,
+  /** The buyer's note on this item; "" = none. */
+  note: z.string(),
+  /** Seller views only: the line's id and the shop's own fields for it (an IMEI). */
+  id: z.string().optional(),
+  customValues: z.record(z.union([z.string(), z.number(), z.boolean()])).optional(),
 };
 
 /** What the buyer's order page and the seller's order page both show. */
@@ -224,6 +343,8 @@ const orderViewSchema = z.object({
   ...orderFactsShape,
   pickupAddress: z.string(),
   pickupHours: z.string(),
+  /** A booking (only services): when the buyer would like it done; null otherwise. */
+  preferredAt: z.string().nullable(),
   cancelReason: orderCancelReasonSchema.nullable(),
   items: z.array(z.object({ variantId: z.string(), ...orderItemShape })),
 });
@@ -299,6 +420,8 @@ export const sellerOrderDetailSchema = orderViewSchema.extend({
   id: z.string(),
   buyerPhone: z.string(),
   cancelNote: z.string(),
+  /** Dine-in: the table it was for; "" = none. */
+  tableName: z.string(),
   events: z.array(z.object({ status: orderStatusSchema, actor: z.enum(["buyer", "merchant", "system"]), at: z.string() })),
   dispatches: z.array(
     z.object({

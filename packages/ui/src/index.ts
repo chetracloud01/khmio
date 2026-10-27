@@ -15,6 +15,7 @@ export * from "./Input";
 export * from "./Mio";
 export * from "./MoneyInput";
 export * from "./Notice";
+export * from "./OptionChips";
 export * from "./PillInput";
 export * from "./site/KhmioMark";
 export * from "./site/kit";

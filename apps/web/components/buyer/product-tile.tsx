@@ -39,6 +39,7 @@ export function ProductTile({
   ordering,
   soldOut = false,
   canAddMore = true,
+  picksFirst = false,
   labels,
   onOpen,
   onAdjust,
@@ -59,6 +60,8 @@ export function ProductTile({
   ordering: boolean;
   soldOut?: boolean;
   canAddMore?: boolean;
+  /** Choices to make first (sugar level, add-ons): + opens the sheet even without options. */
+  picksFirst?: boolean;
   labels: ProductTileLabels;
   onOpen: () => void;
   /** +1 / −1 for a product without options. */
@@ -67,9 +70,10 @@ export function ProductTile({
 }) {
   const list = view === "list";
   const hasOptions = optionCount > 0;
-  const showStepper = ordering && !hasOptions && quantity > 0 && !soldOut;
-  // + adds a product without options straight away; one with options opens its sheet to choose.
-  const add = () => (hasOptions ? onOpen() : onAdjust(1));
+  const opensSheet = hasOptions || picksFirst;
+  const showStepper = ordering && !opensSheet && quantity > 0 && !soldOut;
+  // + adds a product with nothing to choose straight away; one with options or choices opens its sheet.
+  const add = () => (opensSheet ? onOpen() : onAdjust(1));
   const addLabel = quantity > 0 ? `${labels.add} · ${labels.inCart}` : labels.add;
 
   const media = (

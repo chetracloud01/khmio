@@ -1,5 +1,6 @@
 import type { Prisma, Tx } from "@khmio/db";
 import { formatTrackingCode, getInvoiceState, maskKhmerPhone } from "@khmio/shared";
+import { orderItemSelect, toBuyerOrderItem } from "./order-lines";
 
 // The invoice / receipt (design/screens.md B7), for the seller (GET
 // /orders/:id/invoice) and the buyer (GET /public/orders/:token/invoice) from
@@ -31,10 +32,7 @@ export const invoiceOrderSelect = {
   buyerName: true,
   buyerPhone: true,
   createdAt: true,
-  items: {
-    select: { titleKm: true, titleEn: true, variantLabelKm: true, variantLabelEn: true, unitPriceMinor: true, quantity: true, lineTotalMinor: true },
-    orderBy: { createdAt: "asc" },
-  },
+  items: { select: orderItemSelect, orderBy: { createdAt: "asc" } },
 } satisfies Prisma.OrderSelect;
 
 export const invoiceStoreSelect = {
@@ -58,11 +56,13 @@ type InvoiceStoreRow = Prisma.StoreGetPayload<{ select: typeof invoiceStoreSelec
  * shows it at all).
  */
 export function toInvoice(order: InvoiceOrderRow, store: InvoiceStoreRow, publicUrl: (key: string) => string, viewer: "seller" | "buyer") {
-  const { publicToken, trackingCode, buyerPhone, ...rest } = order;
+  const { publicToken, trackingCode, buyerPhone, items, ...rest } = order;
   const { logoKey, slug, pickupAddress, ...shop } = store;
   return {
     order: {
       ...rest,
+      // The shop's own fields stay off invoices: the buyer's copy can be forwarded.
+      items: items.map(toBuyerOrderItem),
       trackingCode: formatTrackingCode(slug, trackingCode),
       buyerPhone: viewer === "seller" ? buyerPhone : maskKhmerPhone(buyerPhone),
       state: getInvoiceState(order),

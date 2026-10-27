@@ -18,6 +18,7 @@ const rows = (overrides: Partial<PublicShopRows> = {}): PublicShopRows => ({
     telegramLink: "t.me/sokhacoffee",
     facebookLink: "",
     mapUrl: "https://maps.app.goo.gl/abc",
+    modules: ["options", "choices", "tables"],
   },
   categories: [{ id: "category-1", nameKm: "ភេសជ្ជៈ", nameEn: "Drinks" }],
   products: [productRow()],
@@ -33,6 +34,7 @@ const rows = (overrides: Partial<PublicShopRows> = {}): PublicShopRows => ({
   open: true,
   stock: {},
   khqrReady: false,
+  customFields: [],
   ...overrides,
 });
 
@@ -80,5 +82,35 @@ describe("stock on the shop page", () => {
   it("sends free stock only for tracked options, as counted", () => {
     expect(toPublicShop(rows({ stock: { "variant-1": 3 } }), photoUrl).stock).toEqual({ "variant-1": 3 });
     expect(toPublicShop(rows(), photoUrl).stock).toEqual({});
+  });
+});
+
+describe("the shop's own fields on the shop page", () => {
+  const warranty = { id: "warranty", target: "product" as const, type: "number" as const, labelKm: "ធានា", labelEn: "Warranty", options: [], required: false, public: true };
+
+  it("show only the public fields' values; a private one never leaves the API", () => {
+    const shop = toPublicShop(rows({ customFields: [warranty], products: [productRow({ customValues: { warranty: 12, costNote: "bought at $3" } })] }), photoUrl);
+    expect(shop.products[0]?.customValues).toEqual({ warranty: 12 });
+    expect(JSON.stringify(shop)).not.toContain("bought at");
+    expect(shop.customFields).toEqual([warranty]);
+  });
+});
+
+describe("choices on the shop page", () => {
+  const AT = new Date("2026-10-27T03:00:00Z");
+  const sugar = {
+    id: "sugar", storeId: "store-1", productId: "product-1", kind: "choice" as const, nameKm: "ស្ករ", nameEn: "Sugar", pick: "one" as const, required: true, sortOrder: 0, createdAt: AT, updatedAt: AT,
+    values: [{ id: "less", storeId: "store-1", groupId: "sugar", labelKm: "តិច", labelEn: "Less", extraUsdCents: null, extraKhr: null, sortOrder: 0, createdAt: AT }],
+  };
+  const withSugar = (modules: ("options" | "choices")[]) => rows({ store: { ...rows().store, modules }, products: [productRow({ optionGroups: [sugar] })] });
+
+  it("are offered while the shop takes them, and the page never learns its modules", () => {
+    const shop = toPublicShop(withSugar(["choices"]), photoUrl);
+    expect(shop.products[0]?.choiceGroups).toHaveLength(1);
+    expect(JSON.stringify(shop.store)).not.toContain("modules");
+  });
+
+  it("are left out when the shop switched them off (an order with one would be refused)", () => {
+    expect(toPublicShop(withSugar(["options"]), photoUrl).products[0]?.choiceGroups).toEqual([]);
   });
 });

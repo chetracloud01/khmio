@@ -1,7 +1,8 @@
 "use client";
 
 import { ACCENT_SWATCHES, Button, PageHeader, readStoredTheme, type Accent, type ThemeMode } from "@khmio/ui";
-import { Languages, LogOut, Palette, Send, Store, Truck } from "lucide-react";
+import { hasModule } from "@khmio/shared";
+import { Armchair, Blocks, CarFront, ChefHat, Languages, LogOut, Palette, Send, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,6 +12,7 @@ import { SELLER_FORM } from "@/components/seller-frame/seller-frame";
 import { useThemeLabels } from "@/components/use-theme-labels";
 import { isValidLocale } from "@/i18n/routing";
 import { apiSend } from "@/lib/api";
+import { useMerchant } from "../merchant-context";
 
 // "My shop": the shop's settings in two groups, on a laptop and a phone alike.
 // "Your shop" (shop details — with location, pickup, getting paid, prices and
@@ -23,6 +25,8 @@ export default function MyShopPage() {
   const locale = useLocale();
   const router = useRouter();
   const base = `/${locale}/m`;
+  const { store } = useMerchant();
+  const tablesOn = hasModule(store.modules, "tables");
   // Saved on this device, so read after the page loads (the server can't know it).
   const [theme, setTheme] = useState<{ mode: ThemeMode; accent: Accent } | null>(null);
   useEffect(() => setTheme(readStoredTheme()), []);
@@ -42,6 +46,17 @@ export default function MyShopPage() {
           { key: "shop-details", href: `${base}/shop-details`, icon: Store, tone: "brand", title: tApp("shopDetailsTitle"), detail: t("shopDetailsDetail") },
           { key: "delivery", href: `${base}/delivery`, icon: Truck, tone: "info", title: t("delivery"), detail: t("deliveryDetail") },
           { key: "telegram-alerts", href: `${base}/telegram-alerts`, icon: Send, tone: "warning", title: t("telegramAlerts"), detail: t("telegramAlertsDetail") },
+          { key: "features", href: `${base}/features`, icon: Blocks, tone: "brand", title: t("features"), detail: t("featuresDetail") },
+          // A restaurant's tables and kitchen (Features › tables): the Kitchen is in the laptop's sidebar too.
+          ...(tablesOn
+            ? [
+                { key: "kitchen", href: `${base}/kitchen`, icon: ChefHat, tone: "warning" as const, title: t("kitchen"), detail: t("kitchenDetail") },
+                { key: "tables", href: `${base}/tables`, icon: Armchair, tone: "info" as const, title: t("tables"), detail: t("tablesDetail") },
+              ]
+            : []),
+          ...(hasModule(store.modules, "jobCards")
+            ? [{ key: "job-cards", href: `${base}/job-cards`, icon: CarFront, tone: "info" as const, title: t("jobCards"), detail: t("jobCardsDetail") }]
+            : []),
         ]}
       />
 

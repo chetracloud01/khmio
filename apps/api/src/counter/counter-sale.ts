@@ -1,8 +1,11 @@
 import { merchantActor, writeAudit, type Prisma, type Tx } from "@khmio/db";
-import { cashChange, computeOrderTotal, startOfPhnomPenhDay, type CounterSaleInput, type Currency, type OrderTotal, type PlanId } from "@khmio/shared";
+import { cashChange, computeOrderTotal, hasModule, startOfPhnomPenhDay, type CounterSaleInput, type Currency, type OrderTotal, type PlanId } from "@khmio/shared";
 import { AppException, InvalidInputException } from "../errors";
 import type { MerchantStore } from "../merchant/store.guard";
-import { newOrderToken, orderItemRows, orderTotalLines, readOrderVariants } from "../orders/place-order";
+import { orderItemRows, orderTotalLines, readOrderLines } from "../orders/order-lines";
+import { newOrderToken } from "../orders/place-order";
+import { billJobCard } from "../job-cards/job-cards";
+import { tableNameFor } from "../tables/tables";
 import { returnOrderStock, takeOrderStock, tracksStock } from "../stock/stock";
 
 // Selling in the shop (design/screens.md P1–P4): a sale at the counter is an
@@ -37,12 +40,15 @@ export async function recordCounterSale(tx: Tx, context: MerchantStore, input: C
   const existing = await tx.order.findFirst({ where: { storeId, idempotencyKey: input.idempotencyKey }, select: recordedSaleSelect });
   if (existing) return { ...existing, created: false };
 
-  const store = await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { usdToKhrRate: true, vatPercent: true, area: true } });
-  const { byId, missing } = await readOrderVariants(tx, input.lines);
-  if (Object.keys(missing).length > 0) throw new InvalidInputException(missing);
+  const store = await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { usdToKhrRate: true, vatPercent: true, area: true, modules: true } });
+  const lines = await readOrderLines(tx, input.lines, hasModule(store.modules, "choices"));
+  if (Object.keys(lines.errors).length > 0) throw new InvalidInputException(lines.errors);
+  // Dine-in (Features › tables): the table's name is copied, so renaming it later never changes this sale.
+  if ((input.tableId && !hasModule(store.modules, "tables")) || (input.jobCardId && !hasModule(store.modules, "jobCards"))) throw new AppException(403, "module_off");
+  const tableName = input.tableId ? await tableNameFor(tx, input.tableId) : "";
 
   const total: OrderTotal = computeOrderTotal({
-    lines: orderTotalLines(input.lines, byId),
+    lines: orderTotalLines(input.lines, lines),
     currency: input.currency,
     usdToKhrRate: store.usdToKhrRate,
     vatPercent: store.vatPercent,
@@ -83,13 +89,16 @@ export async function recordCounterSale(tx: Tx, context: MerchantStore, input: C
       area: store.area,
       buyerName: input.buyerName,
       buyerPhone: input.buyerPhone,
+      tableName,
       ...cash,
       soldByMerchantId: merchantId,
       idempotencyKey: input.idempotencyKey,
     },
     select: recordedSaleSelect,
   });
-  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, byId) });
+  await tx.orderItem.createMany({ data: orderItemRows(storeId, order.id, total, lines, { currency: input.currency, usdToKhrRate: store.usdToKhrRate }) });
+  // "Bill and hand over" (Features › jobCards): the card goes with this sale; refused, with the sale, if it's no longer at the garage.
+  if (input.jobCardId) await billJobCard(tx, input.jobCardId, order.id);
   // Pro and Advance: the sale takes its stock; too little left refuses it, as online.
   if (tracksStock(plan)) await takeOrderStock(tx, order.id, input.lines.map((line) => line.variantId));
   await tx.orderStatusEvent.createMany({ data: [{ storeId, orderId: order.id, status: "completed", actor: "merchant", actorMerchantId: merchantId }] });

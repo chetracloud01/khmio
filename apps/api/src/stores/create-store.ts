@@ -1,5 +1,5 @@
 import { merchantActor, type SystemDb, writeAudit } from "@khmio/db";
-import { BUSINESS_TYPE_DEFAULTS, type CreateStoreInput, DAY_MS, DEFAULT_UNITS, FREE_TRIAL_DAYS, isReservedSlug, shopSlugSchema } from "@khmio/shared";
+import { BUSINESS_TYPE_DEFAULTS, BUSINESS_TYPE_MODULES, type CreateStoreInput, DAY_MS, DEFAULT_UNITS, FREE_TRIAL_DAYS, isReservedSlug, shopSlugSchema } from "@khmio/shared";
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 
@@ -36,6 +36,7 @@ export function newShopData(storeId: string, merchantId: string, input: CreateSt
     slug: input.slug,
     name: input.shopName,
     businessType: input.businessType,
+    modules: [...BUSINESS_TYPE_MODULES[input.businessType]],
     members: { create: { merchantId, role: "owner" as const } },
     subscription: { create: { plan: "free" as const, status: "trialing" as const, currentPeriodStart: now, trialEndsAt: new Date(now.getTime() + FREE_TRIAL_DAYS * DAY_MS) } },
     categories: { create: defaults.categories.map((category, index) => ({ nameKm: category.nameKm, nameEn: category.nameEn, sortOrder: index })) },

@@ -19,6 +19,8 @@ export function productRow(overrides: Partial<ProductRow> = {}): ProductRow {
     descriptionEn: "",
     discountPercent: null,
     isVisible: true,
+    kind: "item",
+    customValues: {},
     deletedAt: null,
     createdAt: AT,
     updatedAt: AT,
@@ -40,8 +42,10 @@ export function productRow(overrides: Partial<ProductRow> = {}): ProductRow {
         deletedAt: null,
         createdAt: AT,
         updatedAt: AT,
+        values: [],
       },
     ],
+    optionGroups: [],
     ...overrides,
   };
 }

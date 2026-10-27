@@ -57,5 +57,9 @@ export const counterSaleInputSchema = z.object({
   payment: counterPaymentSchema,
   buyerName: z.string().trim().max(60, "too_long"),
   buyerPhone: optionalKhmerPhoneSchema,
+  /** Dine-in (Features › tables): the table this sale is for. */
+  tableId: z.string().uuid("required").optional(),
+  /** A garage (Features › jobCards): the job card this sale bills; the card is then handed over. */
+  jobCardId: z.string().uuid("required").optional(),
 });
 export type CounterSaleInput = z.infer<typeof counterSaleInputSchema>;

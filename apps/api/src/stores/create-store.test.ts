@@ -1,4 +1,4 @@
-import { BUSINESS_TYPE_DEFAULTS, DAY_MS, DEFAULT_UNITS, FREE_TRIAL_DAYS } from "@khmio/shared";
+import { BUSINESS_TYPE_DEFAULTS, BUSINESS_TYPE_MODULES, DAY_MS, DEFAULT_UNITS, FREE_TRIAL_DAYS } from "@khmio/shared";
 import { describe, expect, it } from "vitest";
 import { newShopData, usableSlug } from "./create-store";
 
@@ -20,6 +20,10 @@ describe("a new shop", () => {
     expect(shop.categories.create.map((category) => category.nameEn)).toEqual(BUSINESS_TYPE_DEFAULTS.restaurant.categories.map((category) => category.nameEn));
     expect(shop.categories.create.map((category) => category.sortOrder)).toEqual(BUSINESS_TYPE_DEFAULTS.restaurant.categories.map((_, index) => index));
     expect(shop.units.create).toHaveLength(DEFAULT_UNITS.length);
+  });
+
+  it("switches on its business type's modules", () => {
+    expect(shop.modules).toEqual([...BUSINESS_TYPE_MODULES.restaurant]);
   });
 });
 

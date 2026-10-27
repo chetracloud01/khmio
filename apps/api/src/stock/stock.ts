@@ -130,8 +130,10 @@ export async function readStockPage(tx: Tx, storeId: string, plan: PlanId) {
 
 /** This shop's live option, or a 404-like refusal (another shop's id finds nothing under row-level security). */
 async function ownVariant(tx: Tx, variantId: string): Promise<void> {
-  const found = await tx.productVariant.findFirst({ where: { id: variantId, deletedAt: null, product: { deletedAt: null } }, select: { id: true } });
+  const found = await tx.productVariant.findFirst({ where: { id: variantId, deletedAt: null, product: { deletedAt: null } }, select: { id: true, product: { select: { kind: true } } } });
   if (!found) throw new InvalidInputException({ variantId: "product_unavailable" });
+  // A service has nothing on a shelf to count.
+  if (found.product.kind === "service") throw new AppException(409, "action_not_allowed");
 }
 
 /** Starts following one option's stock from a count; the count is written as the first correction. */

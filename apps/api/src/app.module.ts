@@ -14,6 +14,10 @@ import { HealthController } from "./health/health.controller";
 import { MerchantStoreGuard } from "./merchant/store.guard";
 import { OrdersController } from "./orders/orders.controller";
 import { ProductsController } from "./products/products.controller";
+import { CustomFieldsController } from "./custom-fields/custom-fields.controller";
+import { JobCardsController } from "./job-cards/job-cards.controller";
+import { ModulesController } from "./modules/modules.controller";
+import { TablesController } from "./tables/tables.controller";
 import { FakeBankController } from "./payments/fake-bank.controller";
 import { khqrProvider } from "./payments/khqr";
 import { PublicController } from "./public/public.controller";
@@ -35,6 +39,10 @@ import { WaitlistController } from "./website/waitlist.controller";
     OrdersController,
     CounterController,
     StockController,
+    ModulesController,
+    CustomFieldsController,
+    TablesController,
+    JobCardsController,
     AdminAuthController,
     AdminController,
     FilesController,

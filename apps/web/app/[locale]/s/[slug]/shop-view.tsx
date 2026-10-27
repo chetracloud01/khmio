@@ -1,6 +1,6 @@
 "use client";
 
-import { canAddMore, type Currency } from "@khmio/shared";
+import { canAddMore, cartLineKey, type Currency } from "@khmio/shared";
 import { Button, IconButton, PriceTag, ThemeSwitcher } from "@khmio/ui";
 import { Check, ChevronLeft, ChevronRight, ImageOff, SearchX, Share2, ShoppingBag, Store, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -11,6 +11,8 @@ import { BuyerColumns, BuyerShell } from "@/components/buyer-shell";
 import { CartPanel } from "@/components/buyer/cart-panel";
 import { BrowseToolbar } from "@/components/buyer/browse-toolbar";
 import { ProductTile, type ProductView } from "@/components/buyer/product-tile";
+import { ItemPicker, type PickedItem } from "@/components/buyer/item-picker";
+import { CustomValuesList } from "@/components/custom-fields/custom-field-input";
 import { QuantityControl } from "@/components/buyer/quantity-control";
 import { StockNote, type StockLabels } from "@/components/buyer/stock-note";
 import { ShopHero } from "@/components/buyer/shop-hero";
@@ -21,7 +23,7 @@ import { useThemeLabels } from "@/components/use-theme-labels";
 import { shareOrCopyLink } from "@/components/share-link";
 import type { Product, ProductVariant, PublicShop } from "@/lib/api";
 import { withShop } from "@/lib/buyer-back";
-import { cartLines, cartTotal, useShopCart } from "@/lib/cart";
+import { cartLines, cartTotal, useShopCart, variantQuantity } from "@/lib/cart";
 import { discounted, startingVariant, usdValue } from "@/lib/product-price";
 import { isTakingOrders } from "@/lib/shop-ordering";
 import { productStock, variantStock } from "@/lib/shop-stock";
@@ -185,7 +187,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
                 shop={shop}
                 currency={currency}
                 ordering={ordering}
-                quantity={product.variants.reduce((sum, variant) => sum + (cart.quantities[variant.id] ?? 0), 0)}
+                quantity={product.variants.reduce((sum, variant) => sum + variantQuantity(cart.quantities, variant.id), 0)}
                 onOpen={() => setOpen(product)}
                 onAdjust={(delta) => {
                   const variant = product.variants[0];
@@ -224,6 +226,10 @@ function OpenShop({ shop }: { shop: PublicShop }) {
           ordering={ordering}
           quantities={cart.quantities}
           onSetQuantity={cart.setQuantity}
+          onAddLine={(item) => {
+            cart.addLine(cartLineKey(item.variantId, item.choiceIds), item.quantity, item.note);
+            setOpen(null);
+          }}
           onClose={() => setOpen(null)}
         />
       )}
@@ -304,6 +310,7 @@ function ShopProductTile({
       photo={product.photos[0] ? <PhotoThumb photo={product.photos[0]} lazy className="h-full w-full object-cover" /> : null}
       discountPercent={product.discountPercent}
       optionCount={optionCount}
+      picksFirst={product.choiceGroups.length > 0}
       price={variant ? <VariantPrice product={product} variant={variant} currency={currency} /> : null}
       quantity={quantity}
       ordering={ordering}
@@ -336,6 +343,7 @@ function ProductSheet({
   ordering,
   quantities,
   onSetQuantity,
+  onAddLine,
   onClose,
 }: {
   product: Product;
@@ -345,6 +353,8 @@ function ProductSheet({
   ordering: boolean;
   quantities: Record<string, number>;
   onSetQuantity: (variantId: string, quantity: number) => void;
+  /** With option groups or choices: one picked item at a time. */
+  onAddLine: (item: PickedItem) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("Storefront");
@@ -352,6 +362,8 @@ function ProductSheet({
   const [photo, setPhoto] = useState(0);
   const count = product.photos.length;
   const currency = shop.store.defaultCurrency;
+  // Groups or choices: pick them first, then add. Otherwise each option has its own + and −.
+  const picks = product.variantGroups.length > 0 || product.choiceGroups.length > 0;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose();
@@ -392,6 +404,21 @@ function ProductSheet({
             <ShareProduct title={title} />
           </div>
           {description && <p className="whitespace-pre-line text-sm text-muted">{description}</p>}
+          {/* The shop's own public fields: warranty, material… */}
+          <CustomValuesList fields={shop.customFields} values={product.customValues} />
+          {picks ? (
+            ordering && (
+              <ItemPicker
+                product={product}
+                currency={currency}
+                usdToKhrRate={shop.store.usdToKhrRate}
+                stockOf={(variantId) => variantStock(shop, variantId)}
+                inCartOf={(variantId) => variantQuantity(quantities, variantId)}
+                stockLabels={stockLabels(t)}
+                onAdd={onAddLine}
+              />
+            )
+          ) : (
           <ul className="flex flex-col gap-2">
             {product.variants.map((variant) => {
               const label = product.hasOptions ? (locale === "km" ? variant.labelKm || variant.labelEn : variant.labelEn || variant.labelKm) : title;
@@ -419,7 +446,8 @@ function ProductSheet({
               );
             })}
           </ul>
-          {ordering && product.variants.some((variant) => (quantities[variant.id] ?? 0) > 0) && (
+          )}
+          {ordering && !picks && product.variants.some((variant) => (quantities[variant.id] ?? 0) > 0) && (
             <Button variant="secondary" className="w-full" onClick={onClose}>
               {t("close")}
             </Button>
