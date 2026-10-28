@@ -1,11 +1,12 @@
 "use client";
 
 import { formatKhmerPhoneLocal, getOrderTab, ORDER_TABS } from "@khmio/shared";
-import { Mio } from "@khmio/ui";
+import { Mio, PageHeader } from "@khmio/ui";
 import { ChevronRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import type { OrderRecord } from "@/mock/mock-orders";
+import { CustomersLink } from "@/components/customers/customers-link";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
 import { getNextAction, OrderNextButton, sellerOrderHref } from "../../order-next-button";
 import { formatMoney, OrderStatusPill, useOrderText } from "@/components/order-ui";
@@ -106,10 +107,7 @@ function OrdersList() {
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-4 p-4 text-fg md:p-6">
-      <div>
-        <h1 className="text-xl font-bold">{t("title")}</h1>
-        <p className="mt-1 text-sm text-muted">{t("description")}</p>
-      </div>
+      <PageHeader title={t("title")} description={t("description")} actions={<CustomersLink href={`/${locale}/mockup/dashboard/customers`} />} />
 
       <DataGrid
         rowNumbers

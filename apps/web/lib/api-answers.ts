@@ -442,10 +442,38 @@ export const sellerOrderSchema = z.object({
 });
 export type SellerOrder = z.infer<typeof sellerOrderSchema>;
 
+/** GET /customers/page (rows): one of the shop's buyers with their numbers (packages/shared customers.ts). Money per currency, never added together. */
+export const customerRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** 855… */
+  phone: z.string(),
+  /** Orders that count as sales: not cancelled, not still awaiting payment. */
+  orderCount: z.number(),
+  spent: perCurrency,
+  firstOrderAt: z.string().nullable(),
+  lastOrderAt: z.string().nullable(),
+  /** When the shop first saw them. */
+  createdAt: z.string(),
+});
+export type CustomerRow = z.infer<typeof customerRowSchema>;
+
+/** GET /customers/:id: one buyer, their last delivery choice, and their orders, newest first. */
+export const customerDetailSchema = customerRowSchema.extend({
+  area: deliveryAreaSchema.nullable(),
+  districtId: z.string().nullable(),
+  provinceId: z.string().nullable(),
+  landmark: z.string(),
+  orders: z.array(sellerOrderSchema),
+});
+export type CustomerDetail = z.infer<typeof customerDetailSchema>;
+
 /** GET /orders/:id and POST /orders/:id/actions: one order in full, for the seller. */
 export const sellerOrderDetailSchema = orderViewSchema.extend({
   id: z.string(),
   buyerPhone: z.string(),
+  /** Their page in Customers; null for a walk-in at the counter who gave no phone. */
+  customerId: z.string().nullable(),
   cancelNote: z.string(),
   /** Dine-in: the table it was for; "" = none. */
   tableName: z.string(),

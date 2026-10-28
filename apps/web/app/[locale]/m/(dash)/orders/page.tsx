@@ -2,10 +2,12 @@
 
 import { DAY_MS, formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, phnomPenhDay, type ListQuery } from "@khmio/shared";
 import { cn, Mio, Notice, PageHeader } from "@khmio/ui";
-import { AlertTriangle, Phone, Store, Truck } from "lucide-react";
+import { AlertTriangle, Store, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { CallButton } from "@/components/call-button";
+import { CustomersLink } from "@/components/customers/customers-link";
 import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { formatMoney, ORDER_STATUS_TONE, ORDER_TAB_ICON, ORDER_TAB_TONE, orderStatusIcon, TONE_TEXT, useOrderText } from "@/components/order-ui";
 import { OrderStatusCircle } from "@/components/seller-cards";
@@ -43,16 +45,7 @@ export default function OrdersPage() {
       <OrderNextStep order={order} onDone={load} onProblem={setProblem} />
     </div>
   );
-  const callButton = (order: SellerOrder) => (
-    <a
-      href={`tel:+${order.buyerPhone}`}
-      onClick={(event) => event.stopPropagation()}
-      aria-label={t("callBuyer", { name: order.buyerName })}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand hover:bg-brand/15"
-    >
-      <Phone className="h-4 w-4" aria-hidden="true" />
-    </a>
-  );
+  const callButton = (order: SellerOrder) => <CallButton phone={order.buyerPhone} label={t("callBuyer", { name: order.buyerName })} />;
   /** Minutes an order has waited to be confirmed, when that's too long; null otherwise. */
   const lateBy = (order: SellerOrder): number | null => {
     if (getOrderTab(order.status) !== "to_confirm") return null;
@@ -179,7 +172,7 @@ export default function OrdersPage() {
 
   return (
     <div className={`${SELLER_PAGE} gap-4`}>
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} actions={<CustomersLink href={`/${locale}/m/customers`} />} />
 
       {problem && (
         <Notice tone="warning" role="alert">

@@ -1,5 +1,5 @@
 import type { Tx } from "@khmio/db";
-import { DAY_MS, SALES_PERIODS, isCashOrder, needsSellerAction, phnomPenhDay, type Currency, type OrderStatus, type PaymentMethod, type SalesPeriod } from "@khmio/shared";
+import { DAY_MS, NOT_SALE_STATUSES, SALES_PERIODS, isCashOrder, needsSellerAction, phnomPenhDay, type Currency, type OrderStatus, type PaymentMethod, type SalesPeriod } from "@khmio/shared";
 
 // The seller's home page numbers (design/screens.md S3), worked out by the
 // database so they stay right however many orders a shop has. Days are
@@ -10,8 +10,8 @@ import { DAY_MS, SALES_PERIODS, isCashOrder, needsSellerAction, phnomPenhDay, ty
 /** 60 days: the longest period on the sales card (30 days) and the 30 before it, to compare. */
 export const SUMMARY_DAYS = 60;
 export const TOP_PRODUCTS = 5;
-/** Orders that count as sales: not cancelled, and not still waiting for an online payment. */
-export const NOT_SALES = ["cancelled", "awaiting_payment"];
+/** Orders that count as sales: not cancelled, and not still waiting for an online payment (packages/shared orders.ts). */
+export const NOT_SALES = NOT_SALE_STATUSES;
 
 export type Money = Record<Currency, number>;
 

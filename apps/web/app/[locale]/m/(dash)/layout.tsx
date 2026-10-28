@@ -1,7 +1,7 @@
 "use client";
 
 import { hasModule } from "@khmio/shared";
-import { CarFront, ChefHat, ExternalLink, LayoutDashboard, Package, ShoppingBag, Store } from "lucide-react";
+import { CarFront, ChefHat, ExternalLink, LayoutDashboard, Package, ShoppingBag, Store, Users } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -199,7 +199,11 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           icon: ShoppingBag,
           mobile: true,
           badge: waiting,
+          // A phone reaches Customers from the Orders page's button.
+          alsoActiveOn: [`${base}/customers`],
         },
+        // Customers (every plan): beside the four on a laptop; no room in a phone's bottom bar.
+        { href: `${base}/customers`, label: tDash("navCustomers"), icon: Users, mobile: false },
         // The same four on a laptop and a phone: shop details, delivery, store settings, invoices and Telegram alerts are reached from "My shop", which stays lit there.
         {
           href: `${base}/settings`,

@@ -110,9 +110,24 @@ through `apps/web/lib/device-storage.ts` (`readStored(key, schema)`,
 `writeStored(key, value)`): what comes back is checked, and a blocked or full
 storage never breaks the page.
 
-**Live and mockup:** a live screen and its mockup use the same parts, so they
-can't drift apart. When a mockup is next worked on, its lint warnings get
-fixed too.
+**One screen, two data sources (decided 2026-10-28).** A screen is built
+once, as one component in `apps/web/components/<feature>/` that takes its
+data and actions as props. The mockup page renders it with sample data; the
+live page renders it with data from `lib/api.ts`. The owner approves the
+screen on the mockup, and going live only connects the data: there is never
+a second copy to drift apart.
+
+```
+components/customers/customers-screen.tsx   ← the one screen, from the kit
+mockup/dashboard/customers/page.tsx         ← sample data
+m/(dash)/customers/page.tsx                 ← real data (lib/api.ts)
+```
+
+Sample data has the same type as the API's answer (the schema in
+`lib/api-answers.ts`), so a mockup can't show something the API can't send.
+Older screens built twice: when one is next worked on, its mockup page
+renders the live screen's component with sample data, or is removed when
+nothing but the live page needs it. Their lint warnings get fixed then too.
 
 ## 4. Backend (`apps/api`, `apps/worker`)
 

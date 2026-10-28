@@ -1,5 +1,5 @@
 import type { Prisma } from "@khmio/db";
-import { formatTrackingCode, listQueryFromParams, listQuerySchemaFor, ORDER_LIST_SPEC, ORDER_TABS, orderStatusesForTab, parseTrackingCode, type ListPage, type ListQuery, type OrderTab } from "@khmio/shared";
+import { formatTrackingCode, phoneSearchDigits, listQueryFromParams, listQuerySchemaFor, ORDER_LIST_SPEC, ORDER_TABS, orderStatusesForTab, parseTrackingCode, type ListPage, type ListQuery, type OrderTab } from "@khmio/shared";
 import { readListPage } from "../list/list-page";
 
 export const orderListQuerySchema = listQuerySchemaFor(ORDER_LIST_SPEC);
@@ -44,9 +44,9 @@ export function orderSearchWhere(q: string): Prisma.OrderWhereInput | null {
   if (digits && /^[\d\s+#-]+$/.test(text)) {
     const number = Number(digits.replace(/^#/, ""));
     if (Number.isSafeInteger(number) && number <= 2_147_483_647) or.push({ orderNumber: number });
-    // Phones are saved as 855XXXXXXXX: drop what the buyer's way of writing adds.
-    const phone = digits.replace(/^855/, "").replace(/^0/, "");
-    if (phone.length >= 3) or.push({ buyerPhone: { contains: phone } });
+    // Phones are saved as 855XXXXXXXX: packages/shared drops what the buyer's way of writing adds.
+    const phone = phoneSearchDigits(text);
+    if (phone) or.push({ buyerPhone: { contains: phone } });
   }
   const code = parseTrackingCode(text);
   if (code) or.push({ trackingCode: code });

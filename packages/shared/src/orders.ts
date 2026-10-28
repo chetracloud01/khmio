@@ -24,6 +24,13 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
+/** Orders that don't count as sales (home figures, profit, customers): cancelled, or still waiting for an online payment. */
+export const NOT_SALE_STATUSES = ["cancelled", "awaiting_payment"] as const satisfies readonly OrderStatus[];
+
+export function countsAsSale(status: OrderStatus): boolean {
+  return !NOT_SALE_STATUSES.some((notSale) => notSale === status);
+}
+
 /** What a seller (or the system, for "pay") can do to an order. */
 export type OrderAction =
   | "pay"
