@@ -165,6 +165,25 @@ export const comparisonSectionSchema = z.object({
     .max(8, "too_long"),
 });
 
+/**
+ * A page of long text under headings: the terms, the privacy policy. Its
+ * date and draft mark are content, so the admin can publish a checked version.
+ */
+export const documentSectionSchema = z.object({
+  ...sectionBase,
+  type: z.literal("document"),
+  title: localizedTextSchema(80),
+  intro: localizedTextSchema(400).optional(),
+  /** The day the text last changed (YYYY-MM-DD), shown as "Last updated". */
+  updatedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "required"),
+  /** Not checked by an advisor yet: the page says so at the top. */
+  draft: z.boolean(),
+  parts: z
+    .array(z.object({ heading: localizedTextSchema(80), paragraphs: z.array(localizedTextSchema(1200)).min(1, "too_short").max(8, "too_long") }))
+    .min(1, "too_short")
+    .max(20, "too_long"),
+});
+
 export const solutionsSectionSchema = z.object({
   ...sectionBase,
   type: z.literal("solutions"),
@@ -256,6 +275,7 @@ export const siteSectionSchema = z.union([
   stepsSectionSchema,
   appsSectionSchema,
   comparisonSectionSchema,
+  documentSectionSchema,
   solutionsSectionSchema,
   featuresSectionSchema,
   promotionSectionSchema,
@@ -274,6 +294,7 @@ export const SITE_SECTION_SCHEMAS = {
   steps: stepsSectionSchema,
   apps: appsSectionSchema,
   comparison: comparisonSectionSchema,
+  document: documentSectionSchema,
   solutions: solutionsSectionSchema,
   features: featuresSectionSchema,
   promotion: promotionSectionSchema,

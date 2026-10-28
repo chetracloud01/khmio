@@ -20,6 +20,10 @@ export interface SiteKitLabels {
   startFree: string;
   sample: string;
   mio: string;
+  /** A document not checked by an advisor yet. */
+  draft: string;
+  /** "Last updated 28 Oct 2026", from a YYYY-MM-DD day. */
+  lastUpdated: (day: string) => string;
 }
 
 export interface SiteKitContext {

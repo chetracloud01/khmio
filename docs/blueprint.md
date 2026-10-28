@@ -1219,7 +1219,7 @@ The steps and their "Done when" checks are in "Roadmap: zero to live" above — 
 - [ ] Backup restored into a fresh database
 - [ ] Sentry alerts reach your Telegram
 - [ ] Khmer text checked by a native reader on a cheap Android phone
-- [ ] Terms of service and privacy policy published
+- [ ] Terms of service and privacy policy published — drafted 2026-10-28 (`/terms`, `/privacy`, marked Draft; `apps/web/site/content-legal.ts`): an advisor checks them, the operator's registered name replaces the placeholder, then `draft: false`
 - [ ] Company registration and e-commerce permit confirmed with a local advisor
 
 **Open questions**

@@ -5,6 +5,7 @@ import { AnnouncementBar, SiteFooter, SiteHeader, SiteSections, solutionMenuItem
 import { useLocale, useTranslations } from "next-intl";
 import { LanguageSwitch } from "@/components/language-switch";
 import { useFormErrorText } from "@/components/form-ui";
+import { useDateText } from "@/components/use-date-text";
 import { usePlanFeatureLabels } from "@/components/plan-features";
 import { SITE_SOLUTIONS } from "./content";
 import { SITE_APPS } from "./content-apps";
@@ -41,6 +42,7 @@ function showsOnLiveSite(section: SiteSection): boolean {
  */
 export function SiteView({ page, href, image, waitlist, submitError, live, note }: SiteViewProps) {
   const t = useTranslations("Site");
+  const dates = useDateText();
   const errorText = useFormErrorText();
   const tMascot = useTranslations("Mascot");
   const tPlans = useTranslations("Plans");
@@ -66,6 +68,8 @@ export function SiteView({ page, href, image, waitlist, submitError, live, note 
       joinWaitlist: t("joinWaitlist"),
       startFree: t("startFree"),
       sample: t("sample"),
+      draft: t("draftNotice"),
+      lastUpdated: (day) => t("lastUpdated", { date: dates.date(day) }),
       mio: tMascot("label"),
     },
     // The app's own plan wording, so the site and the billing screen always match.

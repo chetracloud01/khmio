@@ -15,12 +15,13 @@ const PAGE_PARTS = {
   garage: ["HeroSection", "FeaturesSection", "StepsSection", "PlansSection", "QuestionsSection", "ClosingSection"],
   beta: ["HeroSection", "FeaturesSection", "ClosingSection"],
   pricing: ["HeroSection", "PlansSection", "FeaturesSection", "ClosingSection"],
+  legal: ["DocumentSection", "ClosingSection"],
   more: ["AnnouncementBar", "PromotionSection", "SellerStorySection", "WaitlistSection"],
 } as const;
 type ShownPage = keyof typeof PAGE_PARTS;
-const SHOWN_PAGES: readonly ShownPage[] = ["home", "garage", "beta", "pricing", "more"];
+const SHOWN_PAGES: readonly ShownPage[] = ["home", "garage", "beta", "pricing", "legal", "more"];
 /** What each choice draws: the live pages, and the sample page for sections no page uses yet. */
-const PAGE_CONTENT = { home: SITE_PAGES.home, garage: SITE_PAGES.garage, beta: SITE_PAGES.auto_parts, pricing: SITE_PAGES.pricing, more: SAMPLE_SITE_PAGE };
+const PAGE_CONTENT = { home: SITE_PAGES.home, garage: SITE_PAGES.garage, beta: SITE_PAGES.auto_parts, pricing: SITE_PAGES.pricing, legal: SITE_PAGES.terms, more: SAMPLE_SITE_PAGE };
 /** On every page: the frame around the sections. */
 const FRAME_PARTS = ["SiteHeader", "SiteSections", "SiteContainer", "SiteFooter"];
 
@@ -49,6 +50,7 @@ export function WebsiteTab() {
             { value: "garage", label: t("websiteGarage") },
             { value: "beta", label: t("websiteBeta") },
             { value: "pricing", label: t("websitePricing") },
+            { value: "legal", label: t("websiteLegal") },
             { value: "more", label: t("websiteMore") },
           ]}
         />

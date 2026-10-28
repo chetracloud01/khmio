@@ -183,7 +183,8 @@
     "sampleCookie": "Chocolate Cookie",
     "websiteGarage": "Garage",
     "websiteMore": "Other sections",
-    "websiteBeta": "Beta industry"
+    "websiteBeta": "Beta industry",
+    "websiteLegal": "Terms"
   },
   "Storefront": {
     "verified": "Verified merchant",
@@ -428,7 +429,9 @@
     "available": "Available",
     "solutions": "Industries",
     "beta": "Beta",
-    "apps": "Apps"
+    "apps": "Apps",
+    "draftNotice": "Draft — this text is still being checked by an advisor and may change.",
+    "lastUpdated": "Last updated {date}"
   },
   "MerchantLogin": {
     "title": "Sell online in minutes",

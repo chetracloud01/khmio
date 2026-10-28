@@ -1,6 +1,7 @@
 import type { PlatformProductId, SitePage, SiteSolution } from "@khmio/shared";
 import { startFree } from "./content-parts";
 import type { SitePageKey } from "./pages";
+import { helpPage, privacyPage, termsPage } from "./content-legal";
 import { SOLUTION_PAGES } from "./solution-pages";
 
 // The platform website's content (design/screens.md "Platform website"):
@@ -328,5 +329,8 @@ export const SITE_PICTURES: SitePicture[] = [];
 export const SITE_PAGES: Record<SitePageKey, SitePage> = {
   home: homePage,
   pricing: pricingPage,
+  help: helpPage,
+  terms: termsPage,
+  privacy: privacyPage,
   ...SOLUTION_PAGES,
 };

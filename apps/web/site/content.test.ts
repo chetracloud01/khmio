@@ -42,6 +42,10 @@ describe("website content", () => {
     for (const solution of SITE_SOLUTIONS) expect(siteHasPath(solutionPath(solution.id)), solution.id).toBe(true);
   });
 
+  it("has the pages the footer and header link to: pricing, help, terms and privacy", () => {
+    for (const path of ["/pricing", "/help", "/terms", "/privacy"]) expect(siteHasPath(path), path).toBe(true);
+  });
+
   it("gives each page the address it is served at", () => {
     for (const key of SITE_PAGE_KEYS) expect(`/${SITE_PAGES[key].slug}`).toBe(sitePageInfo(key).path);
   });

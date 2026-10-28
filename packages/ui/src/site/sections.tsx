@@ -359,6 +359,36 @@ export function ComparisonSection({ section, ctx }: { section: SiteSectionOf<"co
   );
 }
 
+/** Long text under headings (terms, privacy): one readable column, the date, and a notice while it's a draft. */
+export function DocumentSection({ section, ctx }: { section: SiteSectionOf<"document">; ctx: SiteKitContext }) {
+  return (
+    <section className="bg-bg py-12 sm:py-16">
+      <SiteContainer className="flex max-w-[760px] flex-col gap-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold leading-normal tracking-tight sm:text-4xl sm:leading-normal">{pick(section.title, ctx.locale)}</h1>
+          <p className="text-sm text-muted">{ctx.labels.lastUpdated(section.updatedOn)}</p>
+        </div>
+        {section.draft && (
+          <p role="note" className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm font-medium text-warning">
+            {ctx.labels.draft}
+          </p>
+        )}
+        {section.intro && <p className="text-base text-muted sm:text-lg">{pick(section.intro, ctx.locale)}</p>}
+        {section.parts.map((part, index) => (
+          <div key={index} className="flex flex-col gap-3">
+            <h2 className="text-xl font-semibold leading-normal">{pick(part.heading, ctx.locale)}</h2>
+            {part.paragraphs.map((paragraph, at) => (
+              <p key={at} className="leading-relaxed text-fg/90">
+                {pick(paragraph, ctx.locale)}
+              </p>
+            ))}
+          </div>
+        ))}
+      </SiteContainer>
+    </section>
+  );
+}
+
 /** Khmio for each kind of business: ready, in beta (start free either way), or coming with its waitlist. */
 export function SolutionsSection({ section, ctx }: { section: SiteSectionOf<"solutions">; ctx: SiteKitContext }) {
   return (
@@ -617,6 +647,8 @@ export function SiteSections({ sections, ctx }: { sections: SiteSection[]; ctx: 
             return <AppsSection key={section.id} section={section} ctx={ctx} />;
           case "comparison":
             return <ComparisonSection key={section.id} section={section} ctx={ctx} />;
+          case "document":
+            return <DocumentSection key={section.id} section={section} ctx={ctx} />;
           case "solutions":
             return <SolutionsSection key={section.id} section={section} ctx={ctx} />;
           case "features":

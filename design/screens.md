@@ -585,6 +585,23 @@ pages, the announcement bar and the beta promotion were removed; old
   cancel any time; data is locked, never deleted (blueprint "Subscription
   tiers").
 
+### P5. Help, Terms, Privacy — Built · Website (Terms and Privacy: draft)
+- `/help`: the questions sellers ask (start, add products, how customers
+  order and pay, Telegram alerts, receipts, price) and "Write to us on
+  Telegram".
+- `/terms` and `/privacy`: long text under headings (the site kit's
+  **document** section), with the date last changed and a **Draft** notice
+  until an advisor in Cambodia has checked them. Privacy says exactly what
+  the system keeps (seller sign-in and shop details; a customer's name,
+  phone, area and orders; Telegram only if they opt in), why, where
+  (Singapore, Cloudflare R2, Vercel), how long (backups 14 days), that
+  Khmio never holds the money, and how to ask for data to be deleted. The
+  operator is a placeholder until the company is registered.
+  (`apps/web/site/content-legal.ts`; when the system changes what it
+  stores, this text changes too.)
+- One route serves every top-level website page (`(site)/[page]`: pricing,
+  help, terms, privacy); the header and footer show their links by themselves.
+
 ## Account hub (My Khmio)
 
 After login, the one place a customer sees and controls every product they
