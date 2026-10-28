@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { currencySchema, minorAmountSchema } from "./money";
+
+/** The longest supplier name a purchase keeps (the database checks it too). */
+export const MAX_SUPPLIER_LENGTH = 80;
 import type { PaymentMethod } from "./checkout";
 
 // Stock is a ledger: every change is one movement, and a location's stock is
@@ -92,8 +96,18 @@ export const stockChangeInputSchema = z
     quantity: quantitySchema,
     reason: stockAdjustmentReasonSchema.optional(),
     note: noteSchema,
+    /** A purchase's cost of one, in its currency (docs/blueprint.md "Cost price", level 2): moves the average cost. Optional. */
+    unitCost: minorAmountSchema.optional(),
+    costCurrency: currencySchema.optional(),
+    /** Who it was bought from. */
+    supplier: z.string().trim().max(MAX_SUPPLIER_LENGTH, "too_long").default(""),
   })
-  .superRefine(requireAdjustmentReason);
+  .superRefine(requireAdjustmentReason)
+  .superRefine((change, ctx) => {
+    if (change.unitCost === undefined) return;
+    if (change.type !== "purchase") ctx.addIssue({ code: z.ZodIssueCode.custom, message: "cost_purchase_only", path: ["unitCost"] });
+    if (!change.costCurrency) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["costCurrency"] });
+  });
 export type StockChangeInput = z.infer<typeof stockChangeInputSchema>;
 
 /** Start tracking one product option's stock, from a count (0 = sold out until stock arrives). */

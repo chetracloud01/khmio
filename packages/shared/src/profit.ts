@@ -28,6 +28,40 @@ export function unitCostIn(cost: VariantCost, currency: Currency, usdToKhrRate: 
   return currency === "USD" ? convertKhrToUsdCents(cost.costMinor, usdToKhrRate) : convertUsdCentsToKhr(cost.costMinor, usdToKhrRate);
 }
 
+/**
+ * A product option's cost after a purchase — the moving weighted average
+ * (docs/blueprint.md "Cost price", level 2): what's on hand at the old cost
+ * and what arrived at the new one, rounded to a whole cent or riel. No cost
+ * typed: the cost stays. Nothing on hand, or no cost yet: the purchase's
+ * cost becomes the cost. Returns never call this: they keep the average.
+ */
+export function movingAverageCost(onHand: number, currentCost: number | null, bought: number, purchaseCost: number | null): number | null {
+  if (purchaseCost === null) return currentCost;
+  if (currentCost === null || onHand <= 0) return purchaseCost;
+  return Math.round((onHand * currentCost + bought * purchaseCost) / (onHand + bought));
+}
+
+/** One tracked product option, for the stock value. */
+export interface StockValueRow {
+  onHand: number;
+  costMinor: number | null;
+  costCurrency: Currency | null;
+}
+
+/**
+ * How much money sits on the shelves: on hand × cost, dollars and riel apart
+ * (never converted), and how many options in stock have no cost yet (left out).
+ */
+export function stockValue(rows: readonly StockValueRow[]): { USD: number; KHR: number; withoutCost: number } {
+  const value = { USD: 0, KHR: 0, withoutCost: 0 };
+  for (const row of rows) {
+    if (row.onHand <= 0) continue;
+    if (row.costMinor === null || row.costCurrency === null) value.withoutCost += 1;
+    else value[row.costCurrency] += row.onHand * row.costMinor;
+  }
+  return value;
+}
+
 /** Most products the report lists per period. */
 export const PROFIT_REPORT_PRODUCTS = 20;
 

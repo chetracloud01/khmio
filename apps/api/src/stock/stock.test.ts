@@ -1,12 +1,15 @@
+import type { Currency } from "@khmio/shared";
 import { describe, expect, it } from "vitest";
 import { toStockPage, tracksStock } from "./stock";
 
-const variant = (id: string, overrides: Partial<{ isDefault: boolean; labelEn: string }> = {}) => ({
+const variant = (id: string, overrides: Partial<{ isDefault: boolean; labelEn: string; costMinor: number | null; costCurrency: Currency | null }> = {}) => ({
   id,
   sku: `SKU-${id}`,
   labelKm: "ធំ",
   labelEn: "Large",
   isDefault: false,
+  costMinor: null,
+  costCurrency: null,
   product: { id: "product-1", titleKm: "កាហ្វេ", titleEn: "Coffee" },
   ...overrides,
 });
@@ -49,9 +52,25 @@ describe("the Stock page", () => {
     const page = toStockPage(
       [],
       [],
-      [{ id: "m1", variantId: "v1", type: "sale", quantity: 2, reason: null, note: "", createdAt: at, order: { id: "o1", orderNumber: 41, channel: "in_store" } }],
+      [{ id: "m1", variantId: "v1", type: "sale", quantity: 2, reason: null, note: "", unitCostMinor: null, costCurrency: null, supplier: "", createdAt: at, order: { id: "o1", orderNumber: 41, channel: "in_store" } }],
       "pro",
     );
     expect(page.movements[0]).toMatchObject({ orderNumber: 41, inStore: true, createdAt: "2026-10-24T03:00:00.000Z" });
+  });
+
+  it("says what the stock is worth, dollars and riel apart, and what has no cost yet", () => {
+    const page = toStockPage(
+      [variant("v1", { costMinor: 2300, costCurrency: "USD" }), variant("v2", { costMinor: 50000, costCurrency: "KHR" }), variant("v3"), variant("v4", { costMinor: 100, costCurrency: "USD" })],
+      [
+        { variantId: "v1", onHand: 4, reserved: 0 },
+        { variantId: "v2", onHand: 2, reserved: 0 },
+        { variantId: "v3", onHand: 5, reserved: 0 },
+      ],
+      [],
+      "pro",
+    );
+    // v4 isn't tracked: it's not on the shelf count.
+    expect(page.value).toEqual({ USD: 9200, KHR: 100000, withoutCost: 1 });
+    expect(page.items[0]).toMatchObject({ costMinor: 2300, costCurrency: "USD" });
   });
 });

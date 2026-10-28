@@ -991,7 +991,16 @@
     "stopTrackingHint": "It then sells without a limit again. Its history stays.",
     "stopTrackingConfirm": "Stop tracking this item? Its count will be cleared.",
     "trackHint": "Count how many you have now. From then on buyers see \"Sold out\" at 0 and \"Only 3 left\", and orders can't take more than you have.",
-    "countNow": "How many you have now"
+    "countNow": "How many you have now",
+    "costOfOneUsd": "Cost of one (USD)",
+    "costOfOneKhr": "Cost of one (KHR)",
+    "costOfOneHint": "Optional. The product's cost becomes the average of what's on hand and this purchase.",
+    "supplierLabel": "Supplier (optional)",
+    "supplierPlaceholder": "e.g. Chhay Auto Parts",
+    "stockValueTitle": "Stock value",
+    "withoutCost": "{count, plural, one {# item has no cost yet} other {# items have no cost yet}}",
+    "costLine": "cost {amount}",
+    "eachCost": "{amount} each"
   },
   "Plans": {
     "free": "Free",
@@ -1533,7 +1542,9 @@
     "ends_before_start": "The end must be after the start.",
     "cash_short": "Less than the total — check the cash received.",
     "sold_out": "Sold out — there's no more of this.",
-    "not_enough_stock": "There isn't that much in stock."
+    "not_enough_stock": "There isn't that much in stock.",
+    "cost_purchase_only": "A cost can only go with stock you bought in.",
+    "cost_currency_mismatch": "This product's cost is in the other currency. Type it in that one."
   },
   "Theme": {
     "button": "Theme and colours",

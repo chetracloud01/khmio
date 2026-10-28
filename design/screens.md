@@ -255,6 +255,12 @@ Phone first; sidebar from tablet width; tables on desktop.
   same transaction and are refused when too little is left; cancel and void
   put it back. Buyers see "Sold out" and "Only N left", and the cart and the
   counter stop at what's left. Lower plans see their counts, locked.
+- **Live, purchases with cost (Pro, 2026-10-28):** stock in asks for the cost
+  of one (in the product's cost currency; a product without one picks $ or ៛
+  there) and a supplier (optional); the product's cost becomes the moving
+  average. Each row shows its cost; a **Stock value** card shows on hand ×
+  cost (dollars and riel apart, and how many items have no cost yet); the
+  history shows each purchase's cost and supplier.
 - Part 2 (Advance): several warehouses and branches, transfers, which
   location the shop and each counter sell from, KHQR reservations.
 

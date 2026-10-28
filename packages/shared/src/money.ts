@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const currencySchema = z.enum(["USD", "KHR"]);
+
+/** Cents or riel, as a price or a cost is typed. The cap stops a slipped finger (an extra few zeros) from saving. */
+export const minorAmountSchema = z
+  .number({ invalid_type_error: "price_invalid" })
+  .int("price_invalid")
+  .min(0, "price_invalid")
+  .max(1_000_000_000, "price_invalid");
 export type Currency = z.infer<typeof currencySchema>;
 
 /** USD stored as integer cents, e.g. $8.50 -> 850. */

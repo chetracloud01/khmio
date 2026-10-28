@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { rawCustomValuesSchema } from "./custom-fields";
-import { currencySchema } from "./money";
+import { currencySchema, minorAmountSchema } from "./money";
 import { productKindSchema } from "./services";
 import { choiceGroupInputSchema, MAX_CHOICE_GROUPS, MAX_VARIANT_GROUPS, variantGroupInputSchema } from "./product-options";
 
@@ -14,14 +14,7 @@ export const MAX_DISCOUNT_PERCENT = 90;
 export const MAX_PRODUCT_OPTIONS = 50;
 export const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
 
-/** Cents or riel. The cap stops a slipped finger (an extra few zeros) from saving. */
-const amountSchema = z
-  .number({ invalid_type_error: "price_invalid" })
-  .int("price_invalid")
-  .min(0, "price_invalid")
-  .max(1_000_000_000, "price_invalid");
-
-const optionalAmount = amountSchema.optional();
+const optionalAmount = minorAmountSchema.optional();
 
 const priceFields = {
   /** Price the storefront shows buyers. */

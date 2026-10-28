@@ -3,29 +3,38 @@
 import {
   getMinimumPlanFor,
   MAX_STOCK_NOTE_LENGTH,
+  MAX_SUPPLIER_LENGTH,
+  parseKhrInput,
   parseQuantityInput,
+  parseUsdInput,
   stockAdjustmentReasonSchema,
   stockMovementSign,
+  type Currency,
   type FormErrorCode,
   type StockAdjustmentReason,
 } from "@khmio/shared";
-import { BottomSheet, Button, ConfirmDialog, EmptyState, Input, Notice, SearchInput, SegmentedControl, Select, StatusPill } from "@khmio/ui";
-import { ChevronRight, PackageOpen } from "lucide-react";
+import { BottomSheet, Button, ConfirmDialog, EmptyState, Input, Notice, SearchInput, SegmentedControl, Select, StatCard, StatusPill } from "@khmio/ui";
+import { ChevronRight, Coins, PackageOpen } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { useFormErrorText } from "@/components/form-ui";
+import { formatMoney } from "@/components/order-ui";
+import { CostCurrencyChoice } from "@/components/product-form/price-inputs";
 import { SubPage } from "@/components/seller-frame/sub-page";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
 import { useDateText } from "@/components/use-date-text";
 import { api, ApiError, type StockPage, stockPageSchema } from "@/lib/api";
+import { useMerchant } from "../merchant-context";
 import { PageLoading, PageOffline } from "../page-states";
 
 type Item = StockPage["items"][number];
 type Mode = "purchase" | "correct";
 
 // Stock (design/screens.md S13), roadmap Pro plan: every product option with
-// its count at the main branch, "Not tracked" until the seller starts it from
-// a count, stock in and corrections with their reason, and the latest changes.
+// its count at the main branch and its cost, "Not tracked" until the seller
+// starts it from a count, stock in (a purchase: its cost moves the average
+// cost, docs/blueprint.md "Cost price", level 2) and corrections with their
+// reason, what the stock is worth, and the latest changes.
 // Orders and counter sales take stock themselves. Lower plans see their
 // counts, locked.
 export default function StockPage() {
@@ -51,10 +60,24 @@ export default function StockPage() {
   const name = (item: Item) => [text(item.titleKm, item.titleEn), text(item.optionKm, item.optionEn)].filter(Boolean).join(" · ");
   const shown = page.items.filter((item) => `${item.titleKm} ${item.titleEn} ${item.optionKm} ${item.optionEn} ${item.sku}`.toLowerCase().includes(query.trim().toLowerCase()));
   const nameOf = new Map(page.items.map((item) => [item.variantId, name(item)]));
+  /** A product's one cost currency: its options share it (null = no cost yet). */
+  const productCurrency = (item: Item): Currency | null => item.costCurrency ?? page.items.find((other) => other.productId === item.productId && other.costCurrency)?.costCurrency ?? null;
+  const worth = (["USD", "KHR"] as const).filter((currency) => page.value[currency] > 0).map((currency) => formatMoney(page.value[currency], currency));
 
   return (
     <SubPage back={{ href: `/${locale}/m/products`, label: t("backToProducts") }} title={t("title")} description={t("description")} width="page">
       {!page.tracksStock && <UpgradePrompt title={t("lockedTitle")} body={t("lockedBody")} plan={getMinimumPlanFor("stock")} />}
+
+      {page.tracksStock && page.items.some((item) => item.onHand !== null) && (
+        <div className="max-w-sm">
+          <StatCard
+            icon={Coins}
+            label={t("stockValueTitle")}
+            value={worth[0] ?? formatMoney(0, "USD")}
+            detail={[...worth.slice(1), ...(page.value.withoutCost > 0 ? [t("withoutCost", { count: page.value.withoutCost })] : [])].join(" · ") || undefined}
+          />
+        </div>
+      )}
 
       {page.items.length === 0 ? (
         <EmptyState icon={PackageOpen} title={t("noProductsYet")} />
@@ -67,7 +90,10 @@ export default function StockPage() {
                 <Button variant="ghost" tone="muted" fullWidth disabled={!page.tracksStock} onClick={() => setOpen(item)} className="min-h-[60px] justify-between rounded-none px-3 text-left text-fg">
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-medium">{name(item)}</span>
-                    <span className="block truncate text-xs text-muted">{item.sku}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {item.sku}
+                      {item.costMinor !== null && item.costCurrency && ` · ${t("costLine", { amount: formatMoney(item.costMinor, item.costCurrency) })}`}
+                    </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     {item.onHand === null ? (
@@ -101,7 +127,11 @@ export default function StockPage() {
                   : movement.reason === "returned" && movement.orderNumber !== null
                     ? t("returnedFrom", { number: movement.orderNumber })
                     : movement.type === "purchase"
-                      ? t("typePurchase")
+                      ? [
+                          t("typePurchase"),
+                          ...(movement.unitCostMinor !== null && movement.costCurrency ? [t("eachCost", { amount: formatMoney(movement.unitCostMinor, movement.costCurrency) })] : []),
+                          ...(movement.supplier ? [movement.supplier] : []),
+                        ].join(" · ")
                       : `${t("typeAdjust")}${movement.reason ? ` · ${t(`reason_${movement.reason}`)}` : ""}`;
               return (
                 <li key={movement.id} className="flex items-center gap-3 p-3">
@@ -123,13 +153,35 @@ export default function StockPage() {
         )}
       </section>
 
-      {open && <ManageSheet item={open} title={name(open)} onClose={() => setOpen(null)} onSaved={(next) => setPage(next)} />}
+      {open && <ManageSheet item={open} title={name(open)} costCurrency={productCurrency(open)} onClose={() => setOpen(null)} onSaved={(next) => setPage(next)} />}
     </SubPage>
   );
 }
 
-/** One option's stock: start tracking it from a count; or record stock in, a correction, or stop tracking. */
-function ManageSheet({ item, title, onClose, onSaved }: { item: Item; title: string; onClose: () => void; onSaved: (page: StockPage) => void }) {
+/** How a cost of one is typed in each currency. */
+const COST_INPUT = {
+  USD: { label: "costOfOneUsd", inputMode: "decimal", parse: parseUsdInput },
+  KHR: { label: "costOfOneKhr", inputMode: "numeric", parse: parseKhrInput },
+} as const;
+
+/**
+ * One option's stock: start tracking it from a count; or record stock in (with
+ * its cost and supplier), a correction, or stop tracking. The cost is typed in
+ * the product's one cost currency; a product without a cost yet picks it here.
+ */
+function ManageSheet({
+  item,
+  title,
+  costCurrency,
+  onClose,
+  onSaved,
+}: {
+  item: Item;
+  title: string;
+  costCurrency: Currency | null;
+  onClose: () => void;
+  onSaved: (page: StockPage) => void;
+}) {
   const t = useTranslations("Stock");
   const tApp = useTranslations("App");
   const errorText = useFormErrorText();
@@ -139,6 +191,10 @@ function ManageSheet({ item, title, onClose, onSaved }: { item: Item; title: str
   const [quantity, setQuantity] = useState(tracked ? "" : "0");
   const [reason, setReason] = useState<StockAdjustmentReason | "">("");
   const [note, setNote] = useState("");
+  const { store } = useMerchant();
+  const [currency, setCurrency] = useState<Currency>(costCurrency ?? store.defaultCurrency);
+  const [costText, setCostText] = useState("");
+  const [supplier, setSupplier] = useState("");
   const [errors, setErrors] = useState<Partial<Record<string, FormErrorCode>>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -159,6 +215,8 @@ function ManageSheet({ item, title, onClose, onSaved }: { item: Item; title: str
   }
 
   const amount = parseQuantityInput(quantity);
+  const unitCost = COST_INPUT[currency].parse(costText);
+  const purchase = mode === "purchase";
   const save = () =>
     tracked
       ? void send("/stock/changes", "POST", {
@@ -167,6 +225,8 @@ function ManageSheet({ item, title, onClose, onSaved }: { item: Item; title: str
           quantity: amount,
           ...(mode === "correct" && reason ? { reason } : {}),
           ...(note.trim() ? { note: note.trim() } : {}),
+          ...(purchase && unitCost !== undefined ? { unitCost, costCurrency: currency } : {}),
+          ...(purchase && supplier.trim() ? { supplier: supplier.trim() } : {}),
         })
       : void send("/stock/track", "POST", { variantId: item.variantId, onHand: amount });
 
@@ -225,6 +285,28 @@ function ManageSheet({ item, title, onClose, onSaved }: { item: Item; title: str
               </>
             )}
             <Input label={t("quantityLabel")} inputMode="numeric" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={errorText(errors.quantity)} />
+            {purchase && (
+              <>
+                {/* The product's cost currency is fixed once it has a cost; until then it's picked here. */}
+                {!costCurrency && <CostCurrencyChoice value={currency} onChange={setCurrency} />}
+                <Input
+                  label={t(COST_INPUT[currency].label)}
+                  inputMode={COST_INPUT[currency].inputMode}
+                  value={costText}
+                  onChange={(event) => setCostText(event.target.value)}
+                  error={errorText(errors.unitCost) ?? errorText(errors.costCurrency)}
+                />
+                <p className="-mt-2 text-xs text-muted">{t("costOfOneHint")}</p>
+                <Input
+                  label={t("supplierLabel")}
+                  placeholder={t("supplierPlaceholder")}
+                  maxLength={MAX_SUPPLIER_LENGTH}
+                  value={supplier}
+                  onChange={(event) => setSupplier(event.target.value)}
+                  error={errorText(errors.supplier)}
+                />
+              </>
+            )}
             <Input
               label={mode === "correct" && reason === "other" ? t("noteRequiredLabel") : t("noteLabel")}
               placeholder={t("notePlaceholder")}

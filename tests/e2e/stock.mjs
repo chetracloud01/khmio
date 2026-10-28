@@ -100,6 +100,35 @@ const history = (await call("/stock", { cookie: a })).json?.movements ?? [];
 check("the history shows every change, newest first", history[0]?.type === "adjust_out" && history[0].reason === "damaged" && history.some((row) => row.type === "sale" && row.inStore) && history.some((row) => row.reason === "returned"));
 
 check("another shop can't change A's stock", (await call("/stock/changes", { method: "POST", cookie: b, body: { variantId: bread, type: "purchase", quantity: 1 } })).status !== 200 && (await onHand()) === 10);
+// Purchases with their cost (docs/blueprint.md "Cost price", level 2): the moving average.
+const item = async () => (await call("/stock", { cookie: a })).json?.items?.find((entry) => entry.variantId === bread);
+sql(`update product_variants set cost_minor = 2000, cost_currency = 'USD' where id = '${bread}'`);
+const bought = await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "purchase", quantity: 10, unitCost: 2600, costCurrency: "USD", supplier: "Chhay Auto Parts" } });
+const afterPurchase = await item();
+check("10 on hand at $20 and 10 bought at $26 cost $23 each", bought.status === 200 && afterPurchase?.onHand === 20 && afterPurchase.costMinor === 2300 && afterPurchase.costCurrency === "USD", JSON.stringify(afterPurchase));
+const purchaseRow = (await call("/stock", { cookie: a })).json?.movements?.[0];
+check("the purchase keeps its cost and supplier in the history", purchaseRow?.type === "purchase" && purchaseRow.unitCostMinor === 2600 && purchaseRow.costCurrency === "USD" && purchaseRow.supplier === "Chhay Auto Parts", JSON.stringify(purchaseRow));
+const riel = await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "purchase", quantity: 1, unitCost: 100000, costCurrency: "KHR" } });
+check("a cost in the product's other currency is refused, and nothing changes", riel.json?.fields?.unitCost === "cost_currency_mismatch" && (await item())?.onHand === 20, riel.raw);
+const onCorrection = await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "adjust_in", quantity: 1, reason: "returned", unitCost: 100, costCurrency: "USD" } });
+check("a cost on a correction is refused", onCorrection.json?.fields?.unitCost === "cost_purchase_only", onCorrection.raw);
+const noCost = await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "purchase", quantity: 1 } });
+check("a purchase without a cost keeps the average", noCost.status === 200 && (await item())?.costMinor === 2300 && (await item())?.onHand === 21);
+const pageNow = (await call("/stock", { cookie: a })).json;
+check("the stock value counts it at the average", pageNow?.value?.USD >= 21 * 2300, JSON.stringify(pageNow?.value));
+const soldAtAverage = await counter(1);
+check("the next sale freezes the average as its cost", soldAtAverage.status === 200 && sql(`select unit_cost_minor from order_items where order_id = '${soldAtAverage.json?.id}'`) === "2300", soldAtAverage.raw);
+await call(`/counter/sales/${soldAtAverage.json?.id}/void`, { method: "POST", cookie: a });
+check("a return puts the stock back and keeps the average", (await item())?.onHand === 21 && (await item())?.costMinor === 2300);
+let refusedByDatabase = false;
+try {
+  sql(`insert into stock_movements (store_id, variant_id, location_id, type, quantity, reason, unit_cost_minor, cost_currency)
+       select store_id, variant_id, location_id, 'adjust_in', 1, 'returned', 100, 'USD' from stock_levels where variant_id = '${bread}' limit 1`);
+} catch {
+  refusedByDatabase = true;
+}
+check("the database itself refuses a cost on anything but a purchase", refusedByDatabase);
+
 const stopped = await call(`/stock/track/${bread}`, { method: "DELETE", cookie: a });
 check("stopping tracking sells without a limit again", stopped.status === 200 && (await onHand()) === null && (await call(`/public/stores/${slugA}`)).json?.stock?.[bread] === undefined);
 

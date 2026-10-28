@@ -795,6 +795,11 @@ model StockMovement {
   transferId      String?                @map("transfer_id") @db.Uuid
   /// Sales and their returns.
   orderId         String?                @map("order_id") @db.Uuid
+  /// A purchase's cost of one, in cost_currency (docs/blueprint.md "Cost price", level 2): it moves the option's average cost. Purchases only.
+  unitCostMinor   Int?                   @map("unit_cost_minor")
+  costCurrency    Currency?              @map("cost_currency")
+  /// Who a purchase came from ("" = not said).
+  supplier        String                 @default("")
   note            String                 @default("")
   actorMerchantId String?                @map("actor_merchant_id") @db.Uuid
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)

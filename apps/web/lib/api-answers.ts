@@ -566,6 +566,8 @@ export const stockPageSchema = z.object({
   tracksStock: z.boolean(),
   /** At or below this many, an option is marked low. */
   lowAt: z.number(),
+  /** On hand × cost, dollars and riel apart, and how many options in stock have no cost yet. */
+  value: z.object({ USD: z.number(), KHR: z.number(), withoutCost: z.number() }),
   items: z.array(
     z.object({
       variantId: z.string(),
@@ -578,6 +580,9 @@ export const stockPageSchema = z.object({
       /** null = not tracked: sells without a limit. */
       onHand: z.number().nullable(),
       low: z.boolean(),
+      /** The option's cost (the average after purchases); null = not known. */
+      costMinor: z.number().nullable(),
+      costCurrency: currencySchema.nullable(),
     }),
   ),
   movements: z.array(
@@ -588,6 +593,10 @@ export const stockPageSchema = z.object({
       quantity: z.number(),
       reason: stockAdjustmentReasonSchema.nullable(),
       note: z.string(),
+      /** A purchase's cost of one and who it came from. */
+      unitCostMinor: z.number().nullable(),
+      costCurrency: currencySchema.nullable(),
+      supplier: z.string(),
       createdAt: z.string(),
       orderId: z.string().nullable(),
       orderNumber: z.number().nullable(),

@@ -1,5 +1,16 @@
 import type { Prisma, Tx } from "@khmio/db";
-import { getBuyerStockState, LOW_STOCK_THRESHOLD, planHasFeature, type PlanId, type StockChangeInput, type StockTrackInput, type SubscriptionStatus } from "@khmio/shared";
+import {
+  getBuyerStockState,
+  LOW_STOCK_THRESHOLD,
+  movingAverageCost,
+  planHasFeature,
+  stockValue,
+  type Currency,
+  type PlanId,
+  type StockChangeInput,
+  type StockTrackInput,
+  type SubscriptionStatus,
+} from "@khmio/shared";
 import { AppException, InvalidInputException } from "../errors";
 import { planInForce } from "../merchant/plan";
 
@@ -61,6 +72,8 @@ const stockVariantSelect = {
   labelKm: true,
   labelEn: true,
   isDefault: true,
+  costMinor: true,
+  costCurrency: true,
   product: { select: { id: true, titleKm: true, titleEn: true } },
 } satisfies Prisma.ProductVariantSelect;
 type StockVariantRow = Prisma.ProductVariantGetPayload<{ select: typeof stockVariantSelect }>;
@@ -72,12 +85,15 @@ const stockMovementSelect = {
   quantity: true,
   reason: true,
   note: true,
+  unitCostMinor: true,
+  costCurrency: true,
+  supplier: true,
   createdAt: true,
   order: { select: { id: true, orderNumber: true, channel: true } },
 } satisfies Prisma.StockMovementSelect;
 type StockMovementRow = Prisma.StockMovementGetPayload<{ select: typeof stockMovementSelect }>;
 
-/** The Stock page: every live product option with its count (null = not tracked), and the latest changes. */
+/** The Stock page: every live product option with its count (null = not tracked) and cost, what the stock is worth, and the latest changes. */
 export function toStockPage(
   variants: StockVariantRow[],
   levels: { variantId: string; onHand: number; reserved: number }[],
@@ -85,10 +101,16 @@ export function toStockPage(
   plan: PlanId,
 ) {
   const byVariant = new Map(levels.map((level) => [level.variantId, level]));
+  const tracked = variants.flatMap((variant) => {
+    const level = byVariant.get(variant.id);
+    return level ? [{ onHand: level.onHand, costMinor: variant.costMinor, costCurrency: variant.costCurrency }] : [];
+  });
   return {
     /** Writes need Pro or Advance; on a lower plan the counts are shown, locked. */
     tracksStock: tracksStock(plan),
     lowAt: LOW_STOCK_THRESHOLD,
+    /** On hand × cost, dollars and riel apart ("Cost price", level 2). */
+    value: stockValue(tracked),
     items: variants.map((variant) => {
       const level = byVariant.get(variant.id);
       const state = level ? getBuyerStockState(true, level.onHand - level.reserved) : null;
@@ -102,6 +124,8 @@ export function toStockPage(
         sku: variant.sku,
         onHand: level ? level.onHand : null,
         low: state !== null && state.kind !== "in_stock",
+        costMinor: variant.costMinor,
+        costCurrency: variant.costCurrency,
       };
     }),
     movements: movements.map(({ createdAt, order, ...movement }) => ({
@@ -159,10 +183,15 @@ export async function untrackVariant(tx: Tx, storeId: string, variantId: string)
 
 /**
  * Stock arriving, or a correction. Taking away only succeeds while enough is
- * free (one statement, like a sale), so a count can never go below zero.
+ * free (one statement, like a sale), so a count can never go below zero. A
+ * purchase with a cost moves the option's average cost (recordPurchaseCost).
  */
 export async function recordStockChange(tx: Tx, context: { storeId: string; merchantId: string }, input: StockChangeInput): Promise<void> {
   const locationId = await mainLocationId(tx, context.storeId);
+  // Before the count changes: the average weighs what was on hand before this purchase.
+  if (input.type === "purchase" && input.unitCost !== undefined && input.costCurrency) {
+    await recordPurchaseCost(tx, input.variantId, locationId, input.quantity, input.unitCost, input.costCurrency);
+  }
   const count =
     input.type === "adjust_out"
       ? await tx.$executeRaw`UPDATE stock_levels SET on_hand = on_hand - ${input.quantity}, updated_at = now()
@@ -182,10 +211,35 @@ export async function recordStockChange(tx: Tx, context: { storeId: string; merc
       type: input.type,
       quantity: input.quantity,
       reason: input.type === "purchase" ? null : (input.reason ?? null),
+      unitCostMinor: input.type === "purchase" ? (input.unitCost ?? null) : null,
+      costCurrency: input.type === "purchase" && input.unitCost !== undefined ? (input.costCurrency ?? null) : null,
+      supplier: input.type === "purchase" ? input.supplier : "",
       note: input.note ?? "",
       actorMerchantId: context.merchantId,
     },
   });
+}
+
+/**
+ * A purchase's cost moves the option's cost to the moving average
+ * (docs/blueprint.md "Cost price", level 2). The option's row and its count
+ * are locked first, so two purchases at once can't both average from the
+ * same old numbers. The cost is in the product's one cost currency: a
+ * purchase in the other one is refused. An untracked option is refused
+ * later by the count's own check, which rolls this back too.
+ */
+async function recordPurchaseCost(tx: Tx, variantId: string, locationId: string, bought: number, unitCost: number, currency: Currency): Promise<void> {
+  const [option] = await tx.$queryRaw<{ productId: string; costMinor: number | null; costCurrency: Currency | null }[]>`
+    SELECT product_id AS "productId", cost_minor AS "costMinor", cost_currency AS "costCurrency"
+      FROM product_variants WHERE id = ${variantId}::uuid FOR UPDATE`;
+  if (!option) throw new InvalidInputException({ variantId: "product_unavailable" });
+  const [level] = await tx.$queryRaw<{ onHand: number }[]>`
+    SELECT on_hand AS "onHand" FROM stock_levels WHERE variant_id = ${variantId}::uuid AND location_id = ${locationId}::uuid FOR UPDATE`;
+  const sibling = await tx.productVariant.findFirst({ where: { productId: option.productId, deletedAt: null, costCurrency: { not: null } }, select: { costCurrency: true } });
+  const productCurrency = option.costCurrency ?? sibling?.costCurrency ?? null;
+  if (productCurrency && productCurrency !== currency) throw new InvalidInputException({ unitCost: "cost_currency_mismatch" });
+  const average = movingAverageCost(level?.onHand ?? 0, option.costMinor, bought, unitCost);
+  await tx.productVariant.update({ where: { id: variantId }, data: { costMinor: average, costCurrency: currency } });
 }
 
 /** The plan of the shop page's store, read through app_public_store_plan (buyers can't read subscriptions). */
