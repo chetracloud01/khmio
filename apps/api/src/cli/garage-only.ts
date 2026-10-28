@@ -1,5 +1,5 @@
 import { createSystemDb } from "@khmio/db";
-import { OFFERED_BUSINESS_TYPES } from "@khmio/shared";
+import type { BusinessType } from "@khmio/shared";
 import { parseArgs } from "node:util";
 import { getEnv } from "../config";
 import { createFileStorage } from "../files/storage";
@@ -8,13 +8,17 @@ import { removeStore } from "./remove-store";
 // pnpm data:garage-only [-- --yes]
 //
 // Garage first (docs/blueprint.md "Garage first"): leaves a development
-// database with only the shops of the business types Khmio offers now
-// (packages/shared OFFERED_BUSINESS_TYPES — the garage), so every test starts
-// from the Demo Garage. Every other shop is deleted with everything it owns
+// database with only garage shops, so every test starts from the Demo Garage
+// — whatever business types sign-up offers (they're all open since
+// 2026-10-28, so the offered list can't decide this). Every other shop is
+// deleted with everything it owns
 // and its photo files, then the test merchants left without a shop. Platform
 // data stays: admin users, settings, the audit log, the waitlist, backups.
 // The database's structure is never touched. Without --yes it only lists
 // what it would delete. Development only.
+
+/** The shops this keeps: garages, the business every change is tested on first. */
+const KEPT_TYPES: BusinessType[] = ["garage"];
 
 async function main() {
   const args = process.argv.slice(2);
@@ -25,14 +29,14 @@ async function main() {
 
   const db = createSystemDb(ownerUrl);
   try {
-    const kept = await db.store.findMany({ where: { businessType: { in: [...OFFERED_BUSINESS_TYPES] } }, select: { slug: true } });
+    const kept = await db.store.findMany({ where: { businessType: { in: KEPT_TYPES } }, select: { slug: true } });
     const doomed = await db.store.findMany({
-      where: { businessType: { notIn: [...OFFERED_BUSINESS_TYPES] } },
+      where: { businessType: { notIn: KEPT_TYPES } },
       select: { id: true, slug: true, businessType: true, _count: { select: { products: true, orders: true, customers: true } } },
       orderBy: { createdAt: "asc" },
     });
     // Merchants who belong to no shop that stays (dev A and B, and anyone who never finished sign-up).
-    const keptMerchant = { memberships: { some: { store: { businessType: { in: [...OFFERED_BUSINESS_TYPES] } } } } };
+    const keptMerchant = { memberships: { some: { store: { businessType: { in: KEPT_TYPES } } } } };
     const merchants = await db.merchant.count({ where: { NOT: keptMerchant } });
 
     process.stdout.write(`Keeping ${kept.length} shop(s): ${kept.map((store) => store.slug).join(", ") || "none — run pnpm demo:garage"}\n`);
