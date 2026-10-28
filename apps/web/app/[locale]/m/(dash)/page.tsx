@@ -98,7 +98,7 @@ export default function MerchantHomePage() {
       <NeedsYouBanner count={summary.waiting} href={`${base}/orders`} />
       <QuickActions items={quickActions} />
       <SetupChecklist />
-      <SalesOverview days={summary.days} top={summary.topProducts} cashToCollect={summary.cashToCollect} mainCurrency={store.defaultCurrency} />
+      <SalesOverview days={summary.days} top={summary.topProducts} cashToCollect={summary.cashToCollect} mainCurrency={store.defaultCurrency} reportLink={{ href: `${base}/reports/profit`, label: tApp("profitReportLink") }} />
       {problem && (
         <p role="alert" className="rounded-DEFAULT bg-danger/10 px-4 py-2 text-sm text-danger">
           {problem}

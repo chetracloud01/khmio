@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Store,
   Truck,
+  Users,
   Warehouse,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -53,6 +54,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     { href: `/${locale}/mockup/dashboard/products`, label: t("navProducts"), icon: Package, mobile: true },
     { href: `/${locale}/mockup/dashboard/stock`, label: t("navStock"), icon: Warehouse, mobile: true },
     { href: `/${locale}/mockup/dashboard/orders`, label: t("navOrders"), icon: ShoppingBag, mobile: true },
+    // Phones reach Customers from the Orders page's button.
+    { href: `/${locale}/mockup/dashboard/customers`, label: t("navCustomers"), icon: Users, mobile: false },
     { href: profileHref, label: t("navProfile"), icon: Store, mobile: true },
     { href: `/${locale}/mockup/dashboard/sell`, label: t("navSell"), icon: ScanLine, mobile: false },
     { href: deliveryHref, label: t("navDelivery"), icon: Truck, mobile: false },
@@ -124,7 +127,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       nav={navItems.map((item) => ({
         ...item,
         // Delivery, Store settings, Verification and Billing are reached from the Profile tab on a phone.
-        alsoActiveOn: item.href === profileHref ? reachedFromProfile : undefined,
+        // …and Customers from the Orders tab.
+        alsoActiveOn: item.href === profileHref ? reachedFromProfile : item.href === `/${locale}/mockup/dashboard/orders` ? [`/${locale}/mockup/dashboard/customers`] : undefined,
         locked: item.href === stockHref && stockLocked,
         lockedLabel: t("lockedOnPlan"),
         badge: item.href === `/${locale}/mockup/dashboard/orders` ? waiting : undefined,

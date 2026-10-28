@@ -13,6 +13,7 @@ import { fileStorageProvider } from "./files/storage";
 import { HealthController } from "./health/health.controller";
 import { MerchantStoreGuard } from "./merchant/store.guard";
 import { OrdersController } from "./orders/orders.controller";
+import { CustomersController } from "./customers/customers.controller";
 import { ProductsController } from "./products/products.controller";
 import { CustomFieldsController } from "./custom-fields/custom-fields.controller";
 import { JobCardsController } from "./job-cards/job-cards.controller";
@@ -37,6 +38,7 @@ import { WaitlistController } from "./website/waitlist.controller";
     ProductsController,
     DeliveryController,
     OrdersController,
+    CustomersController,
     CounterController,
     StockController,
     ModulesController,

@@ -35,6 +35,8 @@ export const orderDetailSelect = {
   pickupHours: true,
   buyerName: true,
   buyerPhone: true,
+  // Their page in Customers; empty for a walk-in at the counter who gave no phone.
+  customerId: true,
   // A booking: when the buyer would like it done.
   preferredAt: true,
   // Dine-in: the table it was for ("" = none).

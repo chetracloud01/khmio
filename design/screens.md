@@ -256,8 +256,15 @@ Phone first; sidebar from tablet width; tables on desktop.
 - Part 2 (Advance): several warehouses and branches, transfers, which
   location the shop and each counter sell from, KHQR reservations.
 
-### S14. Customers — New · 2
-- Buyers with order count, total spent, last order; buyer detail with history.
+### S14. Customers — Built · 2 (every plan)
+- **Live (2026-10-28):** `/m/customers`: every buyer the shop keeps (online
+  checkout, and counter sales with a phone), with orders, spent (dollars and
+  riel apart) and last order; search by name or a phone typed any way; sort
+  by any column. One customer: call or copy their number, their numbers
+  (cancelled and unpaid orders aren't counted), last delivery area, and every
+  order. Laptop: in the side menu; phone: the Customers button on Orders. An
+  order's buyer name opens their page. One screen for the mockup and the live
+  page (`components/customers`). No database change.
 
 ### S15. Discounts — New · 3
 - Promo codes (percent or amount, dates, limit); today codes are sample data only.

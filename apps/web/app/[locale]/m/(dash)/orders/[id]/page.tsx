@@ -372,7 +372,13 @@ function OrderDetail({
         <h2 className="font-semibold">{t("buyer")}</h2>
         <div className="flex items-center gap-3">
           <User className="h-5 w-5 shrink-0 text-muted" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{order.buyerName}</span>
+          {order.customerId ? (
+            <Link href={`/${locale}/m/customers/${order.customerId}`} className="flex min-h-touch min-w-0 flex-1 items-center truncate text-sm font-medium text-brand underline-offset-4 hover:underline">
+              {order.buyerName}
+            </Link>
+          ) : (
+            <span className="min-w-0 flex-1 truncate text-sm font-medium">{order.buyerName}</span>
+          )}
           <a href={`tel:+${order.buyerPhone}`} className="flex min-h-touch shrink-0 items-center gap-2 rounded-DEFAULT border border-border px-3 text-sm font-medium">
             <Phone className="h-4 w-4" aria-hidden="true" />
             <span className="tabular-nums">{formatKhmerPhoneLocal(order.buyerPhone)}</span>

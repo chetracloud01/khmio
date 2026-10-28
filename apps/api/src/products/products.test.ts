@@ -1,3 +1,4 @@
+import type { Currency } from "@khmio/shared";
 import { describe, expect, it } from "vitest";
 import { detectPhotoType, isStorePhotoKey, newPhotoKey } from "../files/photos";
 import { photoUrl, productRow } from "../testing/rows";
@@ -50,6 +51,14 @@ describe("a product as the seller sees it", () => {
   it("shows wholesale prices only on plans that have them", () => {
     expect(toProductDto(productRow(), photoUrl, true).variants[0]).toMatchObject({ wholesalePriceUsdCents: 180 });
     expect(toProductDto(productRow(), photoUrl, false).variants[0]).not.toHaveProperty("wholesalePriceUsdCents");
+  });
+
+  it("sends cost prices to the seller only, never to the shop page", () => {
+    const costCurrency: Currency = "USD";
+    const row = productRow({ variants: productRow().variants.map((variant) => ({ ...variant, costMinor: 120, costCurrency })) });
+    expect(toProductDto(row, photoUrl, false, true).variants[0]).toMatchObject({ costMinor: 120, costCurrency: "USD" });
+    expect(toProductDto(row, photoUrl).variants[0]).not.toHaveProperty("costMinor");
+    expect(JSON.stringify(toProductDto(row, photoUrl, true))).not.toContain("cost");
   });
 
   it("gives each photo its address and its small copy's, and says whether it has options", () => {

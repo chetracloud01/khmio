@@ -128,6 +128,9 @@ export const productVariantSchema = z.object({
   /** Only on plans with wholesale prices. */
   wholesalePriceUsdCents: z.number().nullish(),
   wholesalePriceKhr: z.number().nullish(),
+  /** The seller's own cost (never sent to the shop page); null = not known. */
+  costMinor: z.number().nullish(),
+  costCurrency: currencySchema.nullish(),
 });
 export type ProductVariant = z.infer<typeof productVariantSchema>;
 
@@ -392,6 +395,30 @@ export const sellerSummarySchema = z.object({
 });
 export type SellerSummary = z.infer<typeof sellerSummarySchema>;
 
+const profitFiguresSchema = z.object({
+  sales: z.number(),
+  costedSales: z.number(),
+  cost: z.number(),
+  profit: z.number(),
+  marginPercent: z.number().nullable(),
+  missingCostSales: z.number(),
+});
+const profitPeriodSchema = z.object({
+  USD: profitFiguresSchema,
+  KHR: profitFiguresSchema,
+  products: z.array(z.object({ nameKm: z.string(), nameEn: z.string(), quantity: z.number(), USD: profitFiguresSchema, KHR: profitFiguresSchema })),
+});
+
+/** GET /orders/profit (Pro): per period, sales, cost and profit per currency (never added together); lines without a cost apart. */
+export const profitReportSchema = z.object({
+  mainCurrency: currencySchema,
+  today: profitPeriodSchema,
+  week: profitPeriodSchema,
+  month: profitPeriodSchema,
+});
+export type ProfitReport = z.infer<typeof profitReportSchema>;
+export type ProfitFigures = z.infer<typeof profitFiguresSchema>;
+
 /** GET /orders: one row of the seller's order list. */
 export const sellerOrderSchema = z.object({
   id: z.string(),
@@ -415,10 +442,38 @@ export const sellerOrderSchema = z.object({
 });
 export type SellerOrder = z.infer<typeof sellerOrderSchema>;
 
+/** GET /customers/page (rows): one of the shop's buyers with their numbers (packages/shared customers.ts). Money per currency, never added together. */
+export const customerRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** 855… */
+  phone: z.string(),
+  /** Orders that count as sales: not cancelled, not still awaiting payment. */
+  orderCount: z.number(),
+  spent: perCurrency,
+  firstOrderAt: z.string().nullable(),
+  lastOrderAt: z.string().nullable(),
+  /** When the shop first saw them. */
+  createdAt: z.string(),
+});
+export type CustomerRow = z.infer<typeof customerRowSchema>;
+
+/** GET /customers/:id: one buyer, their last delivery choice, and their orders, newest first. */
+export const customerDetailSchema = customerRowSchema.extend({
+  area: deliveryAreaSchema.nullable(),
+  districtId: z.string().nullable(),
+  provinceId: z.string().nullable(),
+  landmark: z.string(),
+  orders: z.array(sellerOrderSchema),
+});
+export type CustomerDetail = z.infer<typeof customerDetailSchema>;
+
 /** GET /orders/:id and POST /orders/:id/actions: one order in full, for the seller. */
 export const sellerOrderDetailSchema = orderViewSchema.extend({
   id: z.string(),
   buyerPhone: z.string(),
+  /** Their page in Customers; null for a walk-in at the counter who gave no phone. */
+  customerId: z.string().nullable(),
   cancelNote: z.string(),
   /** Dine-in: the table it was for; "" = none. */
   tableName: z.string(),

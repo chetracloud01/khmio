@@ -4,8 +4,11 @@ Micro-merchant e-commerce PWA for Cambodia: Bakong KHQR + ABA PayWay,
 Telegram alerts, Khmer/English. Full plan: docs/blueprint.md
 
 ## How I work (follow this order)
-1. Design first: build screens as real pages in apps/web/app/mockup/ with
-   mock data, from design/screens.md. No backend until I approve a screen.
+1. Design first, one screen: build each screen ONCE as a component in
+   apps/web/components/<feature>/; the mockup page shows it with sample data
+   (from design/screens.md), the live page with real data. No backend until
+   I approve the screen. Never a separate mockup copy (docs/engineering-standard.md
+   "One screen, two data sources").
 2. Then build backend features one at a time, per docs/blueprint.md roadmap.
 3. Always propose a plan and wait for my OK before writing code.
 4. After coding: run lint, typecheck, tests; fix failures; summarize changes.

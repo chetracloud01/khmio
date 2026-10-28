@@ -3,13 +3,14 @@ import { lineFieldsRequestSchema, orderActionRequestSchema } from "@khmio/shared
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
-import { assertStoreWritable } from "../merchant/plan";
+import { assertPlanFeature, assertStoreWritable, storePlan } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
 import { assertModule } from "../modules/modules";
 import { readSellerInvoice } from "./invoice";
 import { saveLineFields } from "./line-fields";
 import { readOrderDetail, runSellerAction } from "./order-actions";
 import { parseOrderListQuery, readOrderList, readOrderListPage, readStoreSlug } from "./order-list";
+import { readProfitReport } from "./profit-report";
 import { sellerSummary } from "./summary";
 
 /** The seller's orders (roadmap steps 4 and 6): the list, one order in full, and moving it on. */
@@ -41,6 +42,15 @@ export class OrdersController {
   @Get("summary")
   async summary(@CurrentStore() context: MerchantStore) {
     return withContext(this.app, context, (tx) => sellerSummary(tx, context.storeId));
+  }
+
+  /** The profit report (Pro plan): sales, cost and profit per period, from the cost frozen on each line. Before ":id". */
+  @Get("profit")
+  async profit(@CurrentStore() context: MerchantStore) {
+    return withContext(this.app, context, async (tx) => {
+      assertPlanFeature((await storePlan(tx, context.storeId)).plan, "profitReport");
+      return readProfitReport(tx, context.storeId);
+    });
   }
 
   @Get(":id")
