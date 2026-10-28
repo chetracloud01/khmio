@@ -1,6 +1,6 @@
 import type { Currency } from "@khmio/shared";
 
-// Types shared by the seller's home (design/screens.md S3), live and mockup.
+// Types shared by the seller's home (design/screens.md S3).
 // Its blocks live in components/seller-app (header, install, banner, quick
 // actions), components/sales-overview and components/seller-cards.
 

@@ -66,7 +66,7 @@ Each phase starts only when its trigger happens. Skipping ahead adds cost with n
 
 **Trigger:** a real second product is decided (with real users who want it).
 
-1. **New app, same repo:** `apps/<product>-web` for the screens, a new module folder in `apps/api` (for example `apps/api/src/booking/`). Same rules as the store: Zod on every input, `withContext()` and RLS, text in `messages/*.json`, design-first mockups.
+1. **New app, same repo:** `apps/<product>-web` for the screens, a new module folder in `apps/api` (for example `apps/api/src/booking/`). Same rules as the store: Zod on every input, `withContext()` and RLS, text in `messages/*.json`, specs first and live pages only (no mockups).
 2. **Shared login:** every product is served on the same origin under its own path — in the same Next.js app, or as a separate app joined by path with Vercel multi-zones — so the existing host-only session cookie already covers all of them. Never widen the cookie with `Domain=`. The `Session` table stays the single source of truth. A product on a **different domain** waits for the Phase 2 identity service.
 3. **Entitlements table** in the platform: which account may use which product, on which plan. Each product's API checks it with a guard — enforced in the API, not just the UI, same rule as `plans.ts`.
 4. **Product plans** live in `packages/shared` next to `plans.ts`, one file per product, so the admin can see and change everything in one place.
@@ -152,7 +152,7 @@ Our strengths — KHQR, Telegram alerts, Khmer first, mobile first — match how
 
 **Watch:** CamInvoice e-invoicing launched May 2025; B2B is voluntary now with a mandatory schedule planned ([VATupdate](https://www.vatupdate.com/2025/05/21/cambodias-new-era-of-e-invoicing-inside-the-caminvoice-mandate/)). When it becomes mandatory, "issue a CamInvoice" can be a paid feature.
 
-**Before building:** finish go-live; interview 5 extra-class teachers and 5 landlords (how they collect today, what goes wrong, would they pay about $3–5/month — a guess to test against "Budget" in `docs/blueprint.md`); then mockups first, per `CLAUDE.md`.
+**Before building:** finish go-live; interview 5 extra-class teachers and 5 landlords (how they collect today, what goes wrong, would they pay about $3–5/month — a guess to test against "Budget" in `docs/blueprint.md`); then specs first and live pages, per `CLAUDE.md`.
 
 ## Open questions
 

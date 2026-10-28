@@ -110,24 +110,23 @@ through `apps/web/lib/device-storage.ts` (`readStored(key, schema)`,
 `writeStored(key, value)`): what comes back is checked, and a blocked or full
 storage never breaks the page.
 
-**One screen, two data sources (decided 2026-10-28).** A screen is built
-once, as one component in `apps/web/components/<feature>/` that takes its
-data and actions as props. The mockup page renders it with sample data; the
-live page renders it with data from `lib/api.ts`. The owner approves the
-screen on the mockup, and going live only connects the data: there is never
-a second copy to drift apart.
+**Live pages only (decided 2026-10-28, with "Garage first").** There are no
+mockups: a screen is built once, as a real page on the kit, from its written
+spec in `design/screens.md`, with the API behind it. The owner approves it on
+the live page with the Demo Garage's data (`pnpm demo:garage`, then "Sign in
+as Garage"), so what is approved is exactly what ships — no second copy to
+drift apart. A big screen keeps its page file thin (load data, handle
+not-found and offline) and draws itself from one component in
+`apps/web/components/<feature>/`:
 
 ```
-components/customers/customers-screen.tsx   ← the one screen, from the kit
-mockup/dashboard/customers/page.tsx         ← sample data
-m/(dash)/customers/page.tsx                 ← real data (lib/api.ts)
+components/customers/customers-screen.tsx   ← the screen, from the kit
+m/(dash)/customers/page.tsx                 ← loads it through lib/api.ts
 ```
 
-Sample data has the same type as the API's answer (the schema in
-`lib/api-answers.ts`), so a mockup can't show something the API can't send.
-Older screens built twice: when one is next worked on, its mockup page
-renders the live screen's component with sample data, or is removed when
-nothing but the live page needs it. Their lint warnings get fixed then too.
+Sample values exist only on `/styleguide` (`app/[locale]/styleguide/samples.ts`),
+to show each part. The old mockups are in git history (tag v0.5.1) if a
+design needs looking up.
 
 ## 4. Backend (`apps/api`, `apps/worker`)
 
@@ -255,7 +254,7 @@ export class OrdersController {
 | Check | Catches |
 | --- | --- |
 | `pnpm typecheck` | Wrong types, missing props, `any` slipping in |
-| `pnpm lint` | Raw controls in live screens (error), in mockups (warning) |
+| `pnpm lint` | Raw controls in screens instead of the kit |
 | `apps/web/app/[locale]/styleguide/coverage.test.ts` | A kit part not shown on `/styleguide` |
 | `apps/web/components/theme-contrast.test.ts` | A colour change that makes text hard to read |
 | Tests beside each rule | A rule broken by a later change |

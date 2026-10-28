@@ -16,7 +16,7 @@ import { readStored, writeStored } from "@/lib/device-storage";
 // The seller home's working blocks in the sales card's style (2026-10-22
 // review): one rounded card each, a title row with a pill on the right, soft
 // inner panels, round icon buttons. "Needs your action", "Share your shop"
-// and "Find order by code". The live dashboard and its mockup draw these.
+// and "Find order by code", drawn by the seller dashboard.
 
 const CARD = "flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-bg p-4 shadow-card";
 
@@ -144,23 +144,6 @@ export function OrdersNeedingAction({ rows, total, allHref, limit = 5 }: { rows:
   );
 }
 
-/**
- * "Share your shop" as a card (the mockup's home): the share panel under a
- * title. `onShared` is told when the link went out (the setup checklist's step).
- */
-export function ShareShopCard({ url, shopName, qrFileName = "shop-qr.png", shared = false, onShared }: { url: string; shopName: string; qrFileName?: string; shared?: boolean; onShared?: () => void }) {
-  const t = useTranslations("Share");
-  return (
-    <section className={CARD}>
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold leading-normal">{t("title")}</h2>
-        {shared && <SharedPill />}
-      </div>
-      <ShareShopPanel url={url} shopName={shopName} qrFileName={qrFileName} onShared={onShared} />
-    </section>
-  );
-}
-
 /** "Shared" in green, once the shop's link has gone out. */
 export function SharedPill() {
   const t = useTranslations("Share");
@@ -174,8 +157,8 @@ export function SharedPill() {
 
 /**
  * The shop's link and its four ways out — QR code, Copy link, Telegram and
- * Other apps (the phone's own share list) — for the header's Share sheet and
- * the mockup's card. The QR code opens in place, with a way back.
+ * Other apps (the phone's own share list) — for the header's Share sheet.
+ * The QR code opens in place, with a way back.
  */
 export function ShareShopPanel({ url, shopName, qrFileName = "shop-qr.png", onShared }: { url: string; shopName: string; qrFileName?: string; onShared?: () => void }) {
   const t = useTranslations("Share");

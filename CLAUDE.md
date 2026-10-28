@@ -3,13 +3,23 @@
 Micro-merchant e-commerce PWA for Cambodia: Bakong KHQR + ABA PayWay,
 Telegram alerts, Khmer/English. Full plan: docs/blueprint.md
 
+**Khmio is the main brand (2026-10-28):** every part of a small business in
+one simple app, for Cambodia (Khmer, KHQR, riel, Telegram, phone first).
+Sign-up is open to every business type (OFFERED_BUSINESS_TYPES in
+packages/shared/business.ts); the garage is the most tested — every change is
+tried first on the Demo Garage (`pnpm demo:garage`) — and the other
+industries are in beta. `pnpm data:garage-only` clears a development
+database back to the garage. Full purpose: docs/blueprint.md "Garage first";
+which business comes next, and what each needs: docs/blueprint.md "Business
+roadmap".
+
 ## How I work (follow this order)
-1. Design first, one screen: build each screen ONCE as a component in
-   apps/web/components/<feature>/; the mockup page shows it with sample data
-   (from design/screens.md), the live page with real data. No backend until
-   I approve the screen. Never a separate mockup copy (docs/engineering-standard.md
-   "One screen, two data sources").
-2. Then build backend features one at a time, per docs/blueprint.md roadmap.
+1. Live pages only, no mockups: build each screen as a real page on the kit,
+   from its spec in design/screens.md, with the API behind it. I approve it on
+   the live page with the Demo Garage's data (docs/engineering-standard.md
+   "Live pages only"). Old mockups are in git history (tag v0.5.1), not in
+   the code.
+2. Build features one at a time, per docs/blueprint.md roadmap.
 3. Always propose a plan and wait for my OK before writing code.
 4. After coding: run lint, typecheck, tests; fix failures; summarize changes.
 5. Never commit unless I ask.
@@ -32,6 +42,8 @@ Every new table with store_id must enable RLS in its migration.
 pnpm db:up (start Postgres) | pnpm dev | pnpm lint | pnpm typecheck | pnpm test |
 pnpm db:migrate (new migration) | pnpm db:deploy (apply migrations)
 pnpm admin:add-owner -- --telegram-id <id> --name "<name>" (make/reset a platform owner; resets their 2FA)
+pnpm demo:garage [-- --reset] (the Demo Garage to test with) | pnpm data:garage-only [-- --yes]
+(development: delete every shop but the garage(s), with their photos; lists first)
 
 ## Rules
 - Prices are integers: price_usd_cents, price_khr (riel). A product may have

@@ -8,6 +8,14 @@ export type BusinessType = z.infer<typeof businessTypeSchema>;
 
 export const BUSINESS_TYPES: readonly BusinessType[] = businessTypeSchema.options;
 
+/**
+ * The business types a new shop can pick, and a shop can switch to. Every
+ * type since 2026-10-28 (docs/blueprint.md "Garage first"): the garage is the
+ * most tested, the others are in beta. Take one out of this list to hide it
+ * again; the API accepts every type either way.
+ */
+export const OFFERED_BUSINESS_TYPES: readonly BusinessType[] = BUSINESS_TYPES;
+
 export interface NamedDefault {
   /** Stable id within a store, e.g. "piece" or "new-arrivals". */
   key: string;

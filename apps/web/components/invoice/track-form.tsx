@@ -27,14 +27,11 @@ const LAST_TRACKED_KEY = "khmio.lastTracked";
 export function TrackForm({
   back,
   find,
-  fill,
   children,
 }: {
   /** The top bar's back arrow: to the shop the buyer came from. */
   back: { href: string; label: string };
   find: (code: string, phone: string) => Promise<TrackOutcome>;
-  /** Fills the fields from outside (the mockup's sample orders). */
-  fill?: { code: string; phone: string; key: number };
   children?: ReactNode;
 }) {
   const t = useTranslations("Track");
@@ -42,20 +39,11 @@ export function TrackForm({
   const tApp = useTranslations("App");
   const [code, setCode] = useState("");
   const [phone, setPhone] = useState("");
-  const [filled, setFilled] = useState<number | undefined>(undefined);
   const [errors, setErrors] = useState<Partial<Record<"code" | "phone", string>>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [last, setLast] = useState<LastTracked | null>(null);
   useEffect(() => setLast(readStored(LAST_TRACKED_KEY, lastTrackedSchema)), []);
-
-  if (fill && fill.key !== filled) {
-    setFilled(fill.key);
-    setCode(fill.code);
-    setPhone(fill.phone);
-    setErrors({});
-    setProblem(null);
-  }
 
   async function run(codeInput: string, phoneInput: string) {
     setProblem(null);

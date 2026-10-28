@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
  * The top of a shop page (design/screens.md B1): a brand-colour banner, the
  * shop's logo over its edge, its name, whether it's open, a short line of
  * facts, and `info` under them — the "Shop info & contact" row that opens
- * the Shop info sheet. The shop leads; Khmio stays in the background. One block for the live shop and its mockup — words come in as props.
+ * the Shop info sheet. The shop leads; Khmio stays in the background. Words come in as props.
  */
 export function ShopHero({
   name,

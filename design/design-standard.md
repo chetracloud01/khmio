@@ -81,8 +81,8 @@ and checks every text pair (4.5 : 1) and shape (3 : 1) in light, dark and
 "follow the device", for every accent. A colour change that fails it doesn't
 ship.
 
-**One kit, no copies.** Every screen — admin, seller, buyer and their
-mockups — is built from the shared building blocks in `packages/ui`
+**One kit, no copies.** Every screen — admin, seller and buyer — is built
+from the shared building blocks in `packages/ui`
 (`blocks.tsx`: `PageHeader`, `SectionTitle`, `StatCard`, `StatusPill` with
 the tones `brand` `success` `warning` `danger` `info` `muted`, `EmptyState`,
 `LoadingBlocks`, `ErrorState`, `DetailList`, `ConfirmDialog`; plus `Button`,
@@ -109,9 +109,7 @@ and each part is shown inside a `Demo` labelled with its name, so the page
 doubles as the list of what exists. Two checks keep it honest:
 `apps/web/app/[locale]/styleguide/coverage.test.ts` fails when a kit part
 isn't on the page, and lint stops a screen in `apps/web/app` that uses a raw
-`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit — an
-error on live screens, a warning in `app/[locale]/mockup` until that mockup
-is next worked on. A part that really needs a raw element (a whole-row tap
+`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit. A part that really needs a raw element (a whole-row tap
 target, the seller header's pill) says why in an `eslint-disable-next-line`
 comment. The kit's answers to the usual cases: `Button variant="ghost"` for
 small text actions, `IconButton` for an icon alone, `ChoiceCards` and
@@ -183,7 +181,7 @@ for text.
 
 ## 5. Forms (all roles)
 
-One standard, implemented in `mockup/form-ui.tsx`:
+One standard, implemented in `apps/web/components/form-ui.tsx`:
 
 1. **Sections** — fields grouped under a title and one line of help.
 2. **Draft** — edits stay in a draft; nothing is saved until Save.

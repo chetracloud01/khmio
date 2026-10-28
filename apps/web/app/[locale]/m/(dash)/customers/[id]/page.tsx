@@ -10,8 +10,7 @@ import { api, ApiError, type CustomerDetail, customerDetailSchema } from "@/lib/
 import { useMerchant } from "../../merchant-context";
 import { PageLoading, PageOffline } from "../../page-states";
 
-// One customer (design/screens.md S14): the same screen as the mockup, from
-// GET /customers/:id. Another shop's customer, or a mistyped address, is
+// One customer (design/screens.md S14), from GET /customers/:id. Another shop's customer, or a mistyped address, is
 // "not found".
 export default function CustomerPage() {
   const t = useTranslations("Customers");

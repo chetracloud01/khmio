@@ -18,7 +18,7 @@ import { useShareShop } from "./share-shop";
 import { z } from "zod";
 
 // The seller's home (design/screens.md S3), from the shared sections in
-// components/seller-home — the same ones as its mockup. The numbers come
+// components/seller-home. The numbers come
 // from GET /orders/summary (kept fresh by the dashboard layout, every minute
 // and after each order step); the rows from the order list.
 export default function MerchantHomePage() {

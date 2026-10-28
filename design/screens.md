@@ -3,8 +3,10 @@
 What each screen contains. How it must look and behave is in
 `design/design-standard.md`. Phone first (360 px), then tablet and desktop.
 
-Status: **Built** = matches the docs · **Mockup** = built as a mockup, backend later · **Change** = exists, needs the
-changes listed · **New** = not built yet.
+Status: **Built** = a live page in the app that matches the docs · **Spec** = written here, not built yet
+(an old mockup of it may be in git tag v0.5.1) · **Change** = exists, needs the changes listed · **New** =
+not designed in detail yet. Screens are built as live pages only, and tested with the Demo Garage first
+(docs/blueprint.md "Garage first").
 Phase: from `docs/blueprint.md` "Market and how we win" — L = launch, 2 = delivery and
 switching, 3 = growth.
 
@@ -18,7 +20,7 @@ something: then it gets a label from the translation files.
 | --- | --- | --- |
 | S1 Login | Mio's face above the sign-in buttons | Built |
 | S4 Orders list, empty | Mio above "No orders yet" | Built |
-| B5 KHQR payment, paid | Mio with a riel coin, a small hop, "Paid!", then B6 | Mockup |
+| B5 KHQR payment, paid | Mio with a riel coin, a small hop, "Paid!", then B6 | Spec |
 | Telegram bot photo, stickers | From the designer's final artwork | Later |
 
 ## Buyer
@@ -51,7 +53,7 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
   buttons (Call, Map, Telegram, Facebook — each opens the phone's own app),
   then Contact (phone → call, address → map, opening hours), Delivery (each
   Phnom Penh zone with its fee, provinces, pickup) and How to pay. One sheet
-  component for the live shop and the mockup.
+  component.
 
 ### B2. Product detail — Built · L
 - Photo carousel (swipe, dots), title, description.
@@ -96,7 +98,7 @@ Flow: Shop → (Product) → Cart → Checkout → Pay → Order status.
   "how to pay" steps.
 - The QR is scannable but its content is a mock until Bakong is connected.
 - **Live** (2026-10-27): `/o/<token>/pay`, from checkout and the order page's
-  "Pay now"; one KhqrPayPanel for the live page and this mockup. Paid only by
+  "Pay now"; one KhqrPayPanel (also shown on /styleguide). Paid only by
   the worker's bank check (the page asks every 3 s). Expired = the order was
   cancelled, so "Order again" instead of "Try again". "Open bank app" waits
   for Bakong's link. With `KHQR_PROVIDER=fake`, "Pay with the test bank".
@@ -242,8 +244,8 @@ Phone first; sidebar from tablet width; tables on desktop.
   it's the shop's only way to get an order (once delivery is set up). The
   separate "On your invoices" page is gone; its old link opens this group.
 
-### S11. Verification (KYC) — Built · L
-### S12. Plan and billing — Built · L
+### S11. Verification (KYC) — Spec · L
+### S12. Plan and billing — Spec · L
 ### S13. Stock — Built · L (Pro, Advance)
 - **Live, part 1 (Pro, main branch):** `/m/stock` from the Products page:
   each product option with its count, "Not tracked" until the seller starts
@@ -263,8 +265,8 @@ Phone first; sidebar from tablet width; tables on desktop.
   by any column. One customer: call or copy their number, their numbers
   (cancelled and unpaid orders aren't counted), last delivery area, and every
   order. Laptop: in the side menu; phone: the Customers button on Orders. An
-  order's buyer name opens their page. One screen for the mockup and the live
-  page (`components/customers`). No database change.
+  order's buyer name opens their page. Drawn from `components/customers`. No
+  database change.
 
 ### S15. Discounts — New · 3
 - Promo codes (percent or amount, dates, limit); today codes are sample data only.
@@ -272,8 +274,9 @@ Phone first; sidebar from tablet width; tables on desktop.
 ### S16. Staff — New · 3
 - Invite by phone; owner / staff roles.
 
-### S17. Reports — New · 3
+### S17. Reports — New · 3 (profit report built)
 - Daily sales, best sellers, delivery success rate.
+- **Live:** the profit report (Pro; `/m/reports/profit`, v0.5.1).
 
 ### P. Sell in shop (counter) — Built · 2 (Basic and up)
 Selling to a customer standing at the counter; owner only in v1, needs
@@ -306,23 +309,23 @@ internet. Plan feature `counterSales` (packages/shared plans.ts).
 
 ### A1. Overview — Built
 ### A2. Merchants — Built
-### A3. KYC review — Built
+### A3. KYC review — Spec
 ### A4. Plans — Built (read-only)
 ### A5. Audit log — Built
 ### A6. Settings — Built
-### A7. Subscriptions, Invoices — Built · L
+### A7. Subscriptions, Invoices — Spec · L
 - Subscriptions: every store's plan, status and what happens next; tabs for
   renewing this week, overdue, paused, trial ending; extend a period.
 - Invoices: list with KHQR reference; statuses Due, Overdue, Paid, Void.
   "Mark as paid" by hand needs a bank reference and reopens the shop;
   "Void" needs a reason. Both go to the audit log.
-### A8. Buyer payments, Failed checks — Built · L
+### A8. Buyer payments, Failed checks — Spec · L
 - Buyer payments: today's attempts across all stores, read-only; totals per
   currency, never added together.
 - Failed checks: attempts a person must look at (no answer, wrong amount,
   wrong currency, paid after expiry). "Check again" or "Close with a note" —
   never "mark as paid".
-### A9. Admin users — Built · L
+### A9. Admin users — Spec · L
 - Roles Owner, Support, Finance from packages/shared admin-roles.ts, with a
   table of what each can do. Invite by Telegram, change role, disable (never
   delete). There is always one active Owner.
@@ -330,7 +333,7 @@ internet. Plan feature `counterSales` (packages/shared plans.ts).
 - New role **Website editor** (with A10–A12): may edit, preview and publish
   website content, nothing else — no shops, money or settings.
 
-### A10. Website pages — Mockup · Website
+### A10. Website pages — Spec · Website
 - List of pages (Home, each product page, Pricing, Help, Terms, Privacy):
   status (published / draft changes), last published, by whom.
 - A page: its sections in order, each with on/off, move up/down, edit,
@@ -346,7 +349,7 @@ internet. Plan feature `counterSales` (packages/shared plans.ts).
   that version the new draft. Publish, restore and remove go to the audit
   log.
 
-### A11. Promotions — Mockup · Website
+### A11. Promotions — Spec · Website
 - A promotion is a "Promotion banner" section of one website page, so A10
   and A11 always show the same thing; edits go to that page's draft and go
   live when the page is published (a "Publish <page>" button here).
@@ -360,7 +363,7 @@ internet. Plan feature `counterSales` (packages/shared plans.ts).
 - Promotions are switched off, never removed — here or in A10 — so the
   record of what ran when is kept.
 
-### A12. Pictures — Mockup · Website
+### A12. Pictures — Spec · Website
 - Library of uploaded pictures: thumbnail, description (Khmer and English),
   size, where it's used (live page, draft, or an earlier version). Upload
   shrinks the picture in the browser first (as product photos do) and needs
@@ -372,7 +375,7 @@ internet. Plan feature `counterSales` (packages/shared plans.ts).
   restored — can't be deleted. Replacing its file updates every page that
   uses it right away, after a confirmation that names those pages.
 
-### A13. Backups — Built (list, Backup now, restore test) · Go-live; restore one shop's catalog: Mockup, after go-live
+### A13. Backups — Built (list, Backup now, restore test) · Go-live; restore one shop's catalog: Spec, after go-live
 Decided 2026-10-06. The nightly backup already exists (go-live step B3):
 the worker backs up the whole database at 03:00 Phnom Penh time into the
 private R2 bucket `khmio-backups`, keeps every backup 14 days and the newest
@@ -441,11 +444,12 @@ backup, its orders untouched, and the seller is told on Telegram.
 ### A14. Waitlist — Built · Website
 Built 2026-10-07 with the live website (no separate mockup: a read-only
 list in the A5 audit log's style). Admin → **Waitlist**: the people who
-asked on a coming-soon product page (P3) to hear when it opens.
-- Filter chips: All products, then one per coming-soon product with its
-  count ("Khmio Class · 12"). The counts are the evidence for choosing the
-  second product (docs/platform-launch-plan.md Stage 5).
-- Each row: when, name, phone (tap to call), business type, product.
+asked on a coming-soon solution page (P3) to hear when it opens.
+- Filter chips: All, then one per coming-soon solution with its count
+  ("Café & restaurant · 12"). The counts are the evidence for which business
+  to switch on next (docs/blueprint.md "Business roadmap"). Sign-ups made for
+  Khmio Class and Rent before they left the website stay listed.
+- Each row: when, name, phone (tap to call), the business, the product.
   Newest first, 100 at a time, "Show older".
 - Read-only. Owner and support only (`merchants_manage`): it holds phone
   numbers; finance sees "only an owner or support can see the waitlist".
@@ -455,10 +459,9 @@ asked on a coming-soon product page (P3) to hear when it opens.
 ## Platform website (Khmio)
 
 The public site on `khmio.com` that presents every product, from
-docs/platform-launch-plan.md Stage 3. Mockups live under `/mockup/site`;
-the live pages (`/`, `/pricing`, `/products/<id>`) are built (2026-10-07)
-from the same content in `apps/web/site/content.ts`, until the admin can
-edit it. The live site hides links to pages not built yet (Help, Terms,
+docs/platform-launch-plan.md Stage 3. The live pages (`/`, `/pricing`,
+`/products/<id>`) are built (2026-10-07) from the content in
+`apps/web/site/content.ts`, until the admin can edit it (A10–A12). The live site hides links to pages not built yet (Help, Terms,
 Privacy) and seller stories marked as samples. Brand rules:
 design/brand-guide.md. Visitors arrive from social media on a phone, often
 inside the TikTok or Facebook browser: phone first, fast, one clear action.
@@ -469,8 +472,8 @@ product cards are content: the admin edits it (A10–A12), previews it and
 publishes it, and the site shows it within seconds — no code, no deploy.
 The admin never moves boxes freely: the code always decides the layout,
 fonts, colours and spacing, so whatever is typed looks right on a phone.
-The mockups read sample content shaped exactly like the future database,
-so switching to real content changes only where it comes from.
+The pages read content shaped exactly like the future database, so
+switching to admin-edited content changes only where it comes from.
 
 **Site kit — the only section types** (one component and one Zod schema
 each, in shared packages; the schema also builds the admin form, so a new
@@ -514,43 +517,66 @@ Pages P1–P4 below list their starting sections, in order; the admin can
 change their content, switch them off, reorder them or add a promotion
 banner anywhere.
 
-### P1. Home — Mockup · Website
-- Hero: Mio (coin pose), the tagline លក់ងាយ ទទួលលុយរហ័ស with its English
-  line, one sentence on what Khmio does, "Start free" and "See pricing".
-- How it works in 3 steps: open your shop → share the link → get paid by
-  KHQR and alerted on Telegram.
-- Products: one card each. Khmio Shop ("Start free", "Learn more"); Khmio
-  Class and Khmio Rent marked "Coming soon" with "Join the waitlist".
-- Why sellers switch: no more payment screenshots, orders in one list,
-  Khmer first, works in the Telegram/Facebook browser.
-- Seller story: a placeholder card, clearly marked as sample until a real
-  seller agrees.
-- Closing band: "Start free — 14 days, no card" and the button.
+### Website redesign (2026-10-28)
 
-### P2. Product page: Khmio Shop — Mockup · Website
-- Title, Khmer subtitle (ហាងអនឡាញ), one-line promise, "Start free".
-- Features, each with a phone picture (a real screenshot later, a framed
-  placeholder now) and two lines: shop link; KHQR checked by itself;
-  Telegram alerts with a Confirm button; delivery and pickup; stock (Pro);
-  branches and warehouses (Advance).
-- "Which plan?" — a short row of the four plans linking to P4.
-- Questions: three or four answers (Do I need a website? Which banks? Is
-  my money safe? Can I cancel?).
+Khmio as the main brand — **every part of your business, in one simple app**
+— for a niche big business software doesn't serve: Cambodia's small shops,
+phone first, Khmer first, with KHQR, riel and dollars, and Telegram. The
+idea of an app suite comes from all-in-one business software; the design,
+words and pieces are Khmio's own. The old design, the Khmio Class and Rent
+pages, the announcement bar and the beta promotion were removed; old
+`/products/…` links redirect (Shop → the garage page, Class and Rent → home).
 
-### P3. Product page: coming soon (Class, Rent) — Mockup · Website
-- One page for every product not built yet (`/products/class`,
-  `/products/rent`), filled from the product list.
-- Title, Khmer subtitle, "Coming soon", what it will do in three points.
-- **Waitlist form:** name, phone (the usual phone rules, +855 prefix),
-  business type (teacher / school, landlord, other), the product preset.
-  Checked by a Zod schema from `packages/shared`; problems shown under the
-  field. After sending: a thank-you state with Mio and "We'll message you
-  on Telegram or by phone when it opens" — no date.
-- The mockup keeps sign-ups on the device only; the real form saves them
-  (one platform table, bot check and rate limit) when the site is built.
+- **Look:** a soft brand-colour glow behind the hero, large headlines,
+  pill buttons, cards with 24 px corners, colourful app tiles (theme tones
+  only), a centred heading on every section, a sticky see-through header.
+  Light and dark both work; phone first; Kantumruy Pro.
+- **Header:** logo, **Apps** (the home page's app grid), an **Industries**
+  menu (each business with its status badge), Pricing, language, Log in,
+  "Start free". On a phone: one menu sheet.
+- **Footer:** the industries, Khmio (pricing, contact) and legal links.
+- **Apps** come from one list (`SITE_APPS`, `apps/web/site/content-apps.ts`):
+  name, one line, icon and tone, a plan mark (Basic, Pro, Advance), and
+  **Available** or **Coming soon**. No pages of their own.
+- **Industries** come from one list (`SITE_SOLUTIONS`, `apps/web/site/content.ts`):
+  name, one line, what it covers, icon, and **Available** (green, the
+  garage), **Beta** (blue: open at sign-up, still being tested) or **Coming
+  soon** (with a waitlist). A badge is one word in that list.
 
-### P4. Pricing — Mockup · Website
-- Khmio Shop plans (the Plans section — not editable prices): Free, Basic, Pro, Advance, from `plans.ts`: monthly
+### P1. Home — Built · Website
+- Hero: "Every part of your business, in one simple app", for Cambodia's
+  small businesses; Mio ringed by app tiles; "Start free" and "See all apps";
+  trust points (Khmer & English, riel/dollars & KHQR, Telegram, free in the beta).
+- **App grid:** 16 apps — Online shop, Counter sales (Basic), Orders &
+  delivery, Customers, Stock (Pro), Job cards, Tables & kitchen, Services &
+  bookings, Invoices & receipts, Profit report (Pro), Telegram alerts
+  (Available); KHQR payments, Purchases & suppliers, Discounts, Staff,
+  Branches & warehouses (Advance) (Coming soon).
+- **"Big business software, made small and simple":** a side-by-side table
+  (cards on a phone) — set-up, works on, language, payments, alerts, price.
+  Never names a company.
+- **Industries:** Garage & auto repair (Available; covers car and motorbike
+  repair, car wash, tyres & oil), Auto parts, Phone shop, Café & restaurant,
+  Salon & services, Retail & online sellers (Beta) — each "Start free" and
+  "Learn more".
+- 3 steps to start (pick your business at sign-up), the plans, questions, closing.
+
+### P2. Industry page: Garage & auto repair — Built · Website
+- `/solutions/garage`: hero ("Your whole garage, in your pocket"), the
+  garage's features as a bento grid, "A day at the garage" in 3 steps, the
+  plans, questions, closing.
+
+### P3. Industry page: beta — Built · Website
+- One page per industry in beta (`/solutions/auto-parts`, `phone`, `cafe`,
+  `salon`, `retail`), all from the same sections: "Beta · Free to try",
+  what works today and (last) what's still coming, "Start free".
+- A **coming-soon** industry would instead show its waitlist (name and
+  phone; saved as Khmio Shop for that business, migration
+  `waitlist_solutions`); none is coming soon today. The waitlist section is
+  shown on /styleguide.
+
+### P4. Pricing — Built · Website
+- Khmio plans (the Plans section — not editable prices): Free, Basic, Pro, Advance, from `plans.ts`: monthly
   price, in USD or riel by a toggle (never both added), product limit,
   the trial for Free, and the plan's features.
 - Basic marked "Most shops start here"; each card's button: "Start free".
@@ -558,30 +584,29 @@ banner anywhere.
 - How paying works: one KHQR bill a month, no card, no automatic charge,
   cancel any time; data is locked, never deleted (blueprint "Subscription
   tiers").
-- Class and Rent: "Coming soon — join the waitlist" with links to P3.
 
 ## Account hub (My Khmio)
 
 After login, the one place a customer sees and controls every product they
-use, from docs/platform-roadmap.md Phase 1. Mockups under
-`/mockup/account`: a header with the logo, language, theme and the app
-switcher, and three tabs (My apps · Subscriptions · Account).
+use, from docs/platform-roadmap.md Phase 1. Spec only: a header with the
+logo, language, theme and the app switcher, and three tabs (My apps ·
+Subscriptions · Account).
 
-### H1. My apps — Mockup · Hub
+### H1. My apps — Spec · Hub
 - A card per product: Khmio Shop (shop name, plan, status, "Open
   dashboard"); Class and Rent ("Join the waitlist", or "On the waitlist ✓").
 
-### H2. My subscriptions — Mockup · Hub
+### H2. My subscriptions — Spec · Hub
 - Per product: plan, status (trial / active / payment due / paused), next
   bill date and amount, "Pay by KHQR", "Change plan"; payment history.
   The rules are the Shop's S12 and blueprint "Subscription life cycle", so
   "Pay by KHQR" and "Change plan" open the Shop's billing page (S12): the
   money logic lives in one place. Products not built yet say "coming soon".
 
-### H3. Account — Mockup · Hub
+### H3. Account — Spec · Hub
 - Name, login methods (Telegram, phone), language.
 
-### H4. App switcher — Mockup · Hub
+### H4. App switcher — Spec · Hub
 - In the seller dashboard (sidebar and phone header) and in My Khmio: Shop ·
   Class · Rent · My Khmio; the current one is ticked; products not open to
   this account show "Coming soon" and lead to their website page. On a phone
@@ -589,16 +614,9 @@ switcher, and three tabs (My apps · Subscriptions · Account).
 
 ## Build order
 
-Buyer first, then the seller screens the buyer flow depends on.
-
-1. ~~B4 Checkout + S8 Delivery settings~~ — done.
-2. ~~B5 KHQR card~~ — done.
-3. ~~B6 Order status + S4 Orders list + S5 Order detail~~ — done.
-4. ~~B2 Product detail + S7 product form changes~~ — done.
-5. ~~B1 Shop page changes; S2 / S3 checklist and dashboard changes~~ — done.
-6. ~~Admin A7–A9~~ — done.
-7. Platform website: the site kit sections, then P1–P4 from sample
-   content; then the admin website screens A10–A12; then the account hub
-   H1–H4. Mockups only — the content backend is its own roadmap step.
-8. ~~Admin A13 Backups mockup, then the list, Backup now and the restore-test date~~ — done (`/admin/backups`, table `backup_runs`). Restoring one shop's catalog after go-live.
-9. Phase 2 and 3 screens.
+Every screen marked **Spec** is built as a live page, with its API, when
+its roadmap step comes (docs/blueprint.md "Roadmap: zero to live"), and
+tested with the Demo Garage first ("Garage first"). Already built: the
+buyer flow (B1–B8), the seller app (S1–S10, S13, S14, P), the admin's
+working pages (A1, A2, A4–A6, A13, A14) and the website (P1–P4). Still
+spec: S11, S12, A3, A7–A12, H1–H4, and the detailed design of S15–S17.

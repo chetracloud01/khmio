@@ -4,8 +4,8 @@ import type { SubscriptionStatus } from "@khmio/shared";
 import { ErrorState, LoadingBlocks, TONE_STYLES } from "@khmio/ui";
 import { useTranslations } from "next-intl";
 
-// The live admin's blocks come from the shared kit (packages/ui blocks.tsx),
-// the same ones its mockup uses; only admin-specific pieces live here.
+// The admin's blocks come from the shared kit (packages/ui blocks.tsx); only
+// admin-specific pieces live here.
 export { PageHeader, SectionTitle, StatCard, StatusPill as Pill } from "@khmio/ui";
 
 export const STATUS_STYLES: Record<SubscriptionStatus, string> = {

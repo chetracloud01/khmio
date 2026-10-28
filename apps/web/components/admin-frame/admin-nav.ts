@@ -18,11 +18,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-// The one place the admin menu is defined, for the live admin (/admin) and
-// its mockup (/mockup/admin) alike. Adding an admin page = one entry here
-// (plus the page itself, and its "AdminNav" label and description in
-// messages/*.json). An entry not built yet in one of the two shows the
-// standard "coming soon" page there.
+// The one place the admin menu is defined. Adding an admin page = one entry
+// here (plus the page itself, and its "AdminNav" label and description in
+// messages/*.json). An entry not built yet shows the standard "coming soon"
+// page; its spec is in design/screens.md.
 
 export type AdminBadge = "kycPending" | "invoicesOverdue" | "failedChecks" | "trialsEnding" | "backupsStale";
 
@@ -33,10 +32,8 @@ export interface AdminNavItem {
   segment: string;
   icon: LucideIcon;
   badge?: AdminBadge;
-  /** Built in the live admin; otherwise it shows "Soon" there. */
+  /** Built; otherwise the menu marks it "Soon" and its page says so. */
   live: boolean;
-  /** Built in the mockup (default true). */
-  mockup?: boolean;
 }
 
 export interface AdminNavGroup {
@@ -45,7 +42,6 @@ export interface AdminNavGroup {
   items: AdminNavItem[];
 }
 
-export type AdminArea = "live" | "mockup";
 
 export const ADMIN_NAV: AdminNavGroup[] = [
   { key: "groupMain", items: [{ key: "overview", segment: "", icon: LayoutDashboard, live: true }] },
@@ -77,7 +73,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { key: "website", segment: "website", icon: Globe, live: false },
       { key: "promotions", segment: "promotions", icon: Megaphone, live: false },
       { key: "pictures", segment: "pictures", icon: Images, live: false },
-      { key: "waitlist", segment: "waitlist", icon: ListChecks, live: true, mockup: false },
+      { key: "waitlist", segment: "waitlist", icon: ListChecks, live: true },
     ],
   },
   {
@@ -93,14 +89,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = ADMIN_NAV.flatMap((group) => group.items);
 
-/** Not built yet in this admin: the menu marks it "Soon" and its page says so. */
-export function isComingSoon(item: AdminNavItem, area: AdminArea): boolean {
-  return area === "live" ? !item.live : item.mockup === false;
+/** Not built yet: the menu marks it "Soon" and its page says so. */
+export function isComingSoon(item: AdminNavItem): boolean {
+  return !item.live;
 }
 
-/** "/km/admin" or "/km/mockup/admin". */
-export function adminBase(locale: string, area: AdminArea): string {
-  return area === "live" ? `/${locale}/admin` : `/${locale}/mockup/admin`;
+/** "/km/admin". */
+export function adminBase(locale: string): string {
+  return `/${locale}/admin`;
 }
 
 export function adminPath(base: string, segment: string): string {

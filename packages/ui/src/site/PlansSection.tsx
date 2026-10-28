@@ -44,10 +44,10 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
   if (!labels) return null;
 
   return (
-    <section className="bg-bg py-12 sm:py-16">
-      <SiteContainer className="flex flex-col gap-8">
-        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <h2 className="text-2xl font-bold leading-normal sm:text-3xl sm:leading-normal">{pick(section.title, ctx.locale)}</h2>
+    <section className="bg-bg py-16 sm:py-24">
+      <SiteContainer className="flex flex-col gap-10">
+        <div className="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
+          <h2 className="text-2xl font-bold leading-normal tracking-tight sm:text-4xl sm:leading-normal">{pick(section.title, ctx.locale)}</h2>
           <SegmentedControl
             value={currency}
             onChange={(value) => setCurrency(value === "KHR" ? "KHR" : "USD")}
@@ -65,7 +65,7 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
             return (
               <li
                 key={id}
-                className={cn("flex flex-col gap-4 rounded-2xl border bg-bg p-5 shadow-card", highlighted ? "border-2 border-brand" : "border-border")}
+                className={cn("flex flex-col gap-4 rounded-3xl border p-6", highlighted ? "border-2 border-brand bg-brand/5 shadow-raised" : "border-border bg-canvas")}
               >
                 <div className="flex min-h-7 flex-wrap items-center justify-between gap-2">
                   <h3 className="text-lg font-bold">{labels.names[id]}</h3>
@@ -103,7 +103,7 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
                     );
                   })}
                 </ul>
-                <a href={ctx.href("/start")} className={buttonVariants({ variant: highlighted ? "primary" : "secondary", fullWidth: true })}>
+                <a href={ctx.href("/start")} className={cn(buttonVariants({ variant: highlighted ? "primary" : "secondary", fullWidth: true }), "rounded-full")}>
                   {ctx.labels.startFree}
                 </a>
               </li>
@@ -112,7 +112,7 @@ export function PlansSection({ section, ctx }: { section: SiteSectionOf<"plans">
         </ul>
         {section.compare && (
           // Cards on a phone; the cards and this table from tablet width. Same numbers, from plans.ts.
-          <div className="hidden overflow-x-auto rounded-2xl border border-border md:block">
+          <div className="hidden overflow-x-auto rounded-3xl border border-border md:block">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">{labels.compareTitle}</caption>
               <thead className="bg-canvas">

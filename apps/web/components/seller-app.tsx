@@ -1,18 +1,17 @@
 "use client";
 
 import { BottomSheet, Button, cn, Mio, StatusPill } from "@khmio/ui";
-import { Bell, Check, ChevronRight, Copy, Download, FileText, Inbox, MapPin, Phone, Search, Send, Share, SquarePlus, WifiOff, X, type LucideIcon } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { Bell, Check, ChevronRight, Copy, Download, FileText, Inbox, MapPin, Phone, Search, Send, Share, SquarePlus, X, type LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { copyText } from "@/components/share-link";
 import type { ShopState } from "@/components/seller-home";
 
 // The seller app's newer home and app-feel parts (design/screens.md S3, the
 // 2026-10-22 seller review): a compact header, swipeable numbers, quick
 // actions, installing Khmio as an app, the new-order popup and the offline
-// screen. Built as shared blocks so the live dashboard reuses them once the
-// mockup is approved.
+// screen, as shared blocks.
 
 /**
  * The top of the seller's home: greeting and shop status, then a search bar
@@ -277,28 +276,6 @@ export function NewOrderToast({ order, onClose }: { order: { number: string; tot
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
-    </div>
-  );
-}
-
-/** No internet: Mio, a calm message and Try again. The installed app shows this instead of the browser's error. */
-export function OfflineScreen({ onRetry, extra }: { onRetry: () => void; extra?: ReactNode }) {
-  const t = useTranslations("SellerApp");
-  const locale = useLocale();
-  return (
-    <div lang={locale} className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas p-6 text-center text-fg">
-      <span className="relative">
-        <Mio pose="face" size={96} />
-        <span className="absolute -bottom-1 -right-1 flex h-10 w-10 items-center justify-center rounded-full border-4 border-canvas bg-warning text-bg">
-          <WifiOff className="h-5 w-5" aria-hidden="true" />
-        </span>
-      </span>
-      <h1 className="text-xl font-bold leading-normal">{t("offlineTitle")}</h1>
-      <p className="max-w-[34ch] text-sm text-muted">{t("offlineBody")}</p>
-      <Button variant="primary" onClick={onRetry}>
-        {t("offlineRetry")}
-      </Button>
-      {extra}
     </div>
   );
 }

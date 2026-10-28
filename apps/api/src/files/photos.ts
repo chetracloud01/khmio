@@ -41,6 +41,14 @@ export function thumbKeyOf(key: string): string {
   return key.replace(/\.(jpg|png|webp)$/, "-t.jpg");
 }
 
+const STORE_ID = /^[0-9a-f-]{36}$/;
+
+/** The folder holding every file of one shop (stores/<store>/): what deleting the shop clears. Refuses anything but a shop id. */
+export function storeFolderOf(storeId: string): string {
+  if (!STORE_ID.test(storeId)) throw new Error("bad store id");
+  return `stores/${storeId}/`;
+}
+
 /** True only for a photo key in this store's own folder — a product can't point at another shop's photos. */
 export function isStorePhotoKey(storeId: string, key: string): boolean {
   return KEY.exec(key)?.[1] === storeId;

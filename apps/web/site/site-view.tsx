@@ -1,19 +1,18 @@
 "use client";
 
-import { visibleSections, type PlatformProductId, type SitePage, type SiteSection } from "@khmio/shared";
-import { AnnouncementBar, SiteFooter, SiteHeader, SiteSections, type SiteKitContext, type SiteWaitlistContext } from "@khmio/ui";
+import { solutionPath, visibleSections, type SitePage, type SiteSection } from "@khmio/shared";
+import { AnnouncementBar, SiteFooter, SiteHeader, SiteSections, solutionMenuItems, type SiteKitContext, type SiteWaitlistContext } from "@khmio/ui";
 import { useLocale, useTranslations } from "next-intl";
 import { LanguageSwitch } from "@/components/language-switch";
 import { useFormErrorText } from "@/components/form-ui";
 import { usePlanFeatureLabels } from "@/components/plan-features";
-import { SITE_PRODUCTS } from "./content";
+import { SITE_SOLUTIONS } from "./content";
+import { SITE_APPS } from "./content-apps";
 import { siteHasPath } from "./pages";
 
 export interface SiteViewProps {
   page: SitePage;
-  /** The product a coming-soon page collects waitlist sign-ups for. */
-  product?: PlatformProductId;
-  /** Turns a site path ("/pricing", "/start") into a link: the live site and the mockup differ. */
+  /** Turns a site path ("/pricing", "/start") into a link: the live site and the styleguide differ. */
   href: (path: string) => string;
   /** Turns a picture's src ("library:<id>") into an address. */
   image: (src: string) => string;
@@ -23,10 +22,10 @@ export interface SiteViewProps {
   submitError: (error: unknown) => string;
   /**
    * The live site: links to pages not built yet (Help, Terms…) stay hidden,
-   * and so does a seller story marked as a sample. The mockup shows both.
+   * and so does a seller story marked as a sample. The styleguide shows both.
    */
   live: boolean;
-  /** A line under the footer (the mockup's note). */
+  /** A line under the footer (the styleguide's note). */
   note?: string;
 }
 
@@ -37,10 +36,10 @@ function showsOnLiveSite(section: SiteSection): boolean {
 
 /**
  * One platform website page: the announcement bar, header, the page's
- * sections and the footer. The live site (khmio.com) and the website
- * mockups both draw pages with this, so they always look the same.
+ * sections and the footer. The live site (khmio.com) and the styleguide
+ * both draw pages with this, so they always look the same.
  */
-export function SiteView({ page, product, href, image, waitlist, submitError, live, note }: SiteViewProps) {
+export function SiteView({ page, href, image, waitlist, submitError, live, note }: SiteViewProps) {
   const t = useTranslations("Site");
   const errorText = useFormErrorText();
   const tMascot = useTranslations("Mascot");
@@ -56,9 +55,12 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
   const ctx: SiteKitContext = {
     locale,
     href,
-    products: SITE_PRODUCTS,
+    solutions: SITE_SOLUTIONS,
+    apps: SITE_APPS,
     image,
     labels: {
+      available: t("available"),
+      beta: t("beta"),
       comingSoon: t("comingSoon"),
       learnMore: t("learnMore"),
       joinWaitlist: t("joinWaitlist"),
@@ -88,16 +90,11 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
       none: t("compareNone"),
       days: (count) => t("compareDays", { count }),
     },
-    waitlist: product &&
-      waitlist && {
-        product,
+    waitlist: waitlist && {
         ...waitlist,
         labels: {
           name: t("waitlistName"),
           phone: t("waitlistPhone"),
-          businessType: t("waitlistBusiness"),
-          choose: t("waitlistChoose"),
-          businessTypes: { teacher: t("waitlistTeacher"), school: t("waitlistSchool"), landlord: t("waitlistLandlord"), other: t("waitlistOther") },
           submit: t("waitlistSubmit"),
           privacy: t("waitlistPrivacy"),
           errorText: (code) => errorText(code) ?? "",
@@ -112,7 +109,7 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
   const link = (label: string, path: string) => ({ label, href: href(path), path });
   const onlyShown = <T extends { path: string }>(links: T[]) => links.filter((entry) => shown(entry.path)).map(({ path: _path, ...rest }) => rest);
   const footerGroups = [
-    { title: t("footerProducts"), links: onlyShown(SITE_PRODUCTS.map((entry) => link(entry.name, `/products/${entry.id}`))) },
+    { title: t("solutions"), links: onlyShown(SITE_SOLUTIONS.map((entry) => link(entry.name[locale], solutionPath(entry.id)))) },
     {
       title: t("footerKhmio"),
       links: [...onlyShown([link(t("pricing"), "/pricing"), link(t("help"), "/help")]), { label: t("contact"), href: "https://t.me/khmio_support" }],
@@ -125,11 +122,13 @@ export function SiteView({ page, product, href, image, waitlist, submitError, li
       {announcement?.type === "announcement" && <AnnouncementBar section={announcement} ctx={ctx} />}
       <SiteHeader
         homeHref={href("/")}
-        links={onlyShown([link(t("products"), "/products/shop"), link(t("pricing"), "/pricing"), link(t("help"), "/help")])}
+        menu={{ label: t("solutions"), items: solutionMenuItems(ctx) }}
+        // Apps is a place on the home page, so it's always there.
+        links={[{ label: t("apps"), href: `${href("/")}#apps` }, ...onlyShown([link(t("pricing"), "/pricing"), link(t("help"), "/help")])]}
         login={{ label: t("logIn"), href: href("/start") }}
         start={{ label: t("startFree"), href: href("/start") }}
         languageSwitch={languageSwitch}
-        labels={{ openMenu: t("openMenu"), closeMenu: t("closeMenu"), home: t("home"), nav: t("nav") }}
+        labels={{ openMenu: t("openMenu"), closeMenu: t("closeMenu"), home: t("home"), nav: t("nav"), available: t("available"), beta: t("beta"), comingSoon: t("comingSoon") }}
       />
       <main className="flex-1">
         <SiteSections sections={sections} ctx={ctx} />

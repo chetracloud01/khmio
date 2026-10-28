@@ -11,16 +11,12 @@ import { useDateText } from "@/components/use-date-text";
 import type { CustomerRow } from "@/lib/api";
 import { spentLines } from "./spent";
 
-// The shop's customers (design/screens.md S14), built once for the mockup
-// (sample rows) and the live page (the API's pages): docs/engineering-standard.md
-// "One screen, two data sources". A table on a laptop, cards on a phone;
-// search by name or phone; sorted by their newest order unless the seller
-// picks another column (CUSTOMER_LIST_SPEC in packages/shared customers.ts).
+// The shop's customers (design/screens.md S14): a table on a laptop, cards on
+// a phone; search by name or phone; sorted by their newest order unless the
+// seller picks another column (CUSTOMER_LIST_SPEC in packages/shared
+// customers.ts). Read page by page from the API.
 
-/** Sample rows, searched and sorted in the browser (mockup), or the API's pages (live). */
-export type CustomersSource = { rows: CustomerRow[] } | { server: DataGridServer<CustomerRow> };
-
-export function CustomersScreen({ source, hrefFor, mainCurrency }: { source: CustomersSource; hrefFor: (customer: CustomerRow) => string; mainCurrency: Currency }) {
+export function CustomersScreen({ server, hrefFor, mainCurrency }: { server: DataGridServer<CustomerRow>; hrefFor: (customer: CustomerRow) => string; mainCurrency: Currency }) {
   const t = useTranslations("Customers");
   const { timeAgo, date } = useDateText();
   const router = useRouter();
@@ -92,11 +88,10 @@ export function CustomersScreen({ source, hrefFor, mainCurrency }: { source: Cus
     <div className={`${SELLER_PAGE} gap-4`}>
       <PageHeader title={t("title")} description={t("description")} />
       <DataGrid
-        {...source}
+        server={server}
         syncUrl
         getRowId={(customer) => customer.id}
         columns={columns}
-        searchText={(customer) => `${customer.name} ${customer.phone} ${formatKhmerPhoneLocal(customer.phone)}`}
         searchPlaceholder={t("searchPlaceholder")}
         onRowClick={(customer) => router.push(hrefFor(customer))}
         initialSort={{ key: "lastOrder", direction: "desc" }}

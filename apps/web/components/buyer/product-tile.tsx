@@ -24,7 +24,7 @@ export interface ProductTileLabels {
 /**
  * One product in the shop's list (design/screens.md B1), as a grid card or a
  * list row: the photo with its discount badge and a round + on it, the name
- * on two lines, how many options, and the price. The live shop and its mockup
+ * on two lines, how many options, and the price. The live shop
  * both draw this — their data comes in already turned into words and prices.
  */
 export function ProductTile({

@@ -79,7 +79,7 @@ function OpenShop({ shop }: { shop: PublicShop }) {
   const [infoOpen, setInfoOpen] = useState(false);
 
   const text = (km: string, en: string) => (locale === "km" ? km || en : en || km);
-  // The list's search, category, sort and grid-or-list (shared with the mockup: components/buyer).
+  // The list's search, category, sort and grid-or-list (components/buyer).
   const browseAccessors = useMemo<BrowseAccessors<Product>>(
     () => ({
       text: (product) => `${product.titleKm} ${product.titleEn}`,

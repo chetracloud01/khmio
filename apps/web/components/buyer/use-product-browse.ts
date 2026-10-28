@@ -8,7 +8,7 @@ import type { ProductView } from "./product-tile";
 export type ProductSort = "newest" | "price_asc" | "price_desc" | "discount";
 export const PRODUCT_SORTS: readonly ProductSort[] = ["newest", "price_asc", "price_desc", "discount"];
 
-/** How the shop's list reads a product, whatever shape its data has (the live API's or the mockup's). */
+/** How the shop's list reads a product, from the API's product. */
 export interface BrowseAccessors<T> {
   /** Both languages: a buyer may type "coffee" on the Khmer page. */
   text: (item: T) => string;

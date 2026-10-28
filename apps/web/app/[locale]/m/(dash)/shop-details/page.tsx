@@ -3,6 +3,7 @@
 import {
   BUSINESS_TYPES,
   businessTypeSchema,
+  OFFERED_BUSINESS_TYPES,
   deliveryAreaSchema,
   formatKhmerPhoneLocal,
   shopDetailsSaveSchema,
@@ -193,7 +194,8 @@ export default function ShopDetailsPage() {
                 const parsed = businessTypeSchema.safeParse(e.target.value);
                 if (parsed.success) update("businessType", parsed.data);
               }}
-              options={BUSINESS_TYPES.map((type) => ({ value: type, label: tType(type) }))}
+              // The offered types (garage first), and the shop's own if it's no longer offered.
+              options={BUSINESS_TYPES.filter((type) => OFFERED_BUSINESS_TYPES.includes(type) || type === store.businessType).map((type) => ({ value: type, label: tType(type) }))}
             />
             <p className="text-xs text-muted">{t("businessTypeHint")}</p>
           </div>

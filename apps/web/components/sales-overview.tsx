@@ -66,7 +66,6 @@ export function SalesOverview({
   cashToCollect,
   mainCurrency,
   reportLink,
-  sample = false,
 }: {
   days: SalesHistoryDay[];
   top: Record<SalesPeriod, TopProduct[]>;
@@ -74,8 +73,6 @@ export function SalesOverview({
   mainCurrency: Currency;
   /** A way on to a fuller report (the profit report). */
   reportLink?: { href: string; label: string };
-  /** The mockup's made-up numbers, labelled as such. */
-  sample?: boolean;
 }) {
   const t = useTranslations("SellerApp");
   const locale = useLocale();
@@ -116,7 +113,6 @@ export function SalesOverview({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-lg font-semibold leading-normal">
           {t("salesTitle")}
-          {sample && <span className="rounded-full bg-border/40 px-2 py-0.5 text-xs font-semibold text-muted">{t("sampleData")}</span>}
         </h2>
         <SegmentedControl
           value={period}

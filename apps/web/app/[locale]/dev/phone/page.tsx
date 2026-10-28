@@ -37,9 +37,9 @@ export default async function PhonePage({ params: { locale } }: { params: { loca
   const links = [
     { path: `/${locale}`, label: t("linkWebsite") },
     { path: `/${locale}/m/login`, label: t("linkSeller") },
-    { path: `/${locale}/s/dev-merchant-a`, label: t("linkShop") },
+    // Garage first: the Demo Garage's shop (pnpm demo:garage).
+    { path: `/${locale}/s/mekong-auto-garage`, label: t("linkShop") },
     { path: `/${locale}/admin`, label: t("linkAdmin") },
-    { path: `/${locale}/mockup`, label: t("linkMockups") },
   ];
 
   return (

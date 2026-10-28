@@ -15,10 +15,9 @@ import { useDateText } from "@/components/use-date-text";
 import type { CustomerDetail, SellerOrder } from "@/lib/api";
 import { spentLines } from "./spent";
 
-// One customer (design/screens.md S14), built once for the mockup and the
-// live page: how to reach them, their numbers (cancelled and unpaid orders
-// aren't counted), where they last had an order delivered, and every order,
-// newest first, each opening its order page.
+// One customer (design/screens.md S14): how to reach them, their numbers
+// (cancelled and unpaid orders aren't counted), where they last had an order
+// delivered, and every order, newest first, each opening its order page.
 
 /** How long "Copied" stays on the button. */
 const COPIED_FOR_MS = 2000;

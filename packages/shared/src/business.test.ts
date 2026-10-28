@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUSINESS_TYPE_DEFAULTS, BUSINESS_TYPES, DEFAULT_UNITS } from "./business";
+import { BUSINESS_TYPE_DEFAULTS, BUSINESS_TYPES, DEFAULT_UNITS, OFFERED_BUSINESS_TYPES } from "./business";
 
 describe("business type defaults", () => {
   it("gives every type a unit every store has, and at least one category", () => {
@@ -14,5 +14,13 @@ describe("business type defaults", () => {
     const keys = BUSINESS_TYPE_DEFAULTS.garage.categories.map((category) => category.key);
     expect(keys).toEqual(expect.arrayContaining(["cars", "engine-oil", "tyres", "batteries", "parts", "services"]));
     expect(DEFAULT_UNITS.map((unit) => unit.key)).toEqual(expect.arrayContaining(["litre", "set", "vehicle"]));
+  });
+});
+
+describe("business types offered (garage first)", () => {
+  it("offers the garage, and only real business types, each once", () => {
+    expect(OFFERED_BUSINESS_TYPES).toContain("garage");
+    expect(OFFERED_BUSINESS_TYPES.every((type) => BUSINESS_TYPES.includes(type))).toBe(true);
+    expect(new Set(OFFERED_BUSINESS_TYPES).size).toBe(OFFERED_BUSINESS_TYPES.length);
   });
 });

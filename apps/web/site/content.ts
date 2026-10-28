@@ -1,298 +1,198 @@
-import type { PlatformProduct, SitePage } from "@khmio/shared";
+import type { PlatformProductId, SitePage, SiteSolution } from "@khmio/shared";
+import { startFree } from "./content-parts";
 import type { SitePageKey } from "./pages";
+import { SOLUTION_PAGES } from "./solution-pages";
 
 // The platform website's content (design/screens.md "Platform website"):
-// what khmio.com shows, and what the website mockups start from. Shaped
-// exactly like the content the admin will edit (A10–A12) and checked against
-// the site kit's schemas by content.test.ts, so moving it into the database
-// (docs/platform-launch-plan.md Stage 3) changes only where it comes from.
-// Until then, changing the website's words means changing this file.
+// what khmio.com shows. Shaped exactly like the content the admin will edit
+// (A10–A12) and checked against the site kit's schemas by content.test.ts,
+// so moving it into the database (docs/platform-launch-plan.md Stage 3)
+// changes only where it comes from. Until then, changing the website's words
+// means changing these files. Khmio is the main brand: every part of a small
+// business in one app (the app list, site/content-apps.ts), for each kind of
+// business (the industries below: the garage the most tested, the others in
+// beta — docs/blueprint.md "Garage first").
 // Khmer text: to be checked by a native reader before it goes live.
 
-export const SITE_PRODUCTS: PlatformProduct[] = [
+/** The platform's product names (brand names, the same in every language), for sign-ups made for any of them. */
+export const PLATFORM_PRODUCT_NAMES: Record<PlatformProductId, string> = { shop: "Khmio Shop", class: "Khmio Class", rent: "Khmio Rent" };
+
+/** Khmio for each kind of business (the Industries), in the order of docs/blueprint.md "Business roadmap". */
+export const SITE_SOLUTIONS: SiteSolution[] = [
   {
-    id: "shop",
-    name: "Khmio Shop",
-    subtitle: { km: "ហាងអនឡាញ", en: "Online shop" },
+    id: "garage",
+    name: { km: "យានដ្ឋាន និងជួសជុលរថយន្ត", en: "Garage & auto repair" },
     line: {
-      km: "តំណហាង ការបង់ប្រាក់ពេលទទួលទំនិញ (KHQR មកដល់ឆាប់ៗ) ដំណឹងនៅលើ Telegram និងការដឹកជញ្ជូន។",
-      en: "Shop link, cash on delivery (KHQR coming soon), Telegram alerts and delivery.",
+      km: "ប័ណ្ណការងារសម្រាប់រថយន្តនីមួយៗ គ្រឿងបន្លាស់ និងថ្លៃជាងក្នុងវិក្កយបត្រតែមួយ ស្តុក និងអតិថិជន។",
+      en: "A job card for every car, parts and labour on one bill, stock and customers.",
     },
+    covers: [
+      { km: "ជួសជុលរថយន្ត", en: "Car repair" },
+      { km: "ជួសជុលម៉ូតូ", en: "Motorbike repair" },
+      { km: "លាងរថយន្ត", en: "Car wash" },
+      { km: "សំបកកង់ និងប្រេង", en: "Tyres & oil" },
+    ],
     status: "live",
-    icon: "store",
+    icon: "wrench",
   },
   {
-    id: "class",
-    name: "Khmio Class",
-    subtitle: { km: "គ្រប់គ្រងថ្លៃសិក្សា", en: "Class fees" },
-    line: {
-      km: "វិក្កយបត្រប្រចាំខែទៅឪពុកម្តាយតាម KHQR នៅលើ Telegram ហើយឃើញថាអ្នកណាបានបង់។",
-      en: "Monthly KHQR bills to parents on Telegram, and see who has paid.",
-    },
-    status: "coming_soon",
-    icon: "list",
+    id: "auto_parts",
+    name: { km: "ហាងគ្រឿងបន្លាស់", en: "Auto parts shop" },
+    line: { km: "គ្រឿងបន្លាស់តាមទំហំ និងម៉ូដែល ស្តុក និងការទិញចូលជាមួយតម្លៃដើម។", en: "Parts by size and model, stock, and purchases with their cost." },
+    covers: [
+      { km: "គ្រឿងបន្លាស់", en: "Spare parts" },
+      { km: "គ្រឿងតុបតែង", en: "Accessories" },
+      { km: "អាគុយ", en: "Batteries" },
+    ],
+    status: "beta",
+    icon: "car",
   },
   {
-    id: "rent",
-    name: "Khmio Rent",
-    subtitle: { km: "គ្រប់គ្រងបន្ទប់ជួល", en: "Rental rooms" },
-    line: {
-      km: "ថ្លៃជួល អគ្គិសនី និងទឹក ក្នុងវិក្កយបត្រ KHQR តែមួយសម្រាប់បន្ទប់នីមួយៗ។",
-      en: "Rent, electricity and water in one KHQR bill per room.",
-    },
-    status: "coming_soon",
-    icon: "building",
+    id: "phone",
+    name: { km: "ហាងទូរស័ព្ទ និងជួសជុល", en: "Phone shop & repair" },
+    line: { km: "IMEI និងការធានាលើទូរស័ព្ទនីមួយៗ និងប័ណ្ណជួសជុលសម្រាប់ឧបករណ៍។", en: "IMEI and warranty on every phone, and repair job cards for devices." },
+    covers: [
+      { km: "ទូរស័ព្ទ", en: "Phones" },
+      { km: "គ្រឿងបន្ថែម", en: "Accessories" },
+      { km: "ជួសជុល", en: "Repairs" },
+    ],
+    status: "beta",
+    icon: "smartphone",
+  },
+  {
+    id: "cafe",
+    name: { km: "ហាងកាហ្វេ និងភោជនីយដ្ឋាន", en: "Café & restaurant" },
+    line: { km: "កម្រិតស្ករ និងទឹកកក ជម្រើសបន្ថែម តុ និងសំបុត្រផ្ទះបាយ។", en: "Sugar and ice levels, add-ons, tables and kitchen tickets." },
+    covers: [
+      { km: "កាហ្វេ", en: "Café" },
+      { km: "តែគុជ", en: "Bubble tea" },
+      { km: "ភោជនីយដ្ឋាន", en: "Restaurant" },
+    ],
+    status: "beta",
+    icon: "coffee",
+  },
+  {
+    id: "salon",
+    name: { km: "សាឡន និងសេវាកម្ម", en: "Salon & services" },
+    line: { km: "ការកក់ជាមួយពេលវេលា សេវាកម្មគ្មានស្តុក និងដំណឹងនៅលើ Telegram។", en: "Bookings with a time, services without stock, and Telegram alerts." },
+    covers: [
+      { km: "សាឡន", en: "Salon" },
+      { km: "កាត់សក់", en: "Barber" },
+      { km: "ស្ប៉ា", en: "Spa" },
+      { km: "បោកអ៊ុត", en: "Laundry" },
+    ],
+    status: "beta",
+    icon: "scissors",
+  },
+  {
+    id: "retail",
+    name: { km: "ហាងលក់រាយ និងអ្នកលក់អនឡាញ", en: "Retail & online sellers" },
+    line: { km: "ទំហំ × ពណ៌ ស្តុក និងតំណហាងសម្រាប់ Facebook និង TikTok។", en: "Size × colour, stock, and a shop link for Facebook and TikTok." },
+    covers: [
+      { km: "សម្លៀកបំពាក់", en: "Clothing" },
+      { km: "គ្រឿងសំអាង", en: "Cosmetics" },
+      { km: "ហាងទំនិញ", en: "Mini-mart" },
+      { km: "អ្នកលក់អនឡាញ", en: "Online sellers" },
+    ],
+    status: "beta",
+    icon: "shirt",
   },
 ];
-
-const startFree = { label: { km: "ចាប់ផ្តើមឥតគិតថ្លៃ", en: "Start free" }, href: "/start" };
 
 const homePage: SitePage = {
   slug: "",
   seo: {
-    title: { km: "Khmio — លក់ងាយ ទទួលលុយរហ័ស", en: "Khmio — Sell easily, get paid fast" },
+    title: { km: "Khmio — គ្រប់ផ្នែកនៃអាជីវកម្មរបស់អ្នក ក្នុងកម្មវិធីសាមញ្ញមួយ", en: "Khmio — every part of your business, in one simple app" },
     description: {
-      km: "បើកហាងអនឡាញក្នុងរយៈពេលប៉ុន្មាននាទី ទទួលប្រាក់ពេលដឹកដល់ (KHQR មកដល់ឆាប់ៗ) និងការបញ្ជាទិញនៅលើ Telegram។",
-      en: "Open an online shop in minutes, take cash on delivery (KHQR coming soon) and get orders on Telegram.",
+      km: "លក់អនឡាញ និងនៅហាង ស្តុក អតិថិជន និងប្រាក់ចំណេញ — ពីទូរស័ព្ទ ជាភាសាខ្មែរ ជាមួយ KHQR រៀល និង Telegram។",
+      en: "Sell online and in your shop, keep stock, serve customers and see your profit — from your phone, in Khmer, with KHQR, riel and Telegram.",
     },
   },
   sections: [
     {
-      id: "announcement",
-      type: "announcement",
-      visible: true,
-      text: { km: "ថ្មី៖ បញ្ជីរង់ចាំ Khmio Class បានបើកហើយ", en: "New: the Khmio Class waitlist is open" },
-      link: { label: { km: "ចុះឈ្មោះ", en: "Join" }, href: "/products/class" },
-    },
-    {
       id: "hero",
       type: "hero",
       visible: true,
-      eyebrow: { km: "សម្រាប់អ្នកលក់អនឡាញនៅកម្ពុជា", en: "For online sellers in Cambodia" },
-      headline: { km: "លក់ងាយ ទទួលលុយរហ័ស", en: "Sell easily, get paid fast" },
+      eyebrow: { km: "សម្រាប់អាជីវកម្មខ្នាតតូចនៅកម្ពុជា", en: "For Cambodia's small businesses" },
+      headline: { km: "គ្រប់ផ្នែកនៃអាជីវកម្មរបស់អ្នក ក្នុងកម្មវិធីសាមញ្ញមួយ", en: "Every part of your business, in one simple app" },
       sentence: {
-        km: "បើកហាងអនឡាញក្នុងរយៈពេល ១០ នាទី។ អតិថិជនកុម្ម៉ង់ពីតំណរបស់អ្នក ហើយបង់ប្រាក់ពេលទទួលទំនិញ (KHQR មកដល់ឆាប់ៗ)។ ការបញ្ជាទិញនីមួយៗមកដល់ Telegram របស់អ្នកភ្លាមៗ។",
-        en: "Open your online shop in 10 minutes. Buyers order from your link and pay cash on delivery (KHQR coming soon). Every order reaches your Telegram right away.",
+        km: "លក់អនឡាញ និងនៅហាង គ្រប់គ្រងស្តុក បម្រើអតិថិជន និងមើលប្រាក់ចំណេញ — ពីទូរស័ព្ទរបស់អ្នក ជាភាសាខ្មែរ ឬអង់គ្លេស ជាមួយរៀល និងដុល្លារ។",
+        en: "Sell online and in your shop, keep stock, serve customers and see your profit — from your phone, in Khmer or English, with riel and dollars.",
       },
-      art: { kind: "mio", pose: "coin" },
+      art: { kind: "apps" },
       primary: startFree,
-      secondary: { label: { km: "មើលតម្លៃ", en: "See pricing" }, href: "/pricing" },
+      secondary: { label: { km: "មើលកម្មវិធីទាំងអស់", en: "See all apps" }, href: "#apps" },
+      trust: [
+        { icon: "language", text: { km: "ខ្មែរ និងអង់គ្លេស", en: "Khmer & English" } },
+        { icon: "qr", text: { km: "រៀល ដុល្លារ និង KHQR", en: "Riel, dollars & KHQR" } },
+        { icon: "bell", text: { km: "ដំណឹង Telegram", en: "Telegram alerts" } },
+        { icon: "shield", text: { km: "ឥតគិតថ្លៃក្នុងពេលបេតា", en: "Free during the beta" } },
+      ],
     },
     {
-      id: "beta-help",
-      type: "promotion",
+      id: "apps",
+      type: "apps",
       visible: true,
-      title: { km: "បេតា៖ អ្នកលក់ ២០ នាក់ដំបូង ទទួលបានជំនួយរៀបចំហាងដោយឥតគិតថ្លៃ", en: "Beta: the first 20 sellers get free help setting up their shop" },
-      line: { km: "យើងជួយបន្ថែមទំនិញ និងរៀបចំការដឹកជញ្ជូនជាមួយអ្នក។", en: "We add your products and set up delivery with you." },
-      button: startFree,
-      startsAt: "2026-10-01T00:00:00+07:00",
-      endsAt: "2027-01-01T00:00:00+07:00",
+      title: { km: "កម្មវិធីមួយ ឧបករណ៍គ្រប់យ៉ាងដែលអ្នកត្រូវការ", en: "One app, every tool you need" },
+      intro: {
+        km: "បើកតែអ្វីដែលអាជីវកម្មរបស់អ្នកប្រើ។ អ្វីៗទាំងអស់ដំណើរការជាមួយគ្នា នៅលើទូរស័ព្ទរបស់អ្នក។",
+        en: "Switch on only what your business uses. Everything works together, on your phone.",
+      },
+    },
+    {
+      id: "why",
+      type: "comparison",
+      visible: true,
+      title: { km: "កម្មវិធីអាជីវកម្មធំ ធ្វើឲ្យតូច និងសាមញ្ញ", en: "Big business software, made small and simple" },
+      intro: {
+        km: "អ្វីៗដែលអ្នកត្រូវការពីប្រព័ន្ធអាជីវកម្ម — ដោយគ្មានថ្លៃខ្ពស់ និងអ្នកប្រឹក្សា។",
+        en: "What you need from a business system — without the high cost and the consultants.",
+      },
+      them: { km: "កម្មវិធីអាជីវកម្មធំៗ", en: "Big business software" },
+      us: { km: "Khmio", en: "Khmio" },
+      rows: [
+        { label: { km: "ការរៀបចំ", en: "Set-up" }, them: { km: "ច្រើនសប្តាហ៍ ជាមួយអ្នកប្រឹក្សា", en: "Weeks, with a consultant" }, us: { km: "ប៉ុន្មាននាទី ពីទូរស័ព្ទរបស់អ្នក", en: "Minutes, from your phone" } },
+        { label: { km: "ប្រើលើ", en: "Works on" }, them: { km: "កុំព្យូទ័រជាមុន", en: "A computer first" }, us: { km: "ទូរស័ព្ទជាមុន", en: "Your phone first" } },
+        { label: { km: "ភាសា", en: "Language" }, them: { km: "ភាគច្រើនអង់គ្លេស", en: "Mostly English" }, us: { km: "ខ្មែរ និងអង់គ្លេស", en: "Khmer and English" } },
+        { label: { km: "ការបង់ប្រាក់", en: "Payments" }, them: { km: "កាត និងធនាគារបរទេស", en: "Cards and foreign banks" }, us: { km: "KHQR សាច់ប្រាក់ រៀល និងដុល្លារ", en: "KHQR, cash, riel and dollars" } },
+        { label: { km: "ដំណឹង", en: "Alerts" }, them: { km: "អ៊ីមែល", en: "Email" }, us: { km: "Telegram", en: "Telegram" } },
+        { label: { km: "តម្លៃ", en: "Price" }, them: { km: "តាមអ្នកប្រើ តាមកម្មវិធី", en: "Per user, per app" }, us: { km: "តម្លៃតូចមួយក្នុងមួយខែ — ឥតគិតថ្លៃក្នុងពេលបេតា", en: "One small monthly price — free in the beta" } },
+      ],
+    },
+    {
+      id: "industries",
+      type: "solutions",
+      visible: true,
+      title: { km: "រៀបចំសម្រាប់អាជីវកម្មរបស់អ្នក", en: "Made for your kind of business" },
+      intro: {
+        km: "យានដ្ឋានរួចរាល់ហើយ ហើយអាជីវកម្មផ្សេងទៀតកំពុងសាកល្បង — ឥតគិតថ្លៃថ្ងៃនេះ។",
+        en: "Garages are ready; the others are in beta — free to try today.",
+      },
     },
     {
       id: "steps",
       type: "steps",
       visible: true,
-      title: { km: "របៀបដំណើរការ", en: "How it works" },
+      title: { km: "ចាប់ផ្តើមក្នុង ៣ ជំហាន", en: "Start in 3 steps" },
       steps: [
         {
           icon: "store",
           title: { km: "បើកហាងរបស់អ្នក", en: "Open your shop" },
-          line: { km: "ដាក់ឈ្មោះហាង និងបន្ថែមទំនិញពីទូរស័ព្ទ — ចំណាយពេលតែប៉ុន្មាននាទី។", en: "Name your shop and add products from your phone — it takes minutes." },
-        },
-        {
-          icon: "share",
-          title: { km: "ចែករំលែកតំណ", en: "Share the link" },
-          line: { km: "ដាក់តំណហាងនៅលើ Facebook, TikTok ឬ Telegram។", en: "Post your shop link on Facebook, TikTok or Telegram." },
-        },
-        {
-          icon: "qr",
-          title: { km: "ទទួលលុយ", en: "Get paid" },
-          line: { km: "អតិថិជនបង់ប្រាក់ពេលទទួលទំនិញ (KHQR មកដល់ឆាប់ៗ) ហើយការបញ្ជាទិញមកដល់ Telegram របស់អ្នក។", en: "Buyers pay cash on delivery (KHQR coming soon), and the order arrives in your Telegram." },
-        },
-      ],
-    },
-    {
-      id: "products",
-      type: "productCards",
-      visible: true,
-      title: { km: "ផលិតផល Khmio", en: "Khmio products" },
-    },
-    {
-      id: "why",
-      type: "features",
-      visible: true,
-      title: { km: "ហេតុអ្វីអ្នកលក់ប្តូរមក Khmio", en: "Why sellers switch to Khmio" },
-      features: [
-        {
-          icon: "shield",
-          title: { km: "KHQR មកដល់ឆាប់ៗ", en: "KHQR coming soon" },
-          line: {
-            km: "ឆាប់ៗនេះ អតិថិជននឹងបង់តាម KHQR ដែលពិនិត្យដោយស្វ័យប្រវត្តិ ដូច្នេះរូបថតក្លែងក្លាយមិនអាចបោកអ្នកបានទេ។ មុននោះ៖ បង់ប្រាក់ពេលទទួលទំនិញ។",
-            en: "Soon buyers will pay by KHQR, checked by itself, so a fake screenshot can't fool you. Until then: cash on delivery.",
-          },
-        },
-        {
-          icon: "list",
-          title: { km: "ការបញ្ជាទិញនៅកន្លែងតែមួយ", en: "All orders in one list" },
-          line: { km: "ឃើញការបញ្ជាទិញថ្មី វេចខ្ចប់ និងផ្ញើ — មិនបាត់ក្នុងការជជែកទៀតទេ។", en: "See new orders, pack and send — nothing gets lost in chat." },
-        },
-        {
-          icon: "bell",
-          title: { km: "ដំណឹងនៅលើ Telegram", en: "Alerts on Telegram" },
-          line: { km: "ការបញ្ជាទិញថ្មីមកដល់ទូរស័ព្ទរបស់អ្នក ជាមួយប៊ូតុង «បញ្ជាក់»។", en: "New orders reach your phone with a Confirm button." },
-        },
-        {
-          icon: "language",
-          title: { km: "ភាសាខ្មែរជាមុន", en: "Khmer first" },
-          line: { km: "គ្រប់ពាក្យជាភាសាខ្មែរ និងអង់គ្លេស សម្រាប់អ្នក និងអតិថិជនរបស់អ្នក។", en: "Every word in Khmer and English, for you and your buyers." },
-        },
-      ],
-    },
-    {
-      id: "story",
-      type: "sellerStory",
-      visible: true,
-      name: { km: "សុខា", en: "Sokha" },
-      shop: { km: "ហាងកាហ្វេសុខា", en: "Sokha Coffee" },
-      quote: {
-        km: "ពីមុនខ្ញុំត្រូវពិនិត្យរូបថតបង់ប្រាក់រាល់ការបញ្ជាទិញ។ ឥឡូវនេះ Khmio ពិនិត្យឲ្យខ្ញុំ ហើយខ្ញុំមានពេលច្រើនសម្រាប់ធ្វើកាហ្វេ។",
-        en: "I used to check a payment photo for every order. Now Khmio checks for me, and I have more time to make coffee.",
-      },
-      permission: true,
-      sample: true,
-    },
-    {
-      id: "closing",
-      type: "closing",
-      visible: true,
-      headline: { km: "ចាប់ផ្តើមលក់ថ្ងៃនេះ", en: "Start selling today" },
-      line: { km: "សាកល្បងឥតគិតថ្លៃ ១៤ ថ្ងៃ មិនត្រូវការកាតធនាគារ។", en: "14-day free trial, no card needed." },
-      button: startFree,
-    },
-  ],
-};
-
-/** A picture in the website's picture library (A12). Pages point to it as "library:<id>". */
-export interface SitePicture {
-  id: string;
-  /** The file itself: a path under public/, or a data URL for uploads in the mockup. */
-  file: string;
-  alt: { km: string; en: string };
-  width: number;
-  height: number;
-  bytes: number;
-  /** ISO time it was added. */
-  addedAt: string;
-}
-
-const SHOT_BYTES: Record<string, number> = { "shop-link": 30817, khqr: 46277, orders: 33825, send: 31726, delivery: 32618, stock: 27537 };
-
-/** The library starts with the Shop app's phone screenshots (Khmer), saved under public/site/shop. */
-export const SITE_PICTURES: SitePicture[] = [];
-
-/** A Shop screenshot: added to the library once, used by the page as "library:shop-<file>". */
-const shot = (file: string, km: string, en: string) => {
-  const id = `shop-${file}`;
-  if (!SITE_PICTURES.some((picture) => picture.id === id)) {
-    SITE_PICTURES.push({ id, file: `/site/shop/${file}.jpg`, alt: { km, en }, width: 360, height: 740, bytes: SHOT_BYTES[file] ?? 0, addedAt: "2026-10-06T09:00:00+07:00" });
-  }
-  return { src: `library:${id}`, alt: { km, en } };
-};
-
-const shopPage: SitePage = {
-  slug: "products/shop",
-  seo: {
-    title: { km: "Khmio Shop — ហាងអនឡាញរបស់អ្នក ក្នុង ១០ នាទី", en: "Khmio Shop — your online shop in 10 minutes" },
-    description: {
-      km: "តំណហាងតែមួយ ការបង់ប្រាក់ពេលទទួលទំនិញ (KHQR មកដល់ឆាប់ៗ) ដំណឹង Telegram និងការដឹកជញ្ជូន។",
-      en: "One shop link, cash on delivery (KHQR coming soon), Telegram alerts and delivery.",
-    },
-  },
-  sections: [
-    {
-      id: "hero",
-      type: "hero",
-      visible: true,
-      eyebrow: { km: "Khmio Shop · ហាងអនឡាញ", en: "Khmio Shop · Online shop" },
-      headline: { km: "ហាងអនឡាញរបស់អ្នក ក្នុង ១០ នាទី", en: "Your online shop in 10 minutes" },
-      sentence: {
-        km: "ចែករំលែកតំណតែមួយ។ អតិថិជនកុម្ម៉ង់ និងបង់ប្រាក់ដោយខ្លួនឯង ហើយអ្នកគ្រប់គ្រងការបញ្ជាទិញទាំងអស់ពីទូរស័ព្ទ។",
-        en: "Share one link. Buyers order and pay on their own, and you run every order from your phone.",
-      },
-      art: { kind: "mio", pose: "face" },
-      primary: startFree,
-      secondary: { label: { km: "មើលតម្លៃ", en: "See pricing" }, href: "/pricing" },
-    },
-    {
-      id: "what-you-get",
-      type: "features",
-      visible: true,
-      title: { km: "អ្វីដែលអ្នកទទួលបាន", en: "What you get" },
-      features: [
-        {
-          icon: "share",
-          title: { km: "តំណហាងតែមួយ", en: "One shop link" },
-          line: {
-            km: "ដាក់តំណនៅលើ Facebook, TikTok ឬ Telegram។ អតិថិជនមើលទំនិញ ដាក់ក្នុងកន្ត្រក និងកុម្ម៉ង់ ដោយមិនចាំបាច់ផ្ញើសារ។",
-            en: "Post it on Facebook, TikTok or Telegram. Buyers browse, add to the cart and order without sending a message.",
-          },
-          image: shot("shop-link", "រូបថតអេក្រង់ទំព័រហាង នៅលើទូរស័ព្ទ", "Screenshot of a shop page on a phone"),
-        },
-        {
-          icon: "qr",
-          title: { km: "KHQR — មកដល់ឆាប់ៗ", en: "KHQR — coming soon" },
-          line: {
-            km: "អតិថិជននឹងស្កេនជាមួយកម្មវិធីធនាគារណាមួយ ហើយការបញ្ជាទិញនឹងក្លាយជា «បានបង់» ដោយស្វ័យប្រវត្តិ។ សម្រាប់ពេលនេះ អតិថិជនបង់ប្រាក់ពេលទទួលទំនិញ។",
-            en: "Buyers will scan with any bank app and the order will turn to Paid by itself. For now, buyers pay cash on delivery.",
-          },
-          image: shot("khqr", "រូបថតអេក្រង់ការបង់ប្រាក់តាម KHQR", "Screenshot of the KHQR payment screen"),
-        },
-        {
-          icon: "bell",
-          title: { km: "ការបញ្ជាទិញ និងដំណឹង Telegram", en: "Orders and Telegram alerts" },
-          line: {
-            km: "ការបញ្ជាទិញទាំងអស់នៅក្នុងបញ្ជីតែមួយ ហើយការបញ្ជាទិញថ្មីនីមួយៗមកដល់ Telegram របស់អ្នក ជាមួយប៊ូតុង «បញ្ជាក់»។",
-            en: "Every order in one list, and each new one reaches your Telegram with a Confirm button.",
-          },
-          image: shot("orders", "រូបថតអេក្រង់បញ្ជីការបញ្ជាទិញរបស់អ្នកលក់", "Screenshot of the seller's order list"),
-        },
-        {
-          icon: "truck",
-          title: { km: "ផ្ញើតាមអ្នកដឹក ឡានក្រុង ឬមកយកផ្ទាល់", en: "Send by driver, bus or pickup" },
-          line: {
-            km: "ជ្រើសរើសរបៀបផ្ញើការបញ្ជាទិញនីមួយៗ ហើយអតិថិជនឃើញស្ថានភាពការបញ្ជាទិញរបស់ខ្លួនជានិច្ច។",
-            en: "Choose how each order goes out, and the buyer always sees where it is.",
-          },
-          image: shot("send", "រូបថតអេក្រង់ការផ្ញើការបញ្ជាទិញ", "Screenshot of sending an order"),
-        },
-        {
-          icon: "list",
-          title: { km: "តំបន់ និងថ្លៃដឹកជញ្ជូន", en: "Delivery zones and fees" },
-          line: {
-            km: "កំណត់ថ្លៃដឹកតាមខណ្ឌ ឬខេត្ត ហើយថ្លៃត្រឹមត្រូវត្រូវបានបូកដោយស្វ័យប្រវត្តិនៅពេលទូទាត់។",
-            en: "Set fees by district or province; checkout adds the right fee by itself.",
-          },
-          image: shot("delivery", "រូបថតអេក្រង់ការកំណត់ការដឹកជញ្ជូន", "Screenshot of the delivery settings"),
+          line: { km: "ចូលជាមួយ Telegram ជ្រើសប្រភេទអាជីវកម្ម ហើយដាក់ឈ្មោះ។", en: "Sign in with Telegram, pick your kind of business and name it." },
         },
         {
           icon: "boxes",
-          title: { km: "ស្តុក និងសាខា", en: "Stock and branches" },
-          line: {
-            km: "តាមដានស្តុកលើគម្រោង Pro និងឃ្លាំង ឬសាខាច្រើនលើគម្រោង Advance។",
-            en: "Track stock on Pro, and several warehouses or branches on Advance.",
-          },
-          image: shot("stock", "រូបថតអេក្រង់ស្តុក ឃ្លាំង និងសាខា", "Screenshot of stock, warehouses and branches"),
+          title: { km: "បន្ថែមទំនិញ ឬសេវាកម្ម", en: "Add products or services" },
+          line: { km: "ពីទូរស័ព្ទរបស់អ្នក ជាមួយរូបថត និងតម្លៃ។", en: "From your phone, with photos and prices." },
+        },
+        {
+          icon: "share",
+          title: { km: "លក់ និងទទួលលុយ", en: "Sell and get paid" },
+          line: { km: "នៅហាង ឬតាមតំណហាងរបស់អ្នក — ការបញ្ជាទិញនីមួយៗមកដល់ Telegram។", en: "At your counter or through your shop link — every order reaches Telegram." },
         },
       ],
     },
-    {
-      id: "plans",
-      type: "plans",
-      visible: true,
-      title: { km: "ជ្រើសរើសគម្រោង", en: "Pick a plan" },
-      highlight: "basic",
-      link: { label: { km: "ប្រៀបធៀបគម្រោងទាំងអស់", en: "Compare all plans" }, href: "/pricing" },
-    },
+    { id: "plans", type: "plans", visible: true, title: { km: "តម្លៃសាមញ្ញ", en: "Simple prices" }, highlight: "basic", link: { label: { km: "ប្រៀបធៀបគម្រោងទាំងអស់", en: "Compare all plans" }, href: "/pricing" } },
     {
       id: "questions",
       type: "questions",
@@ -300,31 +200,28 @@ const shopPage: SitePage = {
       title: { km: "សំណួរញឹកញាប់", en: "Questions" },
       items: [
         {
-          question: { km: "តើខ្ញុំត្រូវការគេហទំព័រទេ?", en: "Do I need a website?" },
+          question: { km: "តើវាឥតគិតថ្លៃទេ?", en: "Is it free?" },
           answer: {
-            km: "ទេ។ Khmio ផ្តល់តំណហាងមួយឲ្យអ្នក (khmio.com/s/ឈ្មោះហាងរបស់អ្នក) ដែលអ្នកចែករំលែកបានគ្រប់ទីកន្លែង។",
-            en: "No. Khmio gives you a shop link (khmio.com/s/your-shop) that you share anywhere.",
+            km: "ឥតគិតថ្លៃក្នុងអំឡុងពេលបេតា។ ក្រោយមក បង់វិក្កយបត្រ KHQR មួយក្នុងមួយខែ — គ្មានកាត គ្មានការកាត់លុយដោយស្វ័យប្រវត្តិ។",
+            en: "Free during the beta. Later, one KHQR bill a month — no card, nothing charged automatically.",
           },
         },
         {
-          question: { km: "តើអតិថិជនបង់ប្រាក់យ៉ាងដូចម្តេច?", en: "How do buyers pay?" },
+          question: { km: "តើវាសម្រាប់អាជីវកម្មប្រភេទណា?", en: "Which businesses is it for?" },
           answer: {
-            km: "សម្រាប់ពេលនេះ បង់ប្រាក់ពេលទទួលទំនិញ។ KHQR មកដល់ឆាប់ៗ៖ ពេលនោះ កម្មវិធីធនាគារណាមួយដែលស្កេន KHQR បាន — ABA, ACLEDA, Wing, Bakong និងផ្សេងទៀត។",
-            en: "Cash on delivery for now. KHQR is coming soon: then any bank app that scans KHQR works — ABA, ACLEDA, Wing, Bakong and more.",
+            km: "យានដ្ឋាន ហាងគ្រឿងបន្លាស់ ហាងទូរស័ព្ទ ហាងកាហ្វេ សាឡន និងហាងលក់រាយ។ យានដ្ឋានត្រូវបានសាកល្បងច្រើនជាងគេ ហើយផ្សេងទៀតកំពុងសាកល្បងជាមួយអ្នកលក់ពិត។",
+            en: "Garages, auto parts and phone shops, cafés, salons and retail. Garages are the most tested; the others are in beta with real sellers.",
           },
         },
         {
-          question: { km: "តើលុយរបស់ខ្ញុំមានសុវត្ថិភាពទេ?", en: "Is my money safe?" },
-          answer: {
-            km: "អតិថិជនបង់ចូលគណនីធនាគាររបស់អ្នកផ្ទាល់។ Khmio មិនកាន់លុយរបស់អ្នកទេ។",
-            en: "Buyers pay straight into your own bank account. Khmio never holds your money.",
-          },
+          question: { km: "តើខ្ញុំត្រូវការកុំព្យូទ័រទេ?", en: "Do I need a computer?" },
+          answer: { km: "ទេ។ អ្វីៗទាំងអស់ដំណើរការលើទូរស័ព្ទ។ កុំព្យូទ័រក៏ប្រើបានដែរ ពេលអ្នកចង់បាន។", en: "No. Everything works on a phone. A computer works too, whenever you want one." },
         },
         {
-          question: { km: "តើខ្ញុំអាចឈប់ប្រើបានពេលណា?", en: "Can I stop any time?" },
+          question: { km: "តើអតិថិជនបង់ប្រាក់យ៉ាងដូចម្តេច?", en: "How do customers pay?" },
           answer: {
-            km: "បាន។ គ្មានការកាត់លុយដោយស្វ័យប្រវត្តិទេ — អ្នកបង់វិក្កយបត្រ KHQR មួយក្នុងមួយខែ។ បើឈប់បង់ ហាងត្រូវផ្អាក ហើយទិន្នន័យរបស់អ្នកនៅដដែល។",
-            en: "Yes. Nothing is charged automatically — you pay one KHQR bill a month. If you stop, your shop pauses and your data is kept.",
+            km: "សាច់ប្រាក់ ឬ QR របស់ហាងអ្នក។ KHQR ដែលពិនិត្យដោយស្វ័យប្រវត្តិ មកដល់ឆាប់ៗ។ លុយចូលគណនីរបស់អ្នកផ្ទាល់ — Khmio មិនកាន់លុយរបស់អ្នកទេ។",
+            en: "Cash or your shop's own QR. KHQR that checks itself is coming soon. The money goes to your own account — Khmio never holds it.",
           },
         },
       ],
@@ -333,142 +230,14 @@ const shopPage: SitePage = {
       id: "closing",
       type: "closing",
       visible: true,
-      headline: { km: "ចាប់ផ្តើមលក់ថ្ងៃនេះ", en: "Start selling today" },
-      line: { km: "សាកល្បងឥតគិតថ្លៃ ១៤ ថ្ងៃ មិនត្រូវការកាតធនាគារ។", en: "14-day free trial, no card needed." },
+      headline: { km: "ដំណើរការអាជីវកម្មរបស់អ្នកនៅលើ Khmio", en: "Run your business on Khmio" },
+      line: { km: "ឥតគិតថ្លៃក្នុងអំឡុងពេលបេតា — មិនត្រូវការកាតធនាគារ។", en: "Free during the beta — no card needed." },
       button: startFree,
     },
   ],
 };
 
-const joinWaitlist = { label: { km: "ចុះឈ្មោះរង់ចាំ", en: "Join the waitlist" }, href: "#waitlist" };
-
-/** P3: one page per product not built yet, all from the same sections. */
-const comingSoonPages: Record<"class" | "rent", SitePage> = {
-  class: {
-    slug: "products/class",
-    seo: {
-      title: { km: "Khmio Class — ប្រមូលថ្លៃសិក្សាតាម KHQR", en: "Khmio Class — collect class fees by KHQR" },
-      description: {
-        km: "វិក្កយបត្រប្រចាំខែទៅឪពុកម្តាយនៅលើ Telegram។ មកដល់ឆាប់ៗ — ចុះឈ្មោះរង់ចាំ។",
-        en: "Monthly bills to parents on Telegram. Coming soon — join the waitlist.",
-      },
-    },
-    sections: [
-      {
-        id: "hero",
-        type: "hero",
-        visible: true,
-        eyebrow: { km: "Khmio Class · មកដល់ឆាប់ៗ", en: "Khmio Class · Coming soon" },
-        headline: { km: "ប្រមូលថ្លៃសិក្សាប្រចាំខែ ដោយមិនចាំបាច់ដើររក", en: "Collect monthly class fees without chasing anyone" },
-        sentence: {
-          km: "សម្រាប់គ្រូបង្រៀនថ្នាក់បន្ថែម និងសាលាតូចៗ។ Khmio ផ្ញើវិក្កយបត្រ KHQR ទៅឪពុកម្តាយនៅលើ Telegram ហើយប្រាប់អ្នកថាអ្នកណាបានបង់។",
-          en: "For extra-class teachers and small schools. Khmio sends parents a KHQR bill on Telegram and tells you who has paid.",
-        },
-        art: { kind: "mio", pose: "coin" },
-        primary: joinWaitlist,
-      },
-      {
-        id: "what-it-will-do",
-        type: "features",
-        visible: true,
-        title: { km: "អ្វីដែលវានឹងធ្វើ", en: "What it will do" },
-        features: [
-          {
-            icon: "list",
-            title: { km: "សិស្ស និងថ្នាក់", en: "Students and classes" },
-            line: { km: "បន្ថែមថ្នាក់ និងសិស្ស ជាមួយលេខទូរស័ព្ទឪពុកម្តាយ។", en: "Add your classes and students with a parent's phone number." },
-          },
-          {
-            icon: "qr",
-            title: { km: "វិក្កយបត្រប្រចាំខែដោយស្វ័យប្រវត្តិ", en: "Automatic monthly bills" },
-            line: { km: "នៅដើមខែ ឪពុកម្តាយនីមួយៗទទួលបាន KHQR នៅលើ Telegram។", en: "At the start of each month, every parent gets a KHQR on Telegram." },
-          },
-          {
-            icon: "bell",
-            title: { km: "ដឹងថាអ្នកណាបានបង់", en: "Know who has paid" },
-            line: {
-              km: "ការបង់ប្រាក់ត្រូវបានបញ្ជាក់ដោយខ្លួនឯង ហើយអ្នកដែលមិនទាន់បង់ទទួលការរំលឹកដោយសុភាព។",
-              en: "Payments confirm themselves, and parents who haven't paid get a polite reminder.",
-            },
-          },
-        ],
-      },
-      {
-        id: "waitlist",
-        type: "waitlist",
-        visible: true,
-        title: { km: "ប្រាប់ខ្ញុំនៅពេលវារួចរាល់", en: "Tell me when it's ready" },
-        thanks: {
-          km: "អរគុណ! យើងនឹងផ្ញើសារទៅអ្នកតាម Telegram ឬទូរស័ព្ទ នៅពេល Khmio Class បើក។",
-          en: "Thank you! We'll message you on Telegram or by phone when Khmio Class opens.",
-        },
-      },
-    ],
-  },
-  rent: {
-    slug: "products/rent",
-    seo: {
-      title: { km: "Khmio Rent — ថ្លៃជួល និងទឹកភ្លើង ក្នុងវិក្កយបត្រតែមួយ", en: "Khmio Rent — rent and utilities in one bill" },
-      description: {
-        km: "វិក្កយបត្រ KHQR ប្រចាំខែសម្រាប់បន្ទប់ជួលនីមួយៗ។ មកដល់ឆាប់ៗ — ចុះឈ្មោះរង់ចាំ។",
-        en: "A monthly KHQR bill for every room. Coming soon — join the waitlist.",
-      },
-    },
-    sections: [
-      {
-        id: "hero",
-        type: "hero",
-        visible: true,
-        eyebrow: { km: "Khmio Rent · មកដល់ឆាប់ៗ", en: "Khmio Rent · Coming soon" },
-        headline: { km: "ថ្លៃជួល អគ្គិសនី និងទឹក ក្នុងវិក្កយបត្រតែមួយ", en: "Rent, electricity and water in one bill" },
-        sentence: {
-          km: "សម្រាប់ម្ចាស់បន្ទប់ជួល អន្តេវាសិកដ្ឋាន និងផ្ទះល្វែងតូចៗ។ វាយលេខកុងទ័រ ហើយ Khmio ផ្ញើវិក្កយបត្រ KHQR ទៅអ្នកជួលនីមួយៗ។",
-          en: "For landlords of rooms, dorms and small apartments. Type the meter readings and Khmio sends each tenant a KHQR bill.",
-        },
-        art: { kind: "mio", pose: "coin" },
-        primary: joinWaitlist,
-      },
-      {
-        id: "what-it-will-do",
-        type: "features",
-        visible: true,
-        title: { km: "អ្វីដែលវានឹងធ្វើ", en: "What it will do" },
-        features: [
-          {
-            icon: "building",
-            title: { km: "បន្ទប់ និងអ្នកជួល", en: "Rooms and tenants" },
-            line: { km: "បន្ថែមបន្ទប់ ថ្លៃជួល និងលេខទូរស័ព្ទអ្នកជួលនីមួយៗ។", en: "Add rooms, the rent and each tenant's phone number." },
-          },
-          {
-            icon: "list",
-            title: { km: "លេខកុងទ័រទឹកភ្លើង", en: "Meter readings" },
-            line: { km: "វាយលេខកុងទ័រប្រចាំខែ ហើយថ្លៃត្រូវបានគណនាឲ្យអ្នក។", en: "Type the monthly meter numbers and the cost is worked out for you." },
-          },
-          {
-            icon: "bell",
-            title: { km: "វិក្កយបត្រ និងការរំលឹក", en: "Bills and reminders" },
-            line: {
-              km: "អ្នកជួលទទួលវិក្កយបត្រ KHQR តែមួយនៅលើ Telegram ហើយអ្នកឃើញថាបន្ទប់ណាបានបង់។",
-              en: "Tenants get one KHQR bill on Telegram, and you see which rooms have paid.",
-            },
-          },
-        ],
-      },
-      {
-        id: "waitlist",
-        type: "waitlist",
-        visible: true,
-        title: { km: "ប្រាប់ខ្ញុំនៅពេលវារួចរាល់", en: "Tell me when it's ready" },
-        thanks: {
-          km: "អរគុណ! យើងនឹងផ្ញើសារទៅអ្នកតាម Telegram ឬទូរស័ព្ទ នៅពេល Khmio Rent បើក។",
-          en: "Thank you! We'll message you on Telegram or by phone when Khmio Rent opens.",
-        },
-      },
-    ],
-  },
-};
-
-/** P4: prices are never typed here — the Plans section reads plans.ts. */
+/** Prices are never typed here — the Plans section reads plans.ts. */
 const pricingPage: SitePage = {
   slug: "pricing",
   seo: {
@@ -491,15 +260,12 @@ const pricingPage: SitePage = {
       },
       art: { kind: "mio", pose: "coin" },
       primary: startFree,
+      trust: [
+        { icon: "shield", text: { km: "គ្មានកាតធនាគារ", en: "No card needed" } },
+        { icon: "clock", text: { km: "ឈប់ពេលណាក៏បាន", en: "Stop any time" } },
+      ],
     },
-    {
-      id: "plans",
-      type: "plans",
-      visible: true,
-      title: { km: "គម្រោង Khmio Shop", en: "Khmio Shop plans" },
-      highlight: "basic",
-      compare: true,
-    },
+    { id: "plans", type: "plans", visible: true, title: { km: "គម្រោង Khmio", en: "Khmio plans" }, highlight: "basic", compare: true },
     {
       id: "how-paying-works",
       type: "features",
@@ -509,10 +275,7 @@ const pricingPage: SitePage = {
         {
           icon: "qr",
           title: { km: "វិក្កយបត្រ KHQR មួយក្នុងមួយខែ", en: "One KHQR bill a month" },
-          line: {
-            km: "វិក្កយបត្ររបស់អ្នកមកដល់ Telegram មុនខែបញ្ចប់។ បង់ជាមួយកម្មវិធីធនាគារណាមួយ។",
-            en: "Your bill arrives on Telegram before the month ends. Pay it with any bank app.",
-          },
+          line: { km: "វិក្កយបត្ររបស់អ្នកមកដល់ Telegram មុនខែបញ្ចប់។ បង់ជាមួយកម្មវិធីធនាគារណាមួយ។", en: "Your bill arrives on Telegram before the month ends. Pay it with any bank app." },
         },
         {
           icon: "shield",
@@ -522,10 +285,7 @@ const pricingPage: SitePage = {
         {
           icon: "clock",
           title: { km: "ពេលអនុគ្រោះ", en: "A grace period" },
-          line: {
-            km: "ភ្លេចបង់? អ្វីៗនៅតែដំណើរការមួយរយៈ ខណៈដែលអ្នកបង់ ហើយ Telegram រំលឹកអ្នក។",
-            en: "Missed a bill? Everything keeps working for a while as you pay, and Telegram reminds you.",
-          },
+          line: { km: "ភ្លេចបង់? អ្វីៗនៅតែដំណើរការមួយរយៈ ខណៈដែលអ្នកបង់ ហើយ Telegram រំលឹកអ្នក។", en: "Missed a bill? Everything keeps working for a while as you pay, and Telegram reminds you." },
         },
         {
           icon: "boxes",
@@ -538,13 +298,6 @@ const pricingPage: SitePage = {
       ],
     },
     {
-      id: "coming",
-      type: "productCards",
-      visible: true,
-      title: { km: "មកដល់ឆាប់ៗ៖ Khmio Class និង Khmio Rent", en: "Coming soon: Khmio Class and Khmio Rent" },
-      show: "coming_soon",
-    },
-    {
       id: "closing",
       type: "closing",
       visible: true,
@@ -555,11 +308,25 @@ const pricingPage: SitePage = {
   ],
 };
 
+/** A picture in the website's picture library (A12). Pages point to it as "library:<id>". */
+export interface SitePicture {
+  id: string;
+  /** The file itself: a path under public/, or a data URL for an upload. */
+  file: string;
+  alt: { km: string; en: string };
+  width: number;
+  height: number;
+  bytes: number;
+  /** ISO time it was added. */
+  addedAt: string;
+}
+
+/** The picture library: empty until the garage's own pictures are added (A12). */
+export const SITE_PICTURES: SitePicture[] = [];
+
 /** Every page of the website, by key (site/pages.ts). */
 export const SITE_PAGES: Record<SitePageKey, SitePage> = {
   home: homePage,
-  shop: shopPage,
-  class: comingSoonPages.class,
-  rent: comingSoonPages.rent,
   pricing: pricingPage,
+  ...SOLUTION_PAGES,
 };

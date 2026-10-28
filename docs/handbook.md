@@ -1,6 +1,6 @@
 # Khmio Handbook — start here
 
-As of 2026-10-07 · for the owner, written for someone starting from zero: which document answers what, the whole journey from step 0 to a running business, how to work with Claude every day, what to do when something breaks, and how the system stays easy to maintain and grow
+As of 2026-10-28 · for the owner, written for someone starting from zero: which document answers what, the whole journey from step 0 to a running business, how to work with Claude every day, what to do when something breaks, and how the system stays easy to maintain and grow
 
 This handbook does not repeat the plans; it points to them. When this page and another document disagree, the other document wins (`docs/blueprint.md` above all), and this page gets fixed.
 
@@ -20,7 +20,9 @@ This handbook does not repeat the plans; it points to them. When this page and a
 | What did each database update change? | `docs/database-changes.md` |
 | What does each screen contain? | `design/screens.md` |
 | How do I test the screens with real sellers? | `design/seller-test.md` |
-| Which links open the app, the admin, the designs and GitHub? | This page, section 11 |
+| Which links open the app, the admin, the styleguide and GitHub? | This page, section 11 |
+| Why is the garage tested first, and how does another business leave beta? | `docs/blueprint.md` → "Garage first" |
+| Which businesses does Khmio fit, and which comes next? | `docs/blueprint.md` → "Business roadmap" |
 
 **Golden rule:** when a decision changes, change the document first, then the code. A decision that lives only in a chat is lost.
 
@@ -33,7 +35,8 @@ This handbook does not repeat the plans; it points to them. When this page and a
 | Worker | A program that runs jobs in the background: payment checks, Telegram messages, backups. Folder `apps/worker` |
 | Database | Where shops, products and orders are kept (PostgreSQL) |
 | Migration | A small file that changes the database's shape. Never edit an old one; always add a new one |
-| Mockup | A screen with sample data, used to agree on the design before real code |
+| Demo Garage | A complete made-up garage shop (`pnpm demo:garage`) that every change is tested on — "Garage first" |
+| Spec | A screen written in `design/screens.md` but not built yet. There are no mockups: screens are built as real pages and approved there |
 | Token (colour) | A named colour such as `brand` or `danger`. Screens use names, never raw colour codes |
 | Branch | A separate copy of the code for one task, so `main` stays safe |
 | Commit | A saved checkpoint of changes, with a message saying what changed |
@@ -53,12 +56,12 @@ Status as of 2026-10-06. The live status is always in `docs/blueprint.md` "Where
 | Phase | Goal | Details in | Status |
 | --- | --- | --- | --- |
 | 0. Set up the PC | Tools installed, project runs locally | blueprint "Build guide" Parts 1–3 | Done |
-| 1. Design every screen | Mockups approved | `design/screens.md`, `/mockup` pages | Done |
+| 1. Design every screen | Every screen specified (the mockups were approved, then removed 2026-10-28) | `design/screens.md` | Done |
 | 2. Build Release 1 | Shops, products, checkout, orders, Telegram, admin | blueprint "Roadmap" steps 1–7 | Done, except step 5 KHQR (waits for a Bakong token and gate G3) |
 | 3. Brand | Name, domain, mascot, icon, accounts reserved | `docs/platform-launch-plan.md` Stage 1, `design/brand-guide.md` | Decided: Khmio, Mio, icon C. Open: reserve names, trademark search, designer's final artwork |
 | 4. Go live | The app online on `khmio.com` | `docs/go-live.md`, blueprint step 8 | Code ready; buying hosting and the domain is next |
 | 5. Beta | 5–10 real sellers for two weeks; social media starts | blueprint step 9, launch plan Stage 2 | Next after go-live |
-| 6. Platform website | Home, product, pricing pages; waitlist | launch plan Stage 3 | Mockups after the beta starts |
+| 6. Platform website | Home, product, pricing pages; waitlist | launch plan Stage 3 | Built (content in code); the admin editor after the beta starts |
 | 7. Getting paid | Subscriptions by KHQR, trust, public launch | blueprint Release 2 (steps 10–13), launch plan Stage 4 | Later |
 | 8. Run the platform | Daily, weekly, monthly routine | blueprint "Running the platform after launch" | From go-live on |
 | 9. Grow | Bigger-shop features; second product (Class or Rent) | blueprint Release 3, launch plan Stages 5–6, `docs/platform-roadmap.md` | After the public launch |
@@ -94,7 +97,7 @@ Propose a plan and the files you will change. Don't write code yet.
 **Something is broken** (the most useful template — fill in every line you can)
 ```
 Problem: <one sentence: what is wrong>
-Where: <page link, e.g. http://localhost:3000/km/mockup/checkout, or the command>
+Where: <page link, e.g. http://localhost:3000/km/s/mekong-auto-garage/checkout, or the command>
 What I did: <steps, 1, 2, 3>
 What I expected: <...>
 What happened instead: <...>
@@ -193,7 +196,7 @@ flowchart LR
 
 | Folder | What lives there |
 | --- | --- |
-| `apps/web` | All screens (buyer, seller, admin, mockups), translations in `messages/` |
+| `apps/web` | All screens (buyer, seller, admin, website, styleguide), translations in `messages/` |
 | `apps/api` | The server: every rule is checked here, never only on the screen |
 | `apps/worker` | Background jobs: payment checks, Telegram, backups |
 | `packages/shared` | Rules used by everyone: form checks (Zod), money, phone numbers, plans |
@@ -254,7 +257,7 @@ The full routine is in blueprint "Running the platform after launch". In one lin
 | --- | --- |
 | A roadmap step is finished | blueprint "Where we are now" |
 | A new rule for coding | `CLAUDE.md` |
-| A screen changes | `design/screens.md` first, then the mockup |
+| A screen changes | `design/screens.md` first, then the live page (approved on the Demo Garage) |
 | A look or behaviour rule changes | `design/design-standard.md` |
 | Brand, logo, Mio, colours, fonts, social media | `design/brand-guide.md` |
 | A go-live step changes | `docs/go-live.md` |
@@ -282,13 +285,12 @@ It exists only in development.
 
 | Link | What it is |
 | --- | --- |
-| http://localhost:3000/km | Home page: what Khmio is, "Start free" |
-| http://localhost:3000/km/products/shop | Khmio Shop: what the shop product does |
-| http://localhost:3000/km/products/class | Khmio Class: coming soon, with the waitlist form |
-| http://localhost:3000/km/products/rent | Khmio Rent: coming soon, with the waitlist form |
+| http://localhost:3000/km | Home page: Khmio's apps, "big business software, made small", the industries with their status |
+| http://localhost:3000/km/solutions/garage | Garage & auto repair: Available, the most tested |
+| http://localhost:3000/km/solutions/cafe | An industry in beta (also `auto-parts`, `phone`, `salon`, `retail`) |
 | http://localhost:3000/km/pricing | Pricing: plans read from `packages/shared/plans.ts`, in USD and riel |
 
-**Seller** — on your PC, "Development login" signs in as Test merchant A or B (the real Telegram button needs a public web address)
+**Seller** — on your PC, "Development login" → **Sign in as Garage** opens the Demo Garage (run `pnpm demo:garage` once first; the real Telegram button needs a public web address)
 
 | Link | What it is |
 | --- | --- |
@@ -299,7 +301,7 @@ It exists only in development.
 
 | Link | What it is |
 | --- | --- |
-| http://localhost:3000/km/s/dev-merchant-a | Test merchant A's shop, as a customer sees it |
+| http://localhost:3000/km/s/mekong-auto-garage | The Demo Garage's shop, as a customer sees it |
 
 To test both sides at once, use a normal window for the seller and a private
 window for the buyer.
@@ -314,16 +316,13 @@ window for the buyer.
 | http://localhost:3000/km/admin/audit-log | Every change: who, what, when |
 | http://localhost:3000/km/admin/settings | Exchange rate band, alerts chat, free beta |
 
-### Mockups (designs with sample data, not real)
+### Design
+
+There are no mockups any more (2026-10-28): screens not built yet are written specs in `design/screens.md`, and the old mockups are in git history at tag v0.5.1.
 
 | Link | What it is |
 | --- | --- |
-| http://localhost:3000/km/mockup/site | The website |
-| http://localhost:3000/km/mockup/storefront | The buyer's shop |
-| http://localhost:3000/km/mockup/dashboard | The seller's dashboard |
-| http://localhost:3000/km/mockup/admin | The admin, including screens not built yet (website editor, promotions, pictures, payments) |
-| http://localhost:3000/km/mockup/account | "My Khmio" account hub |
-| http://localhost:3000/km/styleguide | Colours, fonts, buttons: the design standard |
+| http://localhost:3000/km/styleguide | Colours, fonts, buttons and every shared part: the design standard |
 
 ### Online
 
@@ -339,3 +338,5 @@ window for the buyer.
 | `pnpm dev` | Starts the website, API and worker on your PC |
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` | Check the code (Claude runs these after every change) |
 | `pnpm db:up` | Starts the database with Docker (only if you use Docker, not the installed PostgreSQL) |
+| `pnpm demo:garage -- --reset` | A fresh Demo Garage to test with (deletes the old one and its photos first) |
+| `pnpm data:garage-only` | Lists every shop that isn't a garage, and the test merchants without a shop; add `-- --yes` to delete them and their photos. Your PC only, never production |

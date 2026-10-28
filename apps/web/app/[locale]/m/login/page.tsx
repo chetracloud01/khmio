@@ -99,13 +99,9 @@ export default function LoginPage() {
               <p className="text-sm text-muted">{t("devLoginHint")}</p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            {(["a", "b"] as const).map((who) => (
-              <Button key={who} variant="secondary" disabled={busy} onClick={() => void signIn("/auth/dev-login", { as: who })}>
-                {t("devLoginAs", { name: who.toUpperCase() })}
-              </Button>
-            ))}
-            <Button variant="secondary" className="col-span-2" disabled={busy} onClick={() => void signIn("/auth/dev-login", { as: "garage" })}>
+          {/* Garage first: only the Demo Garage (pnpm demo:garage). Test shops A and B stay in the API for the end-to-end checks. */}
+          <div className="grid grid-cols-1 gap-2">
+            <Button variant="secondary" disabled={busy} onClick={() => void signIn("/auth/dev-login", { as: "garage" })}>
               <Car className="h-4 w-4" aria-hidden="true" />
               {t("devLoginGarage")}
             </Button>

@@ -1,9 +1,10 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { libraryPictureId, picturesUsedIn, platformProductSchema, sitePageSchema, type SitePage } from "@khmio/shared";
+import { libraryPictureId, picturesUsedIn, siteAppSchema, SITE_SOLUTION_IDS, sitePageSchema, siteSolutionSchema, solutionPath, type SitePage } from "@khmio/shared";
 import { describe, expect, it } from "vitest";
-import { SITE_PAGES, SITE_PICTURES, SITE_PRODUCTS } from "./content";
-import { SITE_PAGE_INFO, SITE_PAGE_KEYS, siteHasPath } from "./pages";
+import { SITE_PAGES, SITE_PICTURES, SITE_SOLUTIONS } from "./content";
+import { SITE_APPS } from "./content-apps";
+import { SITE_PAGE_KEYS, siteHasPath, sitePageInfo } from "./pages";
 
 // The website's content must be exactly what the admin could publish, and
 // every link and picture in it must lead somewhere — this file is what
@@ -26,16 +27,23 @@ function linksIn(page: SitePage): string[] {
 describe("website content", () => {
   it("passes the site kit's rules", () => {
     for (const key of SITE_PAGE_KEYS) expect(sitePageSchema.safeParse(SITE_PAGES[key]).error?.issues ?? [], key).toEqual([]);
-    for (const product of SITE_PRODUCTS) expect(platformProductSchema.safeParse(product).error?.issues ?? []).toEqual([]);
+    for (const solution of SITE_SOLUTIONS) expect(siteSolutionSchema.safeParse(solution).error?.issues ?? []).toEqual([]);
   });
 
-  it("has one entry per platform product, each with its own page", () => {
-    expect(SITE_PRODUCTS.map((product) => product.id)).toEqual(["shop", "class", "rent"]);
-    for (const product of SITE_PRODUCTS) expect(siteHasPath(`/products/${product.id}`), product.id).toBe(true);
+  it("lists each app once, with enough ready ones to ring the hero's Mio", () => {
+    for (const app of SITE_APPS) expect(siteAppSchema.safeParse(app).error?.issues ?? [], app.id).toEqual([]);
+    expect(new Set(SITE_APPS.map((app) => app.id)).size).toBe(SITE_APPS.length);
+    expect(SITE_APPS.filter((app) => app.status === "live").length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("lists every business solution once, garage first and live, each with its own page", () => {
+    expect(SITE_SOLUTIONS.map((solution) => solution.id)).toEqual([...SITE_SOLUTION_IDS]);
+    expect(SITE_SOLUTIONS[0]).toMatchObject({ id: "garage", status: "live" });
+    for (const solution of SITE_SOLUTIONS) expect(siteHasPath(solutionPath(solution.id)), solution.id).toBe(true);
   });
 
   it("gives each page the address it is served at", () => {
-    for (const key of SITE_PAGE_KEYS) expect(`/${SITE_PAGES[key].slug}`).toBe(SITE_PAGE_INFO[key].path);
+    for (const key of SITE_PAGE_KEYS) expect(`/${SITE_PAGES[key].slug}`).toBe(sitePageInfo(key).path);
   });
 
   it("links only to pages that exist and to places on the same page", () => {
@@ -61,11 +69,12 @@ describe("website content", () => {
     expect(libraryPictureId("library:shop-khqr")).toBe("shop-khqr");
   });
 
-  it("asks for waitlist sign-ups only on coming-soon product pages", () => {
+  it("asks for waitlist sign-ups only on coming-soon solution pages, for that solution", () => {
     for (const key of SITE_PAGE_KEYS) {
-      const product = SITE_PRODUCTS.find((entry) => entry.id === SITE_PAGE_INFO[key].product);
-      const hasWaitlist = SITE_PAGES[key].sections.some((section) => section.type === "waitlist");
-      expect(hasWaitlist, key).toBe(product?.status === "coming_soon");
+      const solution = SITE_SOLUTIONS.find((entry) => entry.id === sitePageInfo(key).solution);
+      const waitlists = SITE_PAGES[key].sections.filter((section) => section.type === "waitlist");
+      expect(waitlists.length, key).toBe(solution?.status === "coming_soon" ? 1 : 0);
+      for (const waitlist of waitlists) expect(waitlist.type === "waitlist" && waitlist.solution, key).toBe(solution?.id);
     }
   });
 });

@@ -4,7 +4,7 @@ import { DEFAULT_ADMIN_SETTINGS, fulfilmentSchema, orderStatusSchema, phnomPenhD
 import { Card, Input } from "@khmio/ui";
 import { Languages, Store, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn } from "@/components/data-grid";
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks } from "@/components/form-ui";
 import { ShopHero } from "@/components/buyer/shop-hero";
@@ -24,11 +24,10 @@ import { InvoiceFields } from "@/components/shop-details/invoice-fields";
 import { LocationFields } from "@/components/shop-details/location-fields";
 import { PricingFields, toPricingDraft, type PricingDraft } from "@/components/shop-details/pricing-fields";
 import { useDateText } from "@/components/use-date-text";
-import { mockDeliverySettings, mockInvoiceDetails, mockStore, mockStoreSettings } from "@/mock/mock-data";
-import { buildSampleOrders, type OrderRecord } from "@/mock/mock-orders";
+import { SAMPLE_DELIVERY, SAMPLE_INVOICE_DETAILS, SAMPLE_ORDERS, SAMPLE_SHOP, SAMPLE_STORE_SETTINGS, type SampleOrder } from "./samples";
 import { Demo, Section } from "./styleguide-ui";
 
-const WAITING = new Set<OrderRecord["status"]>(["awaiting_payment", "cod_pending"]);
+const WAITING = new Set<SampleOrder["status"]>(["awaiting_payment", "cod_pending"]);
 const SAMPLE_HOURS_AGO = 3;
 const SAMPLE_LATTE_CENTS = 200;
 const SAMPLE_COOKIE_CENTS = 100;
@@ -49,13 +48,13 @@ export function AppBlocksTab() {
   const tProfile = useTranslations("DashboardProfile");
   // Shop details' groups with the sample shop's values, editable here.
   const [location, setLocation] = useState<ShopLocation>({
-    address: mockDeliverySettings.pickup.address,
+    address: SAMPLE_DELIVERY.pickup.address,
     mapUrl: "",
-    pickupEnabled: mockDeliverySettings.pickup.enabled,
-    pickupHours: mockDeliverySettings.pickup.hours,
+    pickupEnabled: SAMPLE_DELIVERY.pickup.enabled,
+    pickupHours: SAMPLE_DELIVERY.pickup.hours,
   });
-  const [invoice, setInvoice] = useState<InvoiceDetails>(mockInvoiceDetails);
-  const [pricing, setPricing] = useState<PricingDraft>(() => toPricingDraft(mockStoreSettings));
+  const [invoice, setInvoice] = useState<InvoiceDetails>(SAMPLE_INVOICE_DETAILS);
+  const [pricing, setPricing] = useState<PricingDraft>(() => toPricingDraft(SAMPLE_STORE_SETTINGS));
   const [shopInfoOpen, setShopInfoOpen] = useState(false);
   // Selling at the counter, with a sample sale of two lines.
   const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({ latte: 2, cookie: 1 });
@@ -64,12 +63,11 @@ export function AppBlocksTab() {
   const tCounterDemo = useTranslations("Counter");
   const sampleCounterTotal = (counterQuantities.latte ?? 0) * SAMPLE_LATTE_CENTS + (counterQuantities.cookie ?? 0) * SAMPLE_COOKIE_CENTS;
   const dirty = shopName !== savedShopName;
-  const orders = useMemo(() => buildSampleOrders(new Date()), []);
   const dates = useDateText();
   /** Three hours ago: one moment that shows every way a date is written. */
   const [sampleMoment] = useState(() => new Date(Date.now() - SAMPLE_HOURS_AGO * 60 * 60 * 1000).toISOString());
 
-  const columns: DataGridColumn<OrderRecord>[] = [
+  const columns: DataGridColumn<SampleOrder>[] = [
     { key: "order", header: t("gridColOrder"), hideable: false, sortable: true, value: (order) => order.orderNumber, cell: (order) => <span className="font-medium tabular-nums"><DataGridHighlight text={order.orderNumber} /></span> },
     { key: "buyer", header: t("gridColBuyer"), sortable: true, value: (order) => order.name, cell: (order) => <DataGridHighlight text={order.name} /> },
     { key: "status", header: t("gridColStatus"), cell: (order) => <OrderStatusPill order={order} /> },
@@ -109,7 +107,7 @@ export function AppBlocksTab() {
       </div>
 
       <Section title={t("shopDetailsSection")} description={t("shopDetailsHint")}>
-        {/* Shop details (design/screens.md S10): its groups, shared by the live page and the mockup. */}
+        {/* Shop details (design/screens.md S10): its groups, as the live page uses them. */}
         <Demo name="SectionJumpLinks">
           <SectionJumpLinks
             label={tProfile("jumpTo")}
@@ -133,7 +131,7 @@ export function AppBlocksTab() {
                 values={invoice}
                 errors={{}}
                 onChange={(field, value) => setInvoice((current) => ({ ...current, [field]: value }))}
-                shop={{ name: t("detailShopValue"), logoUrl: null, phone: mockStore.phone, address: location.address }}
+                shop={{ name: t("detailShopValue"), logoUrl: null, phone: SAMPLE_SHOP.phone, address: location.address }}
               />
             </Card>
           </Demo>
@@ -172,7 +170,7 @@ export function AppBlocksTab() {
           </Demo>
           <Demo name="KhqrPayPanel">
             <KhqrPayPanel
-              storeName={mockStore.nameEn}
+              storeName={SAMPLE_SHOP.nameEn}
               amountMinor={10_800}
               currency="KHR"
               qrText="KHQR-STYLEGUIDE"
@@ -213,16 +211,16 @@ export function AppBlocksTab() {
               name: t("detailShopValue"),
               logo: t("detailShopValue").charAt(0),
               openLabel: tShop("openNow"),
-              phone: mockStore.phone,
-              address: mockDeliverySettings.pickup.address,
+              phone: SAMPLE_SHOP.phone,
+              address: SAMPLE_DELIVERY.pickup.address,
               mapUrl: "",
-              telegram: mockInvoiceDetails.telegramLink,
-              facebook: mockInvoiceDetails.facebookLink,
-              delivery: mockDeliverySettings,
-              currency: mockStoreSettings.defaultCurrency,
-              rate: mockStoreSettings.usdToKhrRate,
+              telegram: SAMPLE_INVOICE_DETAILS.telegramLink,
+              facebook: SAMPLE_INVOICE_DETAILS.facebookLink,
+              delivery: SAMPLE_DELIVERY,
+              currency: SAMPLE_STORE_SETTINGS.defaultCurrency,
+              rate: SAMPLE_STORE_SETTINGS.usdToKhrRate,
               khqrReady: true,
-              allowCod: mockStoreSettings.allowCod,
+              allowCod: SAMPLE_STORE_SETTINGS.allowCod,
             }}
           />
         </Demo>
@@ -270,12 +268,12 @@ export function AppBlocksTab() {
       <Section title={t("gridSection")} description={t("gridHint")}>
         <Demo name={["DataGrid", "DataGridHighlight"]}>
           <DataGrid
-            rows={orders}
+            rows={SAMPLE_ORDERS}
             getRowId={(order) => order.orderNumber}
             columns={columns}
             searchText={(order) => `${order.orderNumber} ${order.name}`}
             searchPlaceholder={t("gridSearch")}
-            chips={[{ value: "waiting", label: t("tone_warning"), predicate: (order: OrderRecord) => WAITING.has(order.status) }]}
+            chips={[{ value: "waiting", label: t("tone_warning"), predicate: (order: SampleOrder) => WAITING.has(order.status) }]}
             initialSort={{ key: "order", direction: "desc" }}
             renderCard={(order) => (
               <div className="flex flex-col gap-1">

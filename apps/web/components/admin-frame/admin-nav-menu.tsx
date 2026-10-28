@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { readStored, writeStored } from "@/lib/device-storage";
-import { ADMIN_NAV, adminPath, isComingSoon, type AdminArea, type AdminBadge, type AdminNavGroup } from "./admin-nav";
+import { ADMIN_NAV, adminPath, isComingSoon, type AdminBadge, type AdminNavGroup } from "./admin-nav";
 
 /** Every page not built yet in this admin, gathered at the bottom and folded until opened. */
 const COMING_LATER = "groupComingLater";
@@ -18,11 +18,11 @@ interface Indicator {
   visible: boolean;
 }
 
-/** Folded groups are remembered per viewer, apart for the live admin and the mockup. */
-const closedGroupsKey = (area: AdminArea) => `khmio:${area}-admin-nav-closed`;
+/** Folded groups are remembered per viewer (under the name used when there was also a mockup admin, so choices are kept). */
+const CLOSED_GROUPS_KEY = "khmio:live-admin-nav-closed";
 
-function readClosedGroups(area: AdminArea): Set<string> {
-  return new Set(readStored(closedGroupsKey(area), z.array(z.string())) ?? [COMING_LATER]);
+function readClosedGroups(): Set<string> {
+  return new Set(readStored(CLOSED_GROUPS_KEY, z.array(z.string())) ?? [COMING_LATER]);
 }
 
 /**
@@ -35,14 +35,12 @@ function readClosedGroups(area: AdminArea): Set<string> {
  */
 export function AdminNavMenu({
   compact,
-  area,
   base,
   activeKey,
   badgeCount,
 }: {
   compact: boolean;
-  area: AdminArea;
-  /** "/km/admin" or "/km/mockup/admin". */
+  /** "/km/admin". */
   base: string;
   activeKey: string | undefined;
   badgeCount: Partial<Record<AdminBadge, number>>;
@@ -52,18 +50,18 @@ export function AdminNavMenu({
   const navRef = useRef<HTMLElement>(null);
   const activeRef = useRef<HTMLAnchorElement>(null);
   // Only rendered in the browser (the shell waits for saved data).
-  const [closedGroups, setClosedGroups] = useState(() => readClosedGroups(area));
+  const [closedGroups, setClosedGroups] = useState(() => readClosedGroups());
   const [indicator, setIndicator] = useState<Indicator>({ top: 0, height: 0, visible: false });
   // Slide only after the first measurement, so the highlight doesn't fly in on load.
   const [animate, setAnimate] = useState(false);
 
   const groups: AdminNavGroup[] = useMemo(() => {
-    const working = ADMIN_NAV.map((group) => ({ ...group, items: group.items.filter((item) => !isComingSoon(item, area)) })).filter(
+    const working = ADMIN_NAV.map((group) => ({ ...group, items: group.items.filter((item) => !isComingSoon(item)) })).filter(
       (group) => group.items.length > 0,
     );
-    const later = ADMIN_NAV.flatMap((group) => group.items).filter((item) => isComingSoon(item, area));
+    const later = ADMIN_NAV.flatMap((group) => group.items).filter((item) => isComingSoon(item));
     return later.length > 0 && !compact ? [...working, { key: COMING_LATER, items: later }] : working;
-  }, [area, compact]);
+  }, [compact]);
   const activeGroupKey = groups.find((group) => group.items.some((item) => item.key === activeKey))?.key;
 
   // Landing on a page opens the group it lives in.
@@ -82,7 +80,7 @@ export function AdminNavMenu({
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      writeStored(closedGroupsKey(area), [...next]); // not remembered when storage refuses
+      writeStored(CLOSED_GROUPS_KEY, [...next]); // not remembered when storage refuses
       return next;
     });
   }
@@ -184,7 +182,7 @@ export function AdminNavMenu({
                 {group.items.map((item) => {
                   const isActive = activeKey === item.key;
                   const count = item.badge ? (badgeCount[item.badge] ?? 0) : 0;
-                  const soon = isComingSoon(item, area);
+                  const soon = isComingSoon(item);
                   return (
                     <Link
                       key={item.key}

@@ -15,7 +15,7 @@ export interface CartPanelLine {
 /**
  * The shop page's cart on a laptop (from 1024 px): what's in it, the goods
  * total and Checkout, beside the products — the phone gets the floating cart
- * bar instead. One block for the live shop and its mockup; words come in as props.
+ * bar instead. Words come in as props.
  */
 export function CartPanel({
   title,

@@ -120,9 +120,9 @@ The home page today (`apps/web/app/[locale]/page.tsx`) is a placeholder. The web
 
 | Page | Address | Shows |
 | --- | --- | --- |
-| Home | `/` | One-line promise, how it works in 3 steps, seller stories, a big "Start free" button, the list of products |
-| Product: Shop | `/products/shop` | Each feature with phone screenshots: shop link, KHQR, Telegram alerts, delivery, stock (Pro), branches (Advance) |
-| Product: coming soon | `/products/class`, `/products/rent` | What it will do, and a **"Tell me when it's ready" waitlist** (name, phone or Telegram, business type) |
+| Home | `/` | Khmio as an all-in-one app for small businesses: the app grid, "big business software, made small", the industries with their status, 3 steps, plans, questions, "Start free" — redesigned 2026-10-28 (design/screens.md "Website redesign") |
+| Industry: Garage | `/solutions/garage` | Available: job cards, parts stock, customers, counter sales, profit, Telegram alerts; plans |
+| Industry: beta | `/solutions/auto-parts`, `phone`, `cafe`, `salon`, `retail` | Free to try: what works today and what's coming, "Start free" (a coming-soon industry shows a waitlist instead) |
 | Pricing | `/pricing` | Plans read from `packages/shared/plans.ts`, in USD and riel, with a comparison table |
 | Help | `/help` | Khmer video tutorials (roadmap step 13), common questions |
 | Terms, Privacy | `/terms`, `/privacy` | Required before the public launch (step 13) |
@@ -161,7 +161,7 @@ The website's text, pictures, promotions and product cards are **content in the 
 ### Build order (the `CLAUDE.md` method)
 
 1. Write the page specs in `design/screens.md` — done 2026-10-06 (site kit, P1–P4, A10–A12, account hub H1–H4).
-2. Mockups with sample data, each approved before the next: the site kit sections, then P1–P4 fed by sample content shaped like the future database, then the admin screens A10–A12.
+2. Built as live pages, each approved before the next: the site kit sections, then P1–P4 fed by content shaped like the future database (done 2026-10-07), then the admin screens A10–A12.
 3. **Before go-live (done 2026-10-07):** the live pages from content kept in code (`apps/web/site/content.ts`), with link previews, sitemap and robots; the waitlist (one table, one endpoint, bot check and rate limit) and its admin list (A14).
 4. Build the rest as its own roadmap step, after go-live: platform content tables (pages, sections, versions, promotions, pictures — no `store_id`, admin routes only, with the Website editor permission), publishing with cache refresh; the live pages then read the database instead of the file.
 5. Lint, typecheck, tests; check every page on a phone in Khmer and English.
@@ -197,7 +197,7 @@ The shortlist is in `docs/platform-roadmap.md` "Second product shortlist". Decid
 
 1. Platform pieces first: entitlements (which account has which product and plan), an app switcher in the menu, and "My subscriptions" listing every product.
 2. The monthly billing engine: list of people → automatic monthly bill → KHQR link by Telegram → confirmed by the worker. Reuses `packages/payments` and the worker.
-3. Product screens: mockups first, approval, then the backend step by step, like the store.
+3. Product screens: specs first, then live pages with their API, approved one at a time, like the store (docs/engineering-standard.md "Live pages only").
 4. Beta with people from the waitlist; fix; launch with social media.
 5. Turn the website's "coming soon" page into a real product page with "Start free".
 
@@ -213,7 +213,7 @@ Then repeat Stages 5–6 for the next product; the rental room manager reuses th
 | 2 | Reserve `khmio.com`, `khmio.app` and every name in Stage 1's list on the same day | Free or cheap; names get taken |
 | 3 | Continue go-live (`docs/go-live.md`) | Everything else depends on it |
 | 4 | Start posting short Khmer videos and recruiting beta sellers | The audience grows while you build |
-| 5 | Write the website page specs in `design/screens.md`, then mockups | Ready in time for the public launch |
+| 5 | Write the website page specs in `design/screens.md`, then build the pages | Ready in time for the public launch |
 
 ## Keep in mind
 

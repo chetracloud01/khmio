@@ -11,8 +11,8 @@ import { InvoiceDocument, type InvoiceData, type InvoiceSize } from "./invoice-d
 /**
  * The whole invoice page (design/screens.md B7) — back link, size switch,
  * buttons, the document, and its off-screen copy at paper width that becomes
- * the image and PDF. The buyer's page, the seller's page and the mockup all
- * show this one screen.
+ * the image and PDF. The buyer's page and the seller's page both show this
+ * one screen.
  */
 export function InvoiceScreen({
   data,

@@ -14,8 +14,7 @@ const PILL_IDLE = "border-border bg-bg text-fg hover:border-brand/40";
 /**
  * The pinned top of the shop's list (design/screens.md B1): search with the
  * buyer's recent searches, category chips with how many products each has,
- * then grid-or-list and sort. One block for the live shop
- * and its mockup.
+ * then grid-or-list and sort.
  */
 export function BrowseToolbar({
   browse,

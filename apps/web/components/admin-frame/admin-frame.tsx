@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { LanguageSwitch } from "@/components/language-switch";
 import { useThemeLabels } from "@/components/use-theme-labels";
-import { adminBase, findActiveNav, type AdminArea, type AdminBadge } from "./admin-nav";
+import { adminBase, findActiveNav, type AdminBadge } from "./admin-nav";
 import { AdminNavMenu } from "./admin-nav-menu";
 
 /** "Sokha Chan" → "SC"; one word → its first two letters. */
@@ -19,34 +19,31 @@ function initials(name: string): string {
 }
 
 /**
- * The admin frame (docs/blueprint.md "Admin area standards"), the same for
- * the live admin and its mockup: a dark sidebar that shrinks to icons on a
- * laptop, the same menu in a drawer on phones and tablets, and a header with
- * where you are, language, theme and the account menu. Rendered in the
- * browser only (both admins wait for data first), so reading saved choices
- * while rendering is safe.
+ * The admin frame (docs/blueprint.md "Admin area standards"): a dark sidebar
+ * that shrinks to icons on a laptop, the same menu in a drawer on phones and
+ * tablets, and a header with where you are, language, theme and the account
+ * menu. Rendered in the browser only (the admin waits for data first), so
+ * reading saved choices while rendering is safe.
  */
 export function AdminFrame({
-  area,
   badgeCount,
   account,
   onSignOut,
   children,
 }: {
-  area: AdminArea;
   badgeCount: Partial<Record<AdminBadge, number>>;
   account: { name: string; role: string };
-  /** Missing in the mockup: the button shows, disabled. */
-  onSignOut?: () => void;
+  onSignOut: () => void;
   children: ReactNode;
 }) {
   const t = useTranslations("AdminNav");
   const locale = useLocale();
   const pathname = usePathname();
   const themeLabels = useThemeLabels();
-  const base = adminBase(locale, area);
+  const base = adminBase(locale);
   const active = findActiveNav(pathname, base);
-  const collapsedKey = `khmio:${area}-admin-sidebar-collapsed`;
+  // The name it was saved under when there was also a mockup admin, so the choice is kept.
+  const collapsedKey = "khmio:live-admin-sidebar-collapsed";
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -92,7 +89,6 @@ export function AdminFrame({
   const navList = (compact: boolean) => (
     <AdminNavMenu
       compact={compact}
-      area={area}
       base={base}
       activeKey={active?.item.key}
       badgeCount={badgeCount}
@@ -191,14 +187,6 @@ export function AdminFrame({
                 <span className="truncate font-medium text-fg">{t(active.item.key)}</span>
               </>
             )}
-            {area === "mockup" && (
-              <span
-                title={t("mockNote")}
-                className="ml-2 hidden shrink-0 rounded-full bg-warning/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning sm:inline"
-              >
-                {t("mockBadge")}
-              </span>
-            )}
           </nav>
 
           <LanguageSwitch className="shrink-0" />
@@ -226,10 +214,8 @@ export function AdminFrame({
                   <div className="my-1 h-px bg-border" />
                   <button
                     type="button"
-                    disabled={!onSignOut}
-                    title={onSignOut ? undefined : t("mockNote")}
                     onClick={onSignOut}
-                    className="flex min-h-touch w-full items-center gap-2 rounded-DEFAULT px-3 text-sm text-muted hover:bg-border/10 hover:text-fg disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    className="flex min-h-touch w-full items-center gap-2 rounded-DEFAULT px-3 text-sm text-muted hover:bg-border/10 hover:text-fg"
                   >
                     <LogOut className="h-4 w-4" aria-hidden="true" />
                     {t("signOut")}

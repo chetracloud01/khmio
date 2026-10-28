@@ -1,10 +1,10 @@
-import { GetObjectCommand, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, NoSuchKey, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { isLocalNetworkOrigin, type ApiEnv } from "@khmio/shared";
 import type { Provider } from "@nestjs/common";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { getEnv } from "../config";
-import { isPhotoKey } from "./photos";
+import { isPhotoKey, storeFolderOf } from "./photos";
 
 /**
  * Where photos live. The database keeps only each photo's key
@@ -19,6 +19,12 @@ import { isPhotoKey } from "./photos";
 export interface FileStorage {
   put(key: string, data: Buffer, contentType: string): Promise<void>;
   read(key: string): Promise<Buffer | null>;
+  /**
+   * Deletes every file in one shop's folder — photos, small copies, logo,
+   * payment QR and uploads never saved to a product — and says how many.
+   * Only the development scripts that delete a whole shop call it.
+   */
+  removeStoreFiles(storeId: string): Promise<number>;
   publicUrl(key: string): string;
 }
 
@@ -58,6 +64,13 @@ export class LocalFileStorage implements FileStorage {
 
   async read(key: string): Promise<Buffer | null> {
     return readFile(this.path(key)).catch(() => null);
+  }
+
+  async removeStoreFiles(storeId: string): Promise<number> {
+    const folder = this.path(storeFolderOf(storeId));
+    const entries = await readdir(folder, { recursive: true, withFileTypes: true }).catch(() => []);
+    await rm(folder, { recursive: true, force: true });
+    return entries.filter((entry) => entry.isFile()).length;
   }
 
   publicUrl(key: string): string {
@@ -106,6 +119,21 @@ export class S3FileStorage implements FileStorage {
       if (error instanceof NoSuchKey) return null;
       throw error;
     }
+  }
+
+  /** Page by page (S3 lists and deletes at most 1,000 objects a call). */
+  async removeStoreFiles(storeId: string): Promise<number> {
+    const prefix = storeFolderOf(storeId);
+    let removed = 0;
+    let token: string | undefined;
+    do {
+      const page = await this.client.send(new ListObjectsV2Command({ Bucket: this.bucket, Prefix: prefix, ContinuationToken: token }));
+      const objects = (page.Contents ?? []).flatMap((object) => (object.Key ? [{ Key: object.Key }] : []));
+      if (objects.length) await this.client.send(new DeleteObjectsCommand({ Bucket: this.bucket, Delete: { Objects: objects, Quiet: true } }));
+      removed += objects.length;
+      token = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (token);
+    return removed;
   }
 
   publicUrl(key: string): string {

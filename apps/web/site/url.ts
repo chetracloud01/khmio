@@ -1,4 +1,4 @@
-import { SITE_PAGE_INFO, type SitePageKey } from "./pages";
+import { sitePageInfo, type SitePageKey } from "./pages";
 
 /**
  * The website's public address, for link previews, the sitemap and search
@@ -9,6 +9,6 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3
 
 /** A page's address in one language: "/km", "/en/pricing". */
 export function sitePagePath(pageKey: SitePageKey, locale: string): string {
-  const path = SITE_PAGE_INFO[pageKey].path;
+  const path = sitePageInfo(pageKey).path;
   return `/${locale}${path === "/" ? "" : path}`;
 }

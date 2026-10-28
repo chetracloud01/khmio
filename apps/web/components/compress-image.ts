@@ -1,6 +1,6 @@
 // Photos are shrunk in the browser before upload (docs/blueprint.md "Adding a
 // product"): phone cameras produce 3–8 MB images, which are slow on mobile
-// data — and in this mockup would not fit in browser storage.
+// data.
 
 export const ACCEPTED_IMAGE_TYPES = "image/jpeg,image/png,image/webp";
 
@@ -35,13 +35,8 @@ function drawShrunk(file: File, maxSide: number): Promise<HTMLCanvasElement> {
   });
 }
 
-/** Longest side at most `maxSide` px, re-encoded as JPEG, as a data URL (the mockups keep photos this way). */
-export async function compressImage(file: File, maxSide = 1600, quality = 0.8): Promise<string> {
-  return (await drawShrunk(file, maxSide)).toDataURL("image/jpeg", quality);
-}
-
 /**
- * The same shrink, as a JPEG file ready to upload (the API takes at most
+ * Longest side at most `maxSide` px, as a JPEG file ready to upload (the API takes at most
  * 2 MB). A photo that would still be too big is tried again smaller.
  * Straight from the canvas: turning a data URL back into a file with fetch()
  * is blocked by the site's Content-Security-Policy (connect-src).

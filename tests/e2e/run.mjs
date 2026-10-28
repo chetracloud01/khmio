@@ -7,8 +7,9 @@
 // needed), the stand-in KHQR bank (KHQR_PROVIDER=fake), a temporary photo
 // folder and a throw-away admin key; runs the scripts in roadmap order, with
 // the worker alongside the last one (payments); then b1.mjs, which starts its
-// own API copies with rate limits and Turnstile on. Exits 1 if any check
-// fails, and checks the logs never hold a secret or a phone number.
+// own API copies with rate limits and Turnstile on; and last garage-only.mjs,
+// which deletes every shop but the Demo Garage (pnpm data:garage-only). Exits
+// 1 if any check fails, and checks the logs never hold a secret or a phone number.
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createWriteStream, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -20,7 +21,7 @@ import { ROOT } from "./lib.mjs";
 const PORT = 4105;
 const API = `http://localhost:${PORT}`;
 // "payments" runs last: the worker runs alongside it (it would deliver the messages the earlier scripts look at).
-const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "counter", "stock", "catalog", "step7", "r1a", "home", "profit", "customers", "payments"];
+const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "counter", "stock", "catalog", "step7", "r1a", "home", "profit", "customers", "website", "payments"];
 
 if (!existsSync(join(ROOT, "apps/api/dist/main.js")) || !existsSync(join(ROOT, "apps/worker/dist/index.js"))) {
   console.error('Build first: pnpm build');
@@ -122,6 +123,8 @@ api.kill();
 await new Promise((resolve) => setTimeout(resolve, 1000));
 
 report("b1", await run(process.execPath, [join("tests/e2e", "b1.mjs")]));
+// Last: it deletes every shop that isn't a garage (pnpm data:garage-only), the ones the checks above use.
+report("garage-only", await run(process.execPath, [join("tests/e2e", "garage-only.mjs")]));
 telegram.close();
 
 // Nothing secret, and no phone number, in what the API wrote.

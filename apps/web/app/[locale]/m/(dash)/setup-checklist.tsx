@@ -30,7 +30,7 @@ const REQUIREMENT_ICON: Record<ShareRequirement, LucideIcon> = {
 
 /**
  * What the shop still needs before its link is shared — the same rule as the
- * mockup's checklist (packages/shared shop-readiness.ts), from the real shop's
+ * checklist (packages/shared shop-readiness.ts), from the real shop's
  * facts. Delivery settings and sharing arrive in later roadmap steps, so
  * those rows say so instead of linking to a page that doesn't save yet.
  */

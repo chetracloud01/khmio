@@ -13,18 +13,6 @@
           }
         ]
       }
-    },
-    {
-      "files": ["app/*/mockup/**/*.tsx"],
-      "rules": {
-        "no-restricted-syntax": [
-          "warn",
-          {
-            "selector": "JSXOpeningElement[name.name=/^(button|input|select|textarea)$/]",
-            "message": "Mockups are cleaned up when their screen is next worked on: use the kit (@khmio/ui), see /styleguide."
-          }
-        ]
-      }
     }
   ]
 }
