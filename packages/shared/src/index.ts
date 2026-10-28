@@ -11,6 +11,7 @@ export * from "./custom-fields";
 export * from "./services";
 export * from "./tables";
 export * from "./job-cards";
+export * from "./profit";
 export * from "./checkout";
 export * from "./delivery";
 export * from "./env";

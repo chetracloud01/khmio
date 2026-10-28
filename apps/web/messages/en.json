@@ -207,7 +207,7 @@
     "totalToPay": "Total to pay",
     "startingFrom": "From",
     "chooseOption": "Choose an option",
-    "addToCart": "Add to cart · {amount}",
+    "addToCart": "Add to cart",
     "close": "Close",
     "yourItems": "Your items",
     "details": "Details",
@@ -224,7 +224,6 @@
     "itemNoteLabel": "Note for this item (optional)",
     "itemNotePlaceholder": "e.g. no onions",
     "comboUnavailable": "This combination isn't available.",
-    "addToCart": "Add to cart",
     "addToCartPrice": "Add to cart · {price}",
     "onlyLeft": "Only {count} left",
     "clearSearch": "Clear search",
@@ -831,6 +830,13 @@
     "priceKhrLabel": "Price (KHR)",
     "autoFillNote": "Fills in automatically from the other currency",
     "wholesaleHint": "For bulk/B2B orders — not shown on the buyer storefront yet",
+    "costPriceTitle": "Cost price (only you see this)",
+    "costPriceHint": "What one costs you to buy or make. Used for the profit report; leave blank if you don't know.",
+    "costCurrencyLabel": "Costs in",
+    "costCurrencyUsd": "Dollars ($)",
+    "costCurrencyKhr": "Riel (៛)",
+    "costAmountUsd": "Cost (USD)",
+    "costAmountKhr": "Cost (KHR)",
     "variantsTitle": "Sizes or colours",
     "variantsHint": "Add an option for each size, colour, or other choice buyers pick from",
     "addOption": "Add option",
@@ -1044,7 +1050,8 @@
     "confirmDowngrade": "Schedule downgrade",
     "payTitle": "Pay with KHQR",
     "payNote": "Scan with any bank app. This pays the platform for your plan — it's not a buyer order. Mock QR until payments are wired up.",
-    "simulatePayment": "Simulate payment received (dev only)"
+    "simulatePayment": "Simulate payment received (dev only)",
+    "featureProfitReport": "Profit report"
   },
   "Upgrade": {
     "unlockWith": "Unlock with {plan}",
@@ -2599,7 +2606,8 @@
     "switchLanguage": "ភាសាខ្មែរ / English",
     "headerShare": "Share",
     "quickSell": "Sell in shop",
-    "quickSellHint": "Ring up a customer at the counter"
+    "quickSellHint": "Ring up a customer at the counter",
+    "profitReportLink": "Profit report"
   },
   "MyOrders": {
     "myOrders": "My orders",
@@ -2703,5 +2711,23 @@
     "cashShortServer": "That's less than the total — check the cash received.",
     "saleChanged": "A product changed or is gone. Go back and check the sale.",
     "lineCount": "{count, plural, =1 {1 line} other {# lines}}"
+  },
+  "Profit": {
+    "title": "Profit",
+    "description": "Sales, what they cost you, and what you kept. From the cost price on each product when it was sold.",
+    "backToHome": "Home",
+    "lockedTitle": "See your profit with Pro",
+    "lockedBody": "Add cost prices to your products on any plan; the profit report comes with Pro.",
+    "inDollars": "In dollars",
+    "inRiel": "In riel",
+    "sales": "Sales",
+    "cost": "Cost",
+    "profit": "Profit",
+    "margin": "Margin",
+    "missingCost": "{amount} of sales have no cost price, so they are left out of the profit.",
+    "addCosts": "Add cost prices",
+    "byProduct": "Profit by product",
+    "noSales": "No sales in this period yet.",
+    "noCost": "No cost price"
   }
 }

@@ -128,6 +128,9 @@ export const productVariantSchema = z.object({
   /** Only on plans with wholesale prices. */
   wholesalePriceUsdCents: z.number().nullish(),
   wholesalePriceKhr: z.number().nullish(),
+  /** The seller's own cost (never sent to the shop page); null = not known. */
+  costMinor: z.number().nullish(),
+  costCurrency: currencySchema.nullish(),
 });
 export type ProductVariant = z.infer<typeof productVariantSchema>;
 
@@ -391,6 +394,30 @@ export const sellerSummarySchema = z.object({
   topProducts: z.object({ today: topProductsSchema, week: topProductsSchema, month: topProductsSchema }),
 });
 export type SellerSummary = z.infer<typeof sellerSummarySchema>;
+
+const profitFiguresSchema = z.object({
+  sales: z.number(),
+  costedSales: z.number(),
+  cost: z.number(),
+  profit: z.number(),
+  marginPercent: z.number().nullable(),
+  missingCostSales: z.number(),
+});
+const profitPeriodSchema = z.object({
+  USD: profitFiguresSchema,
+  KHR: profitFiguresSchema,
+  products: z.array(z.object({ nameKm: z.string(), nameEn: z.string(), quantity: z.number(), USD: profitFiguresSchema, KHR: profitFiguresSchema })),
+});
+
+/** GET /orders/profit (Pro): per period, sales, cost and profit per currency (never added together); lines without a cost apart. */
+export const profitReportSchema = z.object({
+  mainCurrency: currencySchema,
+  today: profitPeriodSchema,
+  week: profitPeriodSchema,
+  month: profitPeriodSchema,
+});
+export type ProfitReport = z.infer<typeof profitReportSchema>;
+export type ProfitFigures = z.infer<typeof profitFiguresSchema>;
 
 /** GET /orders: one row of the seller's order list. */
 export const sellerOrderSchema = z.object({

@@ -38,6 +38,8 @@ export function productRow(overrides: Partial<ProductRow> = {}): ProductRow {
         priceKhr: null,
         wholesalePriceUsdCents: 180,
         wholesalePriceKhr: null,
+        costMinor: null,
+        costCurrency: null,
         sortOrder: 0,
         deletedAt: null,
         createdAt: AT,

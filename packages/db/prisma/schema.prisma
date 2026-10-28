@@ -553,6 +553,10 @@ model ProductVariant {
   /// Pro and Advance; kept, hidden, on lower plans.
   wholesalePriceUsdCents Int?      @map("wholesale_price_usd_cents")
   wholesalePriceKhr      Int?      @map("wholesale_price_khr")
+  /// What one costs the shop, in cost_currency (one currency per product): the seller's only, for profit. Empty = not known.
+  /// Level 1 of the cost standard (docs/blueprint.md "Cost price"): typed by the seller; a moving average from purchases later.
+  costMinor              Int?      @map("cost_minor")
+  costCurrency           Currency? @map("cost_currency")
   sortOrder              Int       @default(0) @map("sort_order")
   deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -1051,6 +1055,8 @@ model OrderItem {
   unitPriceMinor Int      @map("unit_price_minor")
   quantity       Int
   lineTotalMinor Int      @map("line_total_minor")
+  /// What one unit cost the shop when sold, in the order's currency (frozen like the price); null = not known.
+  unitCostMinor  Int?     @map("unit_cost_minor")
   /// The choices picked (packages/shared product-options.ts OrderLineChoice[]), frozen like the title: [] = none.
   choices        Json     @default("[]")
   /// The buyer's note on this item ("no onions").

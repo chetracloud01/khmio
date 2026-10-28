@@ -1,8 +1,9 @@
 "use client";
 
-import type { Currency } from "@khmio/shared";
+import { SALES_PERIODS, type Currency, type SalesPeriod } from "@khmio/shared";
 import { cn, SegmentedControl } from "@khmio/ui";
-import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, ChevronRight, Minus } from "lucide-react";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState, type ReactNode } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -15,9 +16,6 @@ import { useDateText } from "./use-date-text";
 // the products that earned the most. Dollars and riel are never added: the
 // shop's main currency leads, the other is shown under it (docs/blueprint.md
 // "Multi-currency pricing and totals").
-
-export type SalesPeriod = "today" | "week" | "month";
-export const SALES_PERIOD_DAYS: Record<SalesPeriod, number> = { today: 1, week: 7, month: 30 };
 
 type Money = Record<Currency, number>;
 
@@ -67,12 +65,15 @@ export function SalesOverview({
   top,
   cashToCollect,
   mainCurrency,
+  reportLink,
   sample = false,
 }: {
   days: SalesHistoryDay[];
   top: Record<SalesPeriod, TopProduct[]>;
   cashToCollect: Money;
   mainCurrency: Currency;
+  /** A way on to a fuller report (the profit report). */
+  reportLink?: { href: string; label: string };
   /** The mockup's made-up numbers, labelled as such. */
   sample?: boolean;
 }) {
@@ -81,7 +82,7 @@ export function SalesOverview({
   // Opens on today: what a seller checks first each time they look.
   const [period, setPeriod] = useState<SalesPeriod>("today");
   const other = otherOf(mainCurrency);
-  const length = SALES_PERIOD_DAYS[period];
+  const length = SALES_PERIODS[period];
 
   const figures = useMemo(() => {
     const current = sumDays(days.slice(-length));
@@ -185,6 +186,12 @@ export function SalesOverview({
           </ol>
         )}
       </div>
+      {reportLink && (
+        <Link href={reportLink.href} className="flex min-h-touch items-center justify-center gap-1 text-sm font-medium text-brand">
+          {reportLink.label}
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      )}
     </section>
   );
 }

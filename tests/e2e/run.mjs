@@ -20,7 +20,7 @@ import { ROOT } from "./lib.mjs";
 const PORT = 4105;
 const API = `http://localhost:${PORT}`;
 // "payments" runs last: the worker runs alongside it (it would deliver the messages the earlier scripts look at).
-const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "counter", "stock", "catalog", "step7", "r1a", "home", "payments"];
+const SCRIPTS = ["step2", "step3", "step3b", "step4", "step6", "counter", "stock", "catalog", "step7", "r1a", "home", "profit", "payments"];
 
 if (!existsSync(join(ROOT, "apps/api/dist/main.js")) || !existsSync(join(ROOT, "apps/worker/dist/index.js"))) {
   console.error('Build first: pnpm build');

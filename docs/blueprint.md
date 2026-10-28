@@ -615,6 +615,12 @@ What each admin role may do is in `packages/shared/src/admin-roles.ts` and is en
 - The merchant sets `usd_to_khr_rate` in Settings; the platform clamps it to a sane band around the market rate (for example ±5%, exact band TBD) so a mistyped rate can't badly misprice an order. Reject or clamp on save, not silently at checkout.
 - **Payment verification never re-converts currency.** The order is created with one fixed `currency` and `total_minor`; the provider (Bakong or PayWay) is asked for exactly that currency and amount; a callback or poll result is accepted only when the provider's reported currency *and* amount are an exact integer match to the order's stored total. Cross-currency comparison must never happen at this layer — a rate change or rounding difference must never be able to mark the wrong amount as paid. (This sharpens the existing "Rules for every provider" rule below — it's the same rule, stated precisely for the multi-currency case.)
 
+**Cost price (the seller's only).** Khmio's costing standard is the **moving weighted average**, the method of ERPNext, Odoo (AVCO) and most POS apps, and accepted by CIFRS; it is built in levels, each only adding to the last (decided 2026-10-28):
+
+- **Level 1 (every plan; the profit report is Pro):** the seller types what one item costs, as **one amount in one currency per product** (`product_variants.cost_minor` + `cost_currency`; both or neither). A sale freezes it on the line (`order_items.unit_cost_minor`), converted into the order's currency with the order's `exchange_rate_used` and rounded per line, like prices. Editing a cost never changes an old order's profit; a line with no cost is "cost missing", never guessed; the shop page never receives a cost.
+- **Level 2 (Pro with stock, later):** a `purchase` stock movement carries its unit cost (converted once, at that day's rate, into the product's cost currency), and each purchase sets the cost to the new average: (on hand × old cost + bought × new cost) ÷ (on hand + bought). Stock value = on hand × cost. Returns go back at the cost they were sold at.
+- **Level 3 (Advance, when sellers ask):** the average per branch, landed costs (delivery, import), suppliers and purchase orders, add-on and recipe costs; FIFO or per-IMEI cost only if a seller truly needs them.
+
 **Stock without overselling (Pro and Advance):** at checkout, one statement reserves stock at the shop's online location only if enough is free:
 
 ```sql
