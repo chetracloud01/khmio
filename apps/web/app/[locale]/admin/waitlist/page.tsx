@@ -1,31 +1,34 @@
 "use client";
 
-import { formatKhmerPhoneLocal, PLATFORM_PRODUCT_IDS, WAITLIST_BUSINESS_TYPES, type PlatformProductId } from "@khmio/shared";
+import { formatKhmerPhoneLocal, WAITLIST_BUSINESS_TYPES } from "@khmio/shared";
 import { Button, Card, EmptyState } from "@khmio/ui";
 import { ListChecks } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { DataGrid, type DataGridColumn } from "@/components/data-grid";
 import { adminWaitlistSchema, type AdminWaitlist } from "@/lib/admin-api";
 import { api, ApiError } from "@/lib/api";
-import { SITE_PRODUCTS } from "@/site/content";
+import { PLATFORM_PRODUCT_NAMES, SITE_SOLUTIONS } from "@/site/content";
 import { useDateText } from "@/components/use-date-text";
 import { LoadState, PageHeader, Pill } from "../admin-ui";
 
 type Signup = AdminWaitlist["signups"][number];
-const productName = (id: PlatformProductId) => SITE_PRODUCTS.find((product) => product.id === id)?.name ?? id;
-const COMING_SOON = PLATFORM_PRODUCT_IDS.filter((id) => SITE_PRODUCTS.find((entry) => entry.id === id)?.status === "coming_soon");
+/** The coming-soon solutions: one chip each, for the businesses waiting for them. */
+const COMING_SOON = SITE_SOLUTIONS.filter((solution) => solution.status === "coming_soon");
 /** Loaded at a time; the grid searches and filters what's loaded, "Load older" adds the next page. */
 const BATCH = 500;
 
 // A14. The website waitlist (design/screens.md): who asked to hear when a
-// coming-soon product opens, and how many per product — the evidence for
-// choosing the second product (docs/platform-launch-plan.md Stage 5).
+// coming-soon business solution opens, and how many per solution — the
+// evidence for which business to switch on next (docs/blueprint.md "Business
+// roadmap"). Sign-ups made for Khmio Class and Rent before they left the
+// website stay listed.
 // Read-only. Owner and support only: it holds phone numbers.
 export default function WaitlistPage() {
   const t = useTranslations("AdminApp");
   const tAdmin = useTranslations("Admin");
   const tSite = useTranslations("Site");
+  const locale = useLocale() === "en" ? "en" : "km";
   const { dateTime } = useDateText();
   const [data, setData] = useState<AdminWaitlist | null>(null);
   const [failed, setFailed] = useState(false);
@@ -44,8 +47,21 @@ export default function WaitlistPage() {
     void load();
   }, [load]);
 
-  const businessType = (type: Signup["businessType"]) =>
-    ({ teacher: tSite("waitlistTeacher"), school: tSite("waitlistSchool"), landlord: tSite("waitlistLandlord"), other: tSite("waitlistOther") })[type];
+  /** The older Class and Rent types by their words; a solution by its name. */
+  const businessType = (type: Signup["businessType"]): string => {
+    switch (type) {
+      case "teacher":
+        return tSite("waitlistTeacher");
+      case "school":
+        return tSite("waitlistSchool");
+      case "landlord":
+        return tSite("waitlistLandlord");
+      case "other":
+        return tSite("waitlistOther");
+      default:
+        return SITE_SOLUTIONS.find((solution) => solution.id === type)?.name[locale] ?? type;
+    }
+  };
 
   const columns: DataGridColumn<Signup>[] = [
     {
@@ -72,8 +88,8 @@ export default function WaitlistPage() {
       key: "product",
       header: t("waitlistColProduct"),
       sortable: true,
-      value: (signup) => productName(signup.product),
-      cell: (signup) => <Pill tone="brand">{productName(signup.product)}</Pill>,
+      value: (signup) => PLATFORM_PRODUCT_NAMES[signup.product],
+      cell: (signup) => <Pill tone="brand">{PLATFORM_PRODUCT_NAMES[signup.product]}</Pill>,
     },
   ];
 
@@ -94,7 +110,7 @@ export default function WaitlistPage() {
             columns={columns}
             searchText={(signup) => `${signup.name} ${signup.phone} ${formatKhmerPhoneLocal(signup.phone)}`}
             searchPlaceholder={t("waitlistSearch")}
-            chips={COMING_SOON.map((id) => ({ value: id, label: productName(id), predicate: (signup: Signup) => signup.product === id }))}
+            chips={COMING_SOON.map((solution) => ({ value: solution.id, label: solution.name[locale], predicate: (signup: Signup) => signup.businessType === solution.id }))}
             filters={[
               {
                 key: "type",
@@ -108,10 +124,10 @@ export default function WaitlistPage() {
               <div className="flex flex-col gap-1">
                 <div className="flex items-start justify-between gap-2">
                   <span className="min-w-0 truncate font-medium">{signup.name}</span>
-                  <Pill tone="brand">{productName(signup.product)}</Pill>
+                  <Pill tone="brand">{businessType(signup.businessType)}</Pill>
                 </div>
                 <span className="text-sm text-muted">
-                  {businessType(signup.businessType)} · {dateTime(signup.createdAt)}
+                  {PLATFORM_PRODUCT_NAMES[signup.product]} · {dateTime(signup.createdAt)}
                 </span>
               </div>
             )}

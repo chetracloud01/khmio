@@ -1,5 +1,5 @@
 import type { Prisma } from "@khmio/db";
-import { formatTrackingCode, listQueryFromParams, listQuerySchemaFor, ORDER_LIST_SPEC, ORDER_TABS, orderStatusesForTab, parseTrackingCode, type ListPage, type ListQuery, type OrderTab } from "@khmio/shared";
+import { CASH_SETTLED_STATUSES, formatTrackingCode, phoneSearchDigits, listQueryFromParams, listQuerySchemaFor, ORDER_LIST_SPEC, ORDER_TABS, orderStatusesForTab, parseTrackingCode, type ListPage, type ListQuery, type OrderTab } from "@khmio/shared";
 import { readListPage } from "../list/list-page";
 
 export const orderListQuerySchema = listQuerySchemaFor(ORDER_LIST_SPEC);
@@ -44,9 +44,9 @@ export function orderSearchWhere(q: string): Prisma.OrderWhereInput | null {
   if (digits && /^[\d\s+#-]+$/.test(text)) {
     const number = Number(digits.replace(/^#/, ""));
     if (Number.isSafeInteger(number) && number <= 2_147_483_647) or.push({ orderNumber: number });
-    // Phones are saved as 855XXXXXXXX: drop what the buyer's way of writing adds.
-    const phone = digits.replace(/^855/, "").replace(/^0/, "");
-    if (phone.length >= 3) or.push({ buyerPhone: { contains: phone } });
+    // Phones are saved as 855XXXXXXXX: packages/shared drops what the buyer's way of writing adds.
+    const phone = phoneSearchDigits(text);
+    if (phone) or.push({ buyerPhone: { contains: phone } });
   }
   const code = parseTrackingCode(text);
   if (code) or.push({ trackingCode: code });
@@ -77,6 +77,9 @@ const isOrderSort = (sort: string): sort is OrderSort => ORDER_SORTS.includes(so
  * sorted by date, pages walk the steps in the order work happens (to confirm,
  * packing, sending, delivered, problems, not paid yet), as the list groups them.
  */
+/** Cash still to collect (packages/shared isCashToCollect): cash on delivery not yet completed or cancelled. */
+const TO_COLLECT_WHERE: Prisma.OrderWhereInput = { paymentMethod: "cod", status: { notIn: [...CASH_SETTLED_STATUSES] } };
+
 export async function readOrderListPage(tx: Prisma.TransactionClient, storeId: string, storeSlug: string, query: ListQuery): Promise<ListPage<ReturnType<typeof toListedOrder>>> {
   const filterWhere: Record<string, Record<string, Prisma.OrderWhereInput>> = ORDER_FILTER_WHERE;
   const chosen = Object.entries(query.filters).flatMap(([key, value]) => {
@@ -89,7 +92,7 @@ export async function readOrderListPage(tx: Prisma.TransactionClient, storeId: s
     query,
     base: { storeId },
     search: orderSearchWhere(query.q),
-    chips: Object.fromEntries(ORDER_TABS.map((tab) => [tab, tabWhere(tab)])),
+    chips: { ...Object.fromEntries(ORDER_TABS.map((tab) => [tab, tabWhere(tab)])), to_collect: TO_COLLECT_WHERE },
     filters: Object.fromEntries(chosen),
     filterOptions: ORDER_FILTER_WHERE,
     orderBy: ORDER_BY[sort](query.dir),

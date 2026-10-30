@@ -3,6 +3,7 @@ import { toFieldErrors } from "./form-errors";
 import {
   applyOrderAction,
   canBuyerCancel,
+  countsAsSale,
   dispatchInputSchema,
   getBuyerProgress,
   getDispatchRoute,
@@ -146,5 +147,18 @@ describe("sending and cancelling forms", () => {
     const result = orderCancellationSchema.safeParse({ reason: "other", note: "" });
     expect(result.success ? {} : toFieldErrors(result.error)).toEqual({ note: "required" });
     expect(orderCancellationSchema.safeParse({ reason: "out_of_stock", note: "" }).success).toBe(true);
+  });
+});
+
+describe("which orders count as sales", () => {
+  it("leaves out cancelled orders and ones still waiting for an online payment", () => {
+    expect(countsAsSale("cancelled")).toBe(false);
+    expect(countsAsSale("awaiting_payment")).toBe(false);
+  });
+
+  it("counts every other order, cash on delivery included", () => {
+    expect(countsAsSale("cod_pending")).toBe(true);
+    expect(countsAsSale("paid")).toBe(true);
+    expect(countsAsSale("completed")).toBe(true);
   });
 });

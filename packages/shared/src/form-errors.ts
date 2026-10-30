@@ -55,6 +55,11 @@ export const FORM_ERROR_CODES = [
   "cash_short",
   "sold_out",
   "not_enough_stock",
+  "cost_currency_mismatch",
+  "return_above_bought",
+  "reorder_max_below_min",
+  "payment_above_owed",
+  "date_in_future",
   "ends_before_start",
 ] as const;
 

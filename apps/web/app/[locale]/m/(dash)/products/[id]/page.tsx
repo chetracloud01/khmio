@@ -2,24 +2,22 @@
 
 import {
   choicePickSchema,
+  currencySchema,
   hasModule,
-  khrInputText,
   MAX_CHOICE_GROUPS,
   MAX_PRODUCT_DESCRIPTION_LENGTH,
   MAX_PRODUCT_PHOTOS,
   MAX_VARIANT_GROUPS,
-  parseKhrInput,
-  parseUsdInput,
   planHasFeature,
   productInputSchema,
   toFieldErrors,
-  usdInputText,
   variantLabel,
+  type Currency,
   type CustomValue,
   type FormErrorCode,
   type ProductFormInput,
 } from "@khmio/shared";
-import { Button, Card, FileButton, IconButton, Input, MoneyInput, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
+import { Button, Card, FileButton, IconButton, Input, Notice, PageHeader, Select, Switch, Textarea } from "@khmio/ui";
 import { Grid3x3, History, Loader2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -39,6 +37,17 @@ import {
   type OptionGroupDraft,
 } from "@/components/product-form/option-groups";
 import { OptionGroupsEditor } from "@/components/product-form/option-groups-editor";
+import {
+  CostCurrencyChoice,
+  costCurrencyOf,
+  EMPTY_PRICE_TEXTS,
+  pickPriceTexts,
+  PriceInputs,
+  priceInput,
+  priceTextsOf,
+  type PriceKind,
+  type PriceTexts,
+} from "@/components/product-form/price-inputs";
 import { SELLER_FORM, SELLER_FORM_BAR } from "@/components/seller-frame/seller-frame";
 import { CustomFieldInput, valuesForSave } from "@/components/custom-fields/custom-field-input";
 import {
@@ -53,6 +62,7 @@ import {
   customFieldsAnswerSchema,
   type Product,
   productSchema,
+  stockPageSchema,
   uploadPhoto,
 } from "@/lib/api";
 import { readStored, writeStored } from "@/lib/device-storage";
@@ -63,6 +73,15 @@ const THUMB_SIDE = 400;
 
 const NEW_VALUE = "__new__";
 
+/** The price boxes' text; cost came later, so a draft kept before it has none. */
+const priceTextsShape = {
+  retailUsd: z.string(),
+  retailKhr: z.string(),
+  wholesaleUsd: z.string(),
+  wholesaleKhr: z.string(),
+  cost: z.string().default(""),
+};
+
 const variantDraftSchema = z.object({
   id: z.string(),
   labelKm: z.string(),
@@ -70,10 +89,7 @@ const variantDraftSchema = z.object({
   /** With variant groups: this row's value in each group. */
   valueIds: z.array(z.string()).default([]),
   sku: z.string(),
-  retailUsd: z.string(),
-  retailKhr: z.string(),
-  wholesaleUsd: z.string(),
-  wholesaleKhr: z.string(),
+  ...priceTextsShape,
 });
 type VariantDraft = z.infer<typeof variantDraftSchema>;
 
@@ -105,10 +121,8 @@ const productDraftSchema = z.object({
   categoryId: z.string(),
   brandId: z.string(),
   uomId: z.string(),
-  retailUsd: z.string(),
-  retailKhr: z.string(),
-  wholesaleUsd: z.string(),
-  wholesaleKhr: z.string(),
+  prices: z.object(priceTextsShape),
+  costCurrency: currencySchema,
   discountPercent: z.string(),
   variantDrafts: z.array(variantDraftSchema),
   variantGroups: z.array(groupDraftSchema),
@@ -276,6 +290,8 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
   // Hidden, not cleared: wholesale prices already saved stay on the server
   // (the API keeps them on plans without wholesale) and return after an upgrade.
   const canWholesale = planHasFeature(store.plan, "wholesalePrice");
+  // Cost is on every plan (the profit report built on it is Pro).
+  const priceKinds: PriceKind[] = canWholesale ? ["retail", "wholesale", "cost"] : ["retail", "cost"];
   // Features for my business: switched off, the groups are hidden and kept as they are by the API.
   const optionsOn = hasModule(store.modules, "options");
   const choicesOn = hasModule(store.modules, "choices");
@@ -297,10 +313,19 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
   const [categoryId, setCategoryId] = useState(existing?.categoryId ?? catalog.categories[0]?.id ?? "");
   const [brandId, setBrandId] = useState(existing?.brandId ?? "");
   const [uomId, setUomId] = useState(existing ? (existing.unitId ?? "") : (catalog.defaultUnitId ?? ""));
-  const [retailUsd, setRetailUsd] = useState(usdInputText(simple?.priceUsdCents));
-  const [retailKhr, setRetailKhr] = useState(khrInputText(simple?.priceKhr));
-  const [wholesaleUsd, setWholesaleUsd] = useState(usdInputText(simple?.wholesalePriceUsdCents));
-  const [wholesaleKhr, setWholesaleKhr] = useState(khrInputText(simple?.wholesalePriceKhr));
+  const [prices, setPrices] = useState<PriceTexts>(priceTextsOf(simple));
+  // One cost currency for the whole product (docs/blueprint.md "Cost price"); a new product starts on the shop's main currency.
+  const [costCurrency, setCostCurrency] = useState<Currency>(costCurrencyOf(existing?.variants, store.defaultCurrency));
+  // Options whose stock is tracked: their cost comes from bills, so it's shown, not typed (the API keeps it either way).
+  const [trackedIds, setTrackedIds] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!existing || !planHasFeature(store.plan, "stock")) return;
+    api("/stock", stockPageSchema).then(
+      (page) => setTrackedIds(new Set(page.items.filter((item) => item.onHand !== null && item.productId === existing.id).map((item) => item.variantId))),
+      () => setTrackedIds(new Set()),
+    );
+  }, [existing, store.plan]);
+  const currencyLocked = existing?.variants.some((variant) => trackedIds.has(variant.id) && variant.costCurrency !== null) ?? false;
   const [discountPercent, setDiscountPercent] = useState(existing?.discountPercent?.toString() ?? "");
   const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>(
     existing?.hasOptions
@@ -310,10 +335,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
           labelEn: variant.labelEn,
           valueIds: variant.valueIds,
           sku: variant.sku,
-          retailUsd: usdInputText(variant.priceUsdCents),
-          retailKhr: khrInputText(variant.priceKhr),
-          wholesaleUsd: usdInputText(variant.wholesalePriceUsdCents),
-          wholesaleKhr: khrInputText(variant.wholesalePriceKhr),
+          ...priceTextsOf(variant),
         }))
       : [],
   );
@@ -347,10 +369,8 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
     categoryId,
     brandId,
     uomId,
-    retailUsd,
-    retailKhr,
-    wholesaleUsd,
-    wholesaleKhr,
+    prices,
+    costCurrency,
     discountPercent,
     variantDrafts,
     variantGroups,
@@ -378,10 +398,8 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
     text(draft.categoryId, (id) => known(categories)(id) && id && setCategoryId(id));
     text(draft.brandId, (id) => known(brands)(id) && setBrandId(id));
     text(draft.uomId, (id) => known(units)(id) && setUomId(id));
-    text(draft.retailUsd, setRetailUsd);
-    text(draft.retailKhr, setRetailKhr);
-    text(draft.wholesaleUsd, setWholesaleUsd);
-    text(draft.wholesaleKhr, setWholesaleKhr);
+    if (draft.prices) setPrices(draft.prices);
+    if (draft.costCurrency) setCostCurrency(draft.costCurrency);
     text(draft.discountPercent, setDiscountPercent);
     if (Array.isArray(draft.variantDrafts)) setVariantDrafts(draft.variantDrafts);
     if (Array.isArray(draft.variantGroups)) setVariantGroups(draft.variantGroups);
@@ -405,10 +423,8 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
         categoryId,
         brandId,
         uomId,
-        retailUsd,
-        retailKhr,
-        wholesaleUsd,
-        wholesaleKhr,
+        prices,
+        costCurrency,
         discountPercent,
         variantDrafts,
         variantGroups,
@@ -487,7 +503,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
   function addVariantRow() {
     setVariantDrafts((previous) => [
       ...previous,
-      { id: nextDraftId(), labelKm: "", labelEn: "", valueIds: [], sku: "", retailUsd: "", retailKhr: "", wholesaleUsd: "", wholesaleKhr: "" },
+      { id: nextDraftId(), labelKm: "", labelEn: "", valueIds: [], sku: "", ...EMPTY_PRICE_TEXTS },
     ]);
   }
 
@@ -500,10 +516,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
         labelEn: "",
         valueIds,
         sku: "",
-        retailUsd: copyFrom?.retailUsd ?? "",
-        retailKhr: copyFrom?.retailKhr ?? "",
-        wholesaleUsd: copyFrom?.wholesaleUsd ?? "",
-        wholesaleKhr: copyFrom?.wholesaleKhr ?? "",
+        ...(copyFrom ? pickPriceTexts(copyFrom) : EMPTY_PRICE_TEXTS),
       })),
     );
     // Messages are keyed by position, so they'd point at the wrong option now.
@@ -523,8 +536,6 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
    * wholesale boxes are hidden, so they're left out (the API keeps what was saved).
    */
   function buildInput(): ProductFormInput {
-    const wholesale = (usd: string, khr: string) =>
-      canWholesale ? { wholesalePriceUsdCents: parseUsdInput(usd), wholesalePriceKhr: parseKhrInput(khr) } : {};
     return {
       titleKm,
       titleEn,
@@ -537,6 +548,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
       brandId: brandId || undefined,
       uomId: uomId || undefined,
       discountPercent: parseDiscountInput(discountPercent),
+      costCurrency,
       // Only while the module is on: switched off, the API keeps what the product has.
       variantGroups: grouped ? toVariantGroupInput(variantGroups) : [],
       choiceGroups: choicesOn ? toChoiceGroupInput(choiceGroups) : [],
@@ -549,16 +561,10 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
               labelKm: row.labelKm,
               labelEn: row.labelEn,
               ...(grouped ? { valueIds: row.valueIds } : {}),
-              retailPriceUsdCents: parseUsdInput(row.retailUsd),
-              retailPriceKhr: parseKhrInput(row.retailKhr),
-              ...wholesale(row.wholesaleUsd, row.wholesaleKhr),
+              ...priceInput(row, priceKinds, costCurrency),
             })),
           }
-        : {
-            retailPriceUsdCents: parseUsdInput(retailUsd),
-            retailPriceKhr: parseKhrInput(retailKhr),
-            ...wholesale(wholesaleUsd, wholesaleKhr),
-          }),
+        : priceInput(prices, priceKinds, costCurrency)),
     };
   }
 
@@ -839,52 +845,18 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
 
         {!hasVariants && (
           <FormSection stacked title={t("priceTitle")} description={t("priceHelp")}>
-            <p className="text-sm font-medium text-fg">{t("retailPriceTitle")}</p>
-            <MoneyInput
-              usd={retailUsd}
-              khr={retailKhr}
-              usdLabel={t("priceUsdLabel")}
-              khrLabel={t("priceKhrLabel")}
-              autoFillRate={rate}
-              onUsdChange={(text) => {
-                setRetailUsd(text);
-                clearErrors("retailPriceUsdCents", "retailPrice");
-              }}
-              onKhrChange={(text) => {
-                setRetailKhr(text);
-                clearErrors("retailPriceKhr", "retailPrice");
-              }}
-              onUsdBlur={() => checkFields("retailPriceUsdCents", "wholesalePrice")}
-              onKhrBlur={() => checkFields("retailPriceKhr", "wholesalePrice")}
-              usdError={error("retailPriceUsdCents") ?? error("retailPrice")}
-              khrError={error("retailPriceKhr")}
+            <PriceInputs
+              texts={prices}
+              onChange={(box, text) => setPrices((previous) => ({ ...previous, [box]: text }))}
+              kinds={priceKinds}
+              usdToKhrRate={rate}
+              costCurrency={costCurrency}
+              onCostCurrencyChange={setCostCurrency}
+              costLocked={simple !== undefined && trackedIds.has(simple.id)}
+              error={error}
+              clearErrors={clearErrors}
+              checkFields={checkFields}
             />
-            <p className="text-xs text-muted">{t("autoFillNote")}</p>
-
-            {canWholesale && (
-              <>
-                <p className="text-sm font-medium text-fg">{t("wholesalePriceTitle")}</p>
-                <MoneyInput
-                  usd={wholesaleUsd}
-                  khr={wholesaleKhr}
-                  usdLabel={t("priceUsdLabel")}
-                  khrLabel={t("priceKhrLabel")}
-                  onUsdChange={(text) => {
-                    setWholesaleUsd(text);
-                    clearErrors("wholesalePriceUsdCents", "wholesalePrice");
-                  }}
-                  onKhrChange={(text) => {
-                    setWholesaleKhr(text);
-                    clearErrors("wholesalePriceKhr", "wholesalePrice");
-                  }}
-                  onUsdBlur={() => checkFields("wholesalePriceUsdCents", "wholesalePrice")}
-                  onKhrBlur={() => checkFields("wholesalePriceKhr", "wholesalePrice")}
-                  usdError={error("wholesalePriceUsdCents") ?? error("wholesalePrice")}
-                  khrError={error("wholesalePriceKhr")}
-                />
-                <p className="text-xs text-muted">{t("wholesaleHint")}</p>
-              </>
-            )}
           </FormSection>
         )}
 
@@ -907,6 +879,12 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
                 </Button>
               )}
             </>
+          )}
+          {hasVariants && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm font-medium text-fg">{t("costCurrencyLabel")}</p>
+              {currencyLocked ? <p className="text-sm text-muted">{t("costCurrencyFromBills")}</p> : <CostCurrencyChoice value={costCurrency} onChange={setCostCurrency} />}
+            </div>
           )}
           {variantDrafts.map((row, index) => {
             const key = (field: string) => `options.${index}.${field}`;
@@ -949,47 +927,18 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
                   onBlur={() => checkFields(key("sku"))}
                   error={error(key("sku"))}
                 />
-                <p className="text-xs font-medium text-muted">{t("retailPriceTitle")}</p>
-                <MoneyInput
-                  className="gap-2"
-                  usd={row.retailUsd}
-                  khr={row.retailKhr}
-                  usdLabel={t("optionPriceUsd")}
-                  khrLabel={t("optionPriceKhr")}
-                  autoFillRate={rate}
-                  onUsdChange={(text) => {
-                    updateVariantRow(row.id, { retailUsd: text });
-                    clearErrors(key("retailPriceUsdCents"), key("retailPrice"));
-                  }}
-                  onKhrChange={(text) => {
-                    updateVariantRow(row.id, { retailKhr: text });
-                    clearErrors(key("retailPriceKhr"), key("retailPrice"));
-                  }}
-                  usdError={error(key("retailPriceUsdCents")) ?? error(key("retailPrice"))}
-                  khrError={error(key("retailPriceKhr"))}
+                <PriceInputs
+                  compact
+                  texts={row}
+                  onChange={(box, text) => updateVariantRow(row.id, { [box]: text })}
+                  kinds={priceKinds}
+                  usdToKhrRate={rate}
+                  costCurrency={costCurrency}
+                  costLocked={trackedIds.has(row.id)}
+                  error={error}
+                  clearErrors={clearErrors}
+                  fieldPrefix={key("")}
                 />
-                {canWholesale && (
-                  <>
-                    <p className="text-xs font-medium text-muted">{t("wholesalePriceTitle")}</p>
-                    <MoneyInput
-                      className="gap-2"
-                      usd={row.wholesaleUsd}
-                      khr={row.wholesaleKhr}
-                      usdLabel={t("optionPriceUsd")}
-                      khrLabel={t("optionPriceKhr")}
-                      onUsdChange={(text) => {
-                        updateVariantRow(row.id, { wholesaleUsd: text });
-                        clearErrors(key("wholesalePriceUsdCents"), key("wholesalePrice"));
-                      }}
-                      onKhrChange={(text) => {
-                        updateVariantRow(row.id, { wholesaleKhr: text });
-                        clearErrors(key("wholesalePriceKhr"), key("wholesalePrice"));
-                      }}
-                      usdError={error(key("wholesalePriceUsdCents")) ?? error(key("wholesalePrice"))}
-                      khrError={error(key("wholesalePriceKhr"))}
-                    />
-                  </>
-                )}
                 <Button
                   variant="ghost"
                   tone="danger"

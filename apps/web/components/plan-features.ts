@@ -10,6 +10,7 @@ export function usePlanFeatureLabels(): Record<PlanFeature, string> {
     counterSales: t("featureCounterSales"),
     stock: t("featureStock"),
     wholesalePrice: t("featureWholesale"),
+    profitReport: t("featureProfitReport"),
     warehouses: t("featureWarehouses"),
   };
 }

@@ -97,7 +97,7 @@ screen. If one is truly needed, the line above it says why:
 **Talking to the server:** client screens call the API only through
 `apps/web/lib/api.ts`, which handles the address, cookies and `ApiError`.
 `api(path, schema, options)` reads the answer with its schema from
-`lib/api-answers.ts` (admin: `lib/admin-api.ts`), so a screen never works on a
+`lib/api-answers/` (admin: `lib/admin-api.ts`), so a screen never works on a
 shape it only assumed; an answer of another shape becomes `ApiError`
 "bad_answer" and the screen shows its error state. `apiSend(path, options)` is
 for calls whose answer isn't used. Answer schemas check the shape, not the
@@ -110,9 +110,23 @@ through `apps/web/lib/device-storage.ts` (`readStored(key, schema)`,
 `writeStored(key, value)`): what comes back is checked, and a blocked or full
 storage never breaks the page.
 
-**Live and mockup:** a live screen and its mockup use the same parts, so they
-can't drift apart. When a mockup is next worked on, its lint warnings get
-fixed too.
+**Live pages only (decided 2026-10-28, with "Garage first").** There are no
+mockups: a screen is built once, as a real page on the kit, from its written
+spec in `design/screens.md`, with the API behind it. The owner approves it on
+the live page with the Demo Garage's data (`pnpm demo:garage`, then "Sign in
+as Garage"), so what is approved is exactly what ships — no second copy to
+drift apart. A big screen keeps its page file thin (load data, handle
+not-found and offline) and draws itself from one component in
+`apps/web/components/<feature>/`:
+
+```
+components/customers/customers-screen.tsx   ← the screen, from the kit
+m/(dash)/customers/page.tsx                 ← loads it through lib/api.ts
+```
+
+Sample values exist only on `/styleguide` (`app/[locale]/styleguide/samples.ts`),
+to show each part. The old mockups are in git history (tag v0.5.1) if a
+design needs looking up.
 
 ## 4. Backend (`apps/api`, `apps/worker`)
 
@@ -240,7 +254,7 @@ export class OrdersController {
 | Check | Catches |
 | --- | --- |
 | `pnpm typecheck` | Wrong types, missing props, `any` slipping in |
-| `pnpm lint` | Raw controls in live screens (error), in mockups (warning) |
+| `pnpm lint` | Raw controls in screens instead of the kit |
 | `apps/web/app/[locale]/styleguide/coverage.test.ts` | A kit part not shown on `/styleguide` |
 | `apps/web/components/theme-contrast.test.ts` | A colour change that makes text hard to read |
 | Tests beside each rule | A rule broken by a later change |

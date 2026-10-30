@@ -11,7 +11,7 @@ import { readMyOrders } from "@/lib/my-orders";
  * "Track my order" on a shop page (design/screens.md B1, B8): a slim pill in
  * the same style as the seller's find-order bar — white, rounded, teal icon —
  * so a returning buyer finds it next to the product search without it
- * looking like a second search box. One block for the live shop and its mockup.
+ * looking like a second search box.
  */
 export function TrackOrderCard({ href }: { href: string }) {
   const t = useTranslations("Track");

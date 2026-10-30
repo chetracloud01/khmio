@@ -12,7 +12,7 @@ import {
 import { z } from "zod";
 
 // What the admin API (apps/api admin/*) answers, read by lib/api.ts api()
-// with these schemas (shape only, like lib/api-answers.ts). The admin cookie
+// with these schemas (shape only, like lib/api-answers/). The admin cookie
 // is set by the API for its /admin routes only.
 
 /** GET /admin/auth/me. */

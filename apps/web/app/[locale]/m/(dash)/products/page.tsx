@@ -1,25 +1,32 @@
 "use client";
 
-import { canAddProduct } from "@khmio/shared";
-import { Button, ConfirmDialog, Notice, PageHeader, Switch } from "@khmio/ui";
-import { Boxes, EyeOff, ImageOff, Plus } from "lucide-react";
+import { canAddProduct, planHasFeature } from "@khmio/shared";
+import { Button, buttonVariants, ConfirmDialog, Notice, PageHeader, Switch } from "@khmio/ui";
+import { ChartColumn, EyeOff, ImageOff, Plus } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
-import { api, ApiError, apiSend, type Catalog, catalogSchema, type Product, productSchema } from "@/lib/api";
+import { ProductStatusTiles } from "@/components/products/product-status-tiles";
+import { IN_VIEW, isProductTileView, PRODUCT_TILE_VIEWS, type ProductTileView } from "@/components/products/product-tiles";
+import { api, ApiError, apiSend, type Catalog, catalogSchema, type Product, productSchema, stockSummarySchema } from "@/lib/api";
+import { listAddress } from "@/lib/list-address";
 import { priceText, startingVariant, usdValue } from "@/lib/product-price";
 import { useMerchant } from "../merchant-context";
 import { PhotoThumb } from "@/components/photo-thumb";
+import { StockLink } from "@/components/stock/stock-link";
 import { z } from "zod";
 
-// The seller's products, from the API: search, filters, Hidden badge, and
-// delete (soft — old orders keep pointing at the product).
+/** Each tile view's chip name (messages "ProductsList"). */
+const VIEW_LABEL = { hidden: "chipHidden", discounted: "chipDiscounted", nocost: "chipNoCost", nophoto: "chipNoPhoto" } as const satisfies Record<ProductTileView, string>;
+
+// The seller's products, from the API: status tiles on top (tapped, the list
+// follows), search, filters, Hidden badge, and delete (soft — old orders keep
+// pointing at the product). "Report" opens Profit & loss.
 export default function ProductsPage() {
   const t = useTranslations("ProductsList");
-  const tStock = useTranslations("Stock");
   const tApp = useTranslations("App");
   const tStore = useTranslations("Storefront");
   const locale = useLocale();
@@ -30,6 +37,22 @@ export default function ProductsPage() {
   const [failed, setFailed] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Product[]>([]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [activeTile, setActiveTile] = useState<ProductTileView | null>(null);
+  // Bumped when a tile is tapped: the list starts again from the address the tile wrote.
+  const [listKey, setListKey] = useState(0);
+  const showsStock = planHasFeature(store.plan, "stock");
+  const [toReorder, setToReorder] = useState<number | null>(null);
+  // The reorder tile only (plans with stock): without it the page still works.
+  useEffect(() => {
+    if (showsStock) api("/stock/summary", stockSummarySchema).then((summary) => setToReorder(summary.toReorder), () => setToReorder(null));
+  }, [showsStock]);
+
+  function selectTile(view: ProductTileView | null) {
+    const search = listAddress(window.location.search.replace(/^\?/, ""), view ? { chip: view } : null);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}`);
+    setActiveTile(view);
+    setListKey((key) => key + 1);
+  }
 
   const load = useCallback(() => {
     setFailed(false);
@@ -218,13 +241,11 @@ export default function ProductsPage() {
         description={t("description")}
         actions={
           <div className="flex items-center gap-2">
-            {/* Counts at the main branch (Pro, Advance); lower plans see them locked. */}
-            <Link href={`/${locale}/m/stock`}>
-              <Button variant="secondary">
-                <Boxes className="h-4 w-4" aria-hidden="true" />
-                {tStock("title")}
-              </Button>
+            <Link href={`/${locale}/m/reports/profit`} className={buttonVariants({ variant: "secondary" })}>
+              <ChartColumn className="h-4 w-4" aria-hidden="true" />
+              {t("reportLink")}
             </Link>
+            <StockLink href={`/${locale}/m/stock`} />
           {atLimit ? (
             <Button variant="primary" disabled>
               <Plus className="h-4 w-4" aria-hidden="true" />
@@ -250,8 +271,12 @@ export default function ProductsPage() {
         </Notice>
       )}
 
+      <ProductStatusTiles products={products} active={activeTile} onSelect={selectTile} toReorder={showsStock ? toReorder : null} reorderHref={`/${locale}/m/stock?${listAddress("", { chip: "reorder" })}`} />
+
       <DataGrid
+        key={listKey}
         syncUrl
+        onViewChange={({ chip }) => setActiveTile(isProductTileView(chip) ? chip : null)}
         rowNumbers
         rows={products}
         getRowId={(product) => product.id}
@@ -260,8 +285,7 @@ export default function ProductsPage() {
         searchPlaceholder={t("searchPlaceholder")}
         chips={[
           ...usedCategories.map((category) => ({ value: `category:${category.id}`, label: name(category), predicate: (product: Product) => product.categoryId === category.id })),
-          { value: "discounted", label: t("chipDiscounted"), predicate: (product: Product) => !!product.discountPercent },
-          { value: "hidden", label: t("chipHidden"), predicate: (product: Product) => !product.isVisible },
+          ...PRODUCT_TILE_VIEWS.map((view) => ({ value: view, label: t(VIEW_LABEL[view]), predicate: (product: Product) => IN_VIEW[view](product) })),
         ]}
         // "All": grouped by category, in the shop's category order.
         groupBy={(chip) => (chip === "all" ? categoryGroups : null)}

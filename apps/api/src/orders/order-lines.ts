@@ -7,6 +7,7 @@ import {
   orderLineChoicesSchema,
   parseCartLineKey,
   pickChoices,
+  unitCostIn,
   type ChoiceGroupFacts,
   type Currency,
   type FormErrorCode,
@@ -154,6 +155,8 @@ export function orderItemRows(
         unitPriceMinor: line.unitPrice,
         quantity: line.quantity,
         lineTotalMinor: line.lineTotal,
+        // The cost frozen like the price, in the order's currency at its rate; no cost known = null ("cost missing").
+        unitCostMinor: unitCostIn(variant, money.currency, money.usdToKhrRate) ?? null,
         choices,
         note: read.notes.get(line.key) ?? "",
       },

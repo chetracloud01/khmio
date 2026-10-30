@@ -25,7 +25,7 @@ function formatCountdown(totalSeconds: number): string {
  * Paying one order by KHQR (design/screens.md B5): the official KHQR card,
  * the countdown and its time bar, save the QR, three "how to pay" steps; the
  * "Paid!" moment with Mio; and the expired state. The page around it decides
- * the status (the mockup by itself; the live page from the API, which only
+ * the status (the live page from the API, which only
  * the worker's bank check moves).
  */
 export function KhqrPayPanel({
@@ -53,7 +53,7 @@ export function KhqrPayPanel({
   expired: { body: string; actionLabel: string; onAction: () => void };
   /** Opens the buyer's bank app; left out until the provider gives a link for it. */
   onOpenBankApp?: () => void;
-  /** Only without a real bank (mockup, KHQR_PROVIDER=fake): pays the code for testing. */
+  /** Only without a real bank (KHQR_PROVIDER=fake): pays the code for testing. */
   testPay?: { label: string; note: string; onPay: () => void; busy: boolean };
 }) {
   const t = useTranslations("Khqr");

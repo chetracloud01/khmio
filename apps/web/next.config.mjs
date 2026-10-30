@@ -51,6 +51,17 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ["@khmio/shared", "@khmio/ui"],
+  /**
+   * The old product pages (before "Garage first", 2026-10-28): Khmio Shop's
+   * page is now the garage's; Class and Rent left the website, so their links
+   * lead home. Permanent, so search engines move too.
+   */
+  async redirects() {
+    return [
+      { source: "/:locale(km|en)/products/shop", destination: "/:locale/solutions/garage", permanent: true },
+      { source: "/:locale(km|en)/products/:product", destination: "/:locale", permanent: true },
+    ];
+  },
   async headers() {
     if (process.env.NODE_ENV !== "production") return [];
     return [{ source: "/:path*", headers: securityHeaders() }];

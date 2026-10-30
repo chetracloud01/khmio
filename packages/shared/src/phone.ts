@@ -26,6 +26,22 @@ export function normalizeKhmerPhone(input: string): string | null {
   return `855${digits}`;
 }
 
+/** Fewest digits a phone search looks for, so "1" doesn't match every number. */
+export const MIN_PHONE_SEARCH_DIGITS = 3;
+
+/**
+ * What a search box's text means as part of a saved `855…` number, however it
+ * was typed ("012 345", "+855 12 345", "855 12"): the digits without the
+ * country code or the leading 0. null when the text isn't a phone (it has
+ * letters) or is too short to search for.
+ */
+export function phoneSearchDigits(text: string): string | null {
+  const typed = text.trim();
+  if (!/^[\d\s+#-]+$/.test(typed)) return null;
+  const digits = typed.replace(/\D/g, "").replace(/^855/, "").replace(/^0/, "");
+  return digits.length >= MIN_PHONE_SEARCH_DIGITS ? digits : null;
+}
+
 /**
  * A saved `855…` number back in the way Cambodians write it: 8 digits →
  * "012 345 678", 9 digits → "097 123 4567". Anything else is returned as is.

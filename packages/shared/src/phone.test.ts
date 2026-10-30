@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { maskKhmerPhone, normalizeKhmerPhone } from "./phone";
+import { maskKhmerPhone, normalizeKhmerPhone, phoneSearchDigits } from "./phone";
 
 describe("normalizeKhmerPhone", () => {
   it("normalizes a 9-digit number with leading 0", () => {
@@ -27,5 +27,20 @@ describe("maskKhmerPhone", () => {
   it("hides the middle and keeps the ends", () => {
     expect(maskKhmerPhone("85512345678")).toBe("012 ••• 678");
     expect(maskKhmerPhone("855971234567")).toBe("097 ••• 4567");
+  });
+});
+
+describe("searching by phone", () => {
+  it("finds the saved number's digits however the phone was typed", () => {
+    expect(phoneSearchDigits("012 345 678")).toBe("12345678");
+    expect(phoneSearchDigits("+855 12 345")).toBe("12345");
+    expect(phoneSearchDigits("855-97-123")).toBe("97123");
+    expect(phoneSearchDigits(" 0971 ")).toBe("971");
+  });
+
+  it("is not a phone search for a name, or for too few digits", () => {
+    expect(phoneSearchDigits("Dara")).toBeNull();
+    expect(phoneSearchDigits("012 Dara")).toBeNull();
+    expect(phoneSearchDigits("01")).toBeNull();
   });
 });

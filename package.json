@@ -17,6 +17,7 @@
     "db:deploy": "pnpm --filter @khmio/db migrate:deploy",
     "admin:add-owner": "pnpm --filter @khmio/api admin:add-owner",
     "demo:garage": "pnpm --filter @khmio/api demo:garage",
+    "data:garage-only": "pnpm --filter @khmio/api data:garage-only",
     "s3:up": "infra\\local-s3.cmd",
     "files:setup": "pnpm --filter @khmio/api files setup",
     "files:check": "pnpm --filter @khmio/api files check",

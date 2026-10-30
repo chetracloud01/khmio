@@ -24,6 +24,13 @@ export const orderStatusSchema = z.enum([
 ]);
 export type OrderStatus = z.infer<typeof orderStatusSchema>;
 
+/** Orders that don't count as sales (home figures, profit, customers): cancelled, or still waiting for an online payment. */
+export const NOT_SALE_STATUSES = ["cancelled", "awaiting_payment"] as const satisfies readonly OrderStatus[];
+
+export function countsAsSale(status: OrderStatus): boolean {
+  return !NOT_SALE_STATUSES.some((notSale) => notSale === status);
+}
+
 /** What a seller (or the system, for "pay") can do to an order. */
 export type OrderAction =
   | "pay"
@@ -50,6 +57,14 @@ export interface OrderFacts {
 
 export function isCashOrder(order: Pick<OrderFacts, "paymentMethod">): boolean {
   return order.paymentMethod === "cod";
+}
+
+/** When a cash order's money is settled: collected (completed) or never coming (cancelled). */
+export const CASH_SETTLED_STATUSES = ["completed", "cancelled"] as const satisfies readonly OrderStatus[];
+
+/** Cash still to collect: a cash-on-delivery order not yet completed or cancelled (the dashboard, the Orders tile, the Sales report). */
+export function isCashToCollect(order: Pick<OrderFacts, "paymentMethod" | "status">): boolean {
+  return isCashOrder(order) && !CASH_SETTLED_STATUSES.some((settled) => settled === order.status);
 }
 
 /** The status a new order starts in: cash orders go straight to the seller, online ones wait for payment. */
@@ -169,7 +184,8 @@ export function orderStatusesForTab(tab: OrderTab): OrderStatus[] {
 /** The seller's order list read page by page (the data grid's server mode): what it may be searched, filtered and sorted by. */
 export const ORDER_LIST_SPEC = {
   sorts: ["order", "buyer", "total", "status"],
-  chips: ORDER_TABS,
+  /** The tabs, and cash still to collect (the Orders tile). */
+  chips: [...ORDER_TABS, "to_collect"],
   filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup", "in_store"] },
   defaultSort: { key: "order", dir: "desc" },
 } as const satisfies ListSpec;

@@ -9,8 +9,8 @@ import { copyText, shareOrCopyLink } from "@/components/share-link";
 
 /**
  * "Your shop link": the address to send, Share and Copy, and a QR code to
- * download and print for the counter. One block for the dashboard home and
- * its mockup. `onShared` is told whenever the link went out (shared, copied
+ * download and print for the counter, on the dashboard home. `onShared` is
+ * told whenever the link went out (shared, copied
  * or the QR downloaded) — the live page marks the setup step done with it.
  */
 export function ShopLinkCard({

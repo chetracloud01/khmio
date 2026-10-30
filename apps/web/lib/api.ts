@@ -71,7 +71,7 @@ async function request(path: string, options: RequestOptions): Promise<{ status:
 }
 
 /**
- * Calls the API and reads its answer with `answer` (lib/api-answers.ts). An
+ * Calls the API and reads its answer with `answer` (lib/api-answers/). An
  * answer of another shape is refused as ApiError "bad_answer", so a screen
  * shows its error state instead of breaking on a missing field.
  */

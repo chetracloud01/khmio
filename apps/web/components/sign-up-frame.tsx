@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 
 /**
- * Seller sign-up and onboarding (design/screens.md S1, S2), live and mockup:
+ * Seller sign-up and onboarding (design/screens.md S1, S2):
  * from 1024 px a split screen — the Deep Khmio Teal side with Mio and what
  * Khmio gives a seller, the form on the right; on a phone one column with
  * the Khmio mark on top. `controls`: language and theme, top right.

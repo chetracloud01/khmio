@@ -8,6 +8,7 @@ import {
   toFieldErrors,
   variantLabel,
   type ChoiceGroupInput,
+  type Currency,
   type FormErrorCode,
   type PlanId,
   type ProductSave,
@@ -30,8 +31,11 @@ export const productInclude = {
 } satisfies Prisma.ProductInclude;
 export type ProductRow = Prisma.ProductGetPayload<{ include: typeof productInclude }>;
 
-/** A product as the dashboard and the shop page see it. Wholesale prices are left out unless the plan has them. */
-export function toProductDto(product: ProductRow, photoUrl: (key: string) => string, showWholesale = false) {
+/**
+ * A product as the dashboard and the shop page see it. Wholesale prices are
+ * left out unless the plan has them; cost prices unless it's for the seller.
+ */
+export function toProductDto(product: ProductRow, photoUrl: (key: string) => string, showWholesale = false, forSeller = false) {
   const variantGroups = product.optionGroups.filter((group) => group.kind === "variant");
   // A variant's values in its groups' order: [size, colour].
   const valueOrder = new Map(variantGroups.flatMap((group, at) => group.values.map((value) => [value.id, at] as const)));
@@ -63,6 +67,8 @@ export function toProductDto(product: ProductRow, photoUrl: (key: string) => str
       priceUsdCents: variant.priceUsdCents,
       priceKhr: variant.priceKhr,
       ...(showWholesale ? { wholesalePriceUsdCents: variant.wholesalePriceUsdCents, wholesalePriceKhr: variant.wholesalePriceKhr } : {}),
+      // What it costs the shop: the seller's own pages only, never the shop page.
+      ...(forSeller ? { costMinor: variant.costMinor, costCurrency: variant.costCurrency } : {}),
     })),
     variantGroups: variantGroups.map((group) => ({
       id: group.id,
@@ -178,6 +184,8 @@ interface VariantPlan {
   priceKhr: number | null;
   wholesalePriceUsdCents: number | null;
   wholesalePriceKhr: number | null;
+  costMinor: number | null;
+  costCurrency: Currency | null;
   sortOrder: number;
 }
 
@@ -252,6 +260,23 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
     return sku;
   };
 
+  // A tracked option's cost is the average its bills worked out (docs/blueprint.md "Cost price", level 2):
+  // while the plan follows stock, the form can't change it, nor the product's cost currency once one has a cost.
+  const trackedIds = new Set(
+    existing && planHasFeature(plan, "stock")
+      ? (await tx.stockLevel.findMany({ where: { variantId: { in: existing.variants.map((variant) => variant.id) } }, select: { variantId: true } })).map((level) => level.variantId)
+      : [],
+  );
+  const trackedCurrency = existing?.variants.find((variant) => trackedIds.has(variant.id) && variant.costCurrency)?.costCurrency ?? null;
+  if (trackedCurrency && product.costCurrency && product.costCurrency !== trackedCurrency) errors.costCurrency = "cost_currency_mismatch";
+
+  // One cost currency for the whole product (the schema requires it once a cost is given); no amount = no currency.
+  const costOf = (variantId: string | undefined, costMinor: number | undefined) => {
+    const kept = existing?.variants.find((variant) => variant.id === variantId && trackedIds.has(variant.id));
+    if (kept) return { costMinor: kept.costMinor, costCurrency: kept.costCurrency };
+    return costMinor !== undefined && product.costCurrency ? { costMinor, costCurrency: product.costCurrency } : { costMinor: null, costCurrency: null };
+  };
+
   let variants: VariantPlan[];
   if (product.options?.length) {
     variants = product.options.map((option, index) => {
@@ -271,6 +296,7 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
         ...(canWholesale
           ? { wholesalePriceUsdCents: option.wholesalePriceUsdCents ?? null, wholesalePriceKhr: option.wholesalePriceKhr ?? null }
           : keptWholesale(id)),
+        ...costOf(id, option.costMinor),
         sortOrder: index,
       };
     });
@@ -289,6 +315,7 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
         ...(canWholesale
           ? { wholesalePriceUsdCents: product.wholesalePriceUsdCents ?? null, wholesalePriceKhr: product.wholesalePriceKhr ?? null }
           : keptWholesale(current?.id)),
+        ...costOf(current?.id, product.costMinor),
         sortOrder: 0,
       },
     ];
@@ -349,14 +376,14 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
 export async function readProducts(tx: Tx, storeId: string, photoUrl: (key: string) => string) {
   const { plan } = await storePlan(tx, storeId);
   const products = await tx.product.findMany({ where: { deletedAt: null }, include: productInclude, orderBy: { createdAt: "desc" } });
-  return products.map((product) => toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice")));
+  return products.map((product) => toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice"), true));
 }
 
 /** One of the seller's products, or null when there's no such product. */
 export async function readProduct(tx: Tx, storeId: string, id: string, photoUrl: (key: string) => string) {
   const { plan } = await storePlan(tx, storeId);
   const product = await tx.product.findFirst({ where: { id, deletedAt: null }, include: productInclude });
-  return product ? toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice")) : null;
+  return product ? toProductDto(product, photoUrl, planHasFeature(plan, "wholesalePrice"), true) : null;
 }
 
 export async function productExists(tx: Tx, id: string): Promise<boolean> {

@@ -37,8 +37,68 @@ export type SiteImage = z.infer<typeof siteImageSchema>;
 export const MIO_POSES = ["face", "coin"] as const;
 
 /** Icons a section may show; the code maps each name to one drawing. */
-export const SITE_ICONS = ["store", "share", "qr", "bell", "truck", "boxes", "building", "shield", "clock", "language", "list", "heart"] as const;
+export const SITE_ICONS = [
+  "store", "share", "qr", "bell", "truck", "boxes", "building", "shield", "clock", "language", "list", "heart",
+  "wrench", "car", "smartphone", "coffee", "scissors", "shirt", "receipt", "chart", "users",
+  "percent", "calendar", "utensils", "layers",
+] as const;
 export type SiteIcon = (typeof SITE_ICONS)[number];
+
+// ---------------------------------------------------------- business solutions
+
+/**
+ * Where something on the website stands. "live": ready and well tested;
+ * "beta": anyone can start free, still being tested with real sellers;
+ * "coming_soon": not built yet (never a date) — a solution then collects
+ * waitlist sign-ups.
+ */
+export const SITE_STATUSES = ["live", "beta", "coming_soon"] as const;
+export const siteStatusSchema = z.enum(SITE_STATUSES);
+export type SiteStatus = z.infer<typeof siteStatusSchema>;
+
+/** A tile's colour: one of the theme's tones, never a raw colour. */
+export const SITE_TONES = ["brand", "info", "success", "warning", "danger"] as const;
+
+/**
+ * Khmio for each kind of business (docs/blueprint.md "Business roadmap"), as
+ * the website lists them (its Industries).
+ */
+export const SITE_SOLUTION_IDS = ["garage", "auto_parts", "phone", "cafe", "salon", "retail"] as const;
+export const siteSolutionIdSchema = z.enum(SITE_SOLUTION_IDS);
+export type SiteSolutionId = z.infer<typeof siteSolutionIdSchema>;
+
+export const siteSolutionSchema = z.object({
+  id: siteSolutionIdSchema,
+  name: localizedTextSchema(40),
+  line: localizedTextSchema(200),
+  /** The kinds of shop it covers ("Car wash", "Tyre & oil"), shown as small tags. */
+  covers: z.array(localizedTextSchema(32)).max(6),
+  status: siteStatusSchema,
+  icon: z.enum(SITE_ICONS),
+});
+export type SiteSolution = z.infer<typeof siteSolutionSchema>;
+
+/**
+ * Khmio's apps — the parts of the one app a business switches on (online
+ * shop, counter sales, stock, job cards…), as the website's app grid lists
+ * them. What each does and whether it's ready; they have no pages of their own.
+ */
+export const siteAppSchema = z.object({
+  id: z.string().trim().regex(/^[a-z0-9-]+$/, "slug_invalid").max(40, "too_long"),
+  name: localizedTextSchema(32),
+  line: localizedTextSchema(120),
+  status: z.enum(["live", "coming_soon"]),
+  icon: z.enum(SITE_ICONS),
+  tone: z.enum(SITE_TONES),
+  /** A plan it needs beyond the free one ("Pro"), shown as a small mark. */
+  plan: z.enum(["basic", "pro", "advance"]).optional(),
+});
+export type SiteApp = z.infer<typeof siteAppSchema>;
+
+/** A solution's page address: "/solutions/auto-parts". */
+export function solutionPath(id: SiteSolutionId): string {
+  return `/solutions/${id.replace(/_/g, "-")}`;
+}
 
 const sectionBase = {
   id: z.string().trim().min(1, "required").max(40, "too_long"),
@@ -58,10 +118,18 @@ export const heroSectionSchema = z.object({
   eyebrow: localizedTextSchema(60).optional(),
   headline: localizedTextSchema(80),
   sentence: localizedTextSchema(200),
-  /** A picture, or Mio in one of the poses. */
-  art: z.union([z.object({ kind: z.literal("mio"), pose: z.enum(MIO_POSES) }), z.object({ kind: z.literal("image"), image: siteImageSchema })]),
+  /** A picture, Mio in one of the poses, or Mio among the app tiles (from the app list). */
+  art: z.union([
+    z.object({ kind: z.literal("mio"), pose: z.enum(MIO_POSES) }),
+    z.object({ kind: z.literal("image"), image: siteImageSchema }),
+    z.object({ kind: z.literal("apps") }),
+  ]),
   primary: siteLinkSchema,
   secondary: siteLinkSchema.optional(),
+  /** Short facts floating beside the art ("Job card · Toyota Camry"), at most three. */
+  highlights: z.array(localizedTextSchema(48)).max(3).optional(),
+  /** Small trust points under the buttons ("KHQR", "Telegram alerts"). */
+  trust: z.array(z.object({ icon: z.enum(SITE_ICONS), text: localizedTextSchema(40) })).max(4).optional(),
 });
 
 export const stepsSectionSchema = z.object({
@@ -74,12 +142,53 @@ export const stepsSectionSchema = z.object({
     .max(4, "too_long"),
 });
 
-export const productCardsSectionSchema = z.object({
+/** Every app as a tile, from the app list (never typed here). */
+export const appsSectionSchema = z.object({
   ...sectionBase,
-  type: z.literal("productCards"),
+  type: z.literal("apps"),
   title: localizedTextSchema(80),
-  /** The cards come from the platform product list, never typed here; this only picks which ones. */
-  show: z.enum(["all", "coming_soon"]).optional(),
+  intro: localizedTextSchema(200).optional(),
+});
+
+/** Side by side: "big business software" and Khmio, row by row. Never names a company. */
+export const comparisonSectionSchema = z.object({
+  ...sectionBase,
+  type: z.literal("comparison"),
+  title: localizedTextSchema(80),
+  intro: localizedTextSchema(200).optional(),
+  /** The two columns' headings: theirs, then ours. */
+  them: localizedTextSchema(40),
+  us: localizedTextSchema(40),
+  rows: z
+    .array(z.object({ label: localizedTextSchema(40), them: localizedTextSchema(80), us: localizedTextSchema(80) }))
+    .min(2, "too_short")
+    .max(8, "too_long"),
+});
+
+/**
+ * A page of long text under headings: the terms, the privacy policy. Its
+ * date and draft mark are content, so the admin can publish a checked version.
+ */
+export const documentSectionSchema = z.object({
+  ...sectionBase,
+  type: z.literal("document"),
+  title: localizedTextSchema(80),
+  intro: localizedTextSchema(400).optional(),
+  /** The day the text last changed (YYYY-MM-DD), shown as "Last updated". */
+  updatedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "required"),
+  /** Not checked by an advisor yet: the page says so at the top. */
+  draft: z.boolean(),
+  parts: z
+    .array(z.object({ heading: localizedTextSchema(80), paragraphs: z.array(localizedTextSchema(1200)).min(1, "too_short").max(8, "too_long") }))
+    .min(1, "too_short")
+    .max(20, "too_long"),
+});
+
+export const solutionsSectionSchema = z.object({
+  ...sectionBase,
+  type: z.literal("solutions"),
+  title: localizedTextSchema(80),
+  intro: localizedTextSchema(200).optional(),
 });
 
 export const featuresSectionSchema = z.object({
@@ -90,6 +199,8 @@ export const featuresSectionSchema = z.object({
     .array(z.object({ icon: z.enum(SITE_ICONS), title: localizedTextSchema(60), line: localizedTextSchema(200), image: siteImageSchema.optional() }))
     .min(2, "too_short")
     .max(8, "too_long"),
+  /** "bento": the first feature large, the rest in tiles around it. Plain cards when left out. */
+  layout: z.enum(["cards", "bento"]).optional(),
 });
 
 export const promotionSectionSchema = z
@@ -137,7 +248,7 @@ export const sellerStorySectionSchema = z.object({
   photo: siteImageSchema.optional(),
   /** Never shown without the seller's permission (design/brand-guide.md). */
   permission: z.literal(true, { errorMap: () => ({ message: "required" }) }),
-  /** A made-up story for the mockup: shown with a "Sample" mark. */
+  /** A made-up story: shown with a "Sample" mark, never on the live site. */
   sample: z.boolean(),
 });
 
@@ -154,13 +265,18 @@ export const waitlistSectionSchema = z.object({
   type: z.literal("waitlist"),
   title: localizedTextSchema(80),
   thanks: localizedTextSchema(200),
+  /** The coming-soon solution the sign-ups are for. */
+  solution: siteSolutionIdSchema,
 });
 
 export const siteSectionSchema = z.union([
   announcementSectionSchema,
   heroSectionSchema,
   stepsSectionSchema,
-  productCardsSectionSchema,
+  appsSectionSchema,
+  comparisonSectionSchema,
+  documentSectionSchema,
+  solutionsSectionSchema,
   featuresSectionSchema,
   promotionSectionSchema,
   plansSectionSchema,
@@ -176,7 +292,10 @@ export const SITE_SECTION_SCHEMAS = {
   announcement: announcementSectionSchema,
   hero: heroSectionSchema,
   steps: stepsSectionSchema,
-  productCards: productCardsSectionSchema,
+  apps: appsSectionSchema,
+  comparison: comparisonSectionSchema,
+  document: documentSectionSchema,
+  solutions: solutionsSectionSchema,
   features: featuresSectionSchema,
   promotion: promotionSectionSchema,
   plans: plansSectionSchema,
@@ -193,7 +312,7 @@ export type SiteSectionType = SiteSection["type"];
 export type SiteSectionOf<T extends SiteSectionType> = Extract<SiteSection, { type: T }>;
 
 export const sitePageSchema = z.object({
-  /** "" is the home page; otherwise the path without a leading slash ("pricing", "products/shop"). */
+  /** "" is the home page; otherwise the path without a leading slash ("pricing", "solutions/garage"). */
   slug: z.string().regex(/^[a-z0-9\-/]*$/, "slug_invalid"),
   /** The link preview on Facebook and Telegram. */
   seo: siteSeoSchema,
@@ -203,20 +322,10 @@ export type SitePage = z.infer<typeof sitePageSchema>;
 
 // ----------------------------------------------------------- platform products
 
+/** The platform's products. Only Khmio Shop is on the website now; Class and Rent sign-ups made before stay valid. */
 export const PLATFORM_PRODUCT_IDS = ["shop", "class", "rent"] as const;
 export const platformProductIdSchema = z.enum(PLATFORM_PRODUCT_IDS);
 export type PlatformProductId = z.infer<typeof platformProductIdSchema>;
-
-/** One product of the platform, as the website lists it. A product not built yet is "coming_soon", never a date. */
-export const platformProductSchema = z.object({
-  id: platformProductIdSchema,
-  name: z.string().trim().min(1, "required").max(40, "too_long"),
-  subtitle: localizedTextSchema(40),
-  line: localizedTextSchema(200),
-  status: z.enum(["live", "coming_soon"]),
-  icon: z.enum(SITE_ICONS),
-});
-export type PlatformProduct = z.infer<typeof platformProductSchema>;
 
 /** Is a promotion showing at this moment? Start inclusive, end exclusive. */
 export function isPromotionLive(promo: Pick<SiteSectionOf<"promotion">, "startsAt" | "endsAt">, now: Date): boolean {
@@ -237,7 +346,8 @@ export function visibleSections(page: Pick<SitePage, "sections">, now: Date): Si
 
 // ----------------------------------------------------------------- waitlist
 
-export const WAITLIST_BUSINESS_TYPES = ["teacher", "school", "landlord", "other"] as const;
+/** The business a sign-up is for: a solution (set by its page), or the older Class and Rent types (sign-ups made before). */
+export const WAITLIST_BUSINESS_TYPES = [...SITE_SOLUTION_IDS, "teacher", "school", "landlord", "other"] as const;
 export type WaitlistBusinessType = (typeof WAITLIST_BUSINESS_TYPES)[number];
 
 /** The "Tell me when it's ready" form on a coming-soon product page. */

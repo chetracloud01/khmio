@@ -11,8 +11,8 @@ import { api, ApiError, apiSend } from "@/lib/api";
 import { AdminContext, type ActiveAdmin } from "./admin-context";
 import { AdminLogin } from "./admin-login";
 
-// The real admin area (roadmap step 7), laptop-first and usable on a phone,
-// in the same frame as its mockup (components/admin-frame). Nothing renders
+// The admin area (roadmap step 7), laptop-first and usable on a phone, in
+// the admin frame (components/admin-frame). Nothing renders
 // until the API says both login steps are done; the API checks the admin's
 // role again on every request.
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -77,7 +77,7 @@ function AdminShell({ me, children }: { me: ActiveAdmin; children: ReactNode }) 
   }
 
   return (
-    <AdminFrame area="live" badgeCount={badges} account={{ name: me.name, role: tApp(`role_${me.role}`) }} onSignOut={() => void signOut()}>
+    <AdminFrame badgeCount={badges} account={{ name: me.name, role: tApp(`role_${me.role}`) }} onSignOut={() => void signOut()}>
       {children}
     </AdminFrame>
   );

@@ -7,7 +7,7 @@ import { BotCheck, TURNSTILE_SITE_KEY } from "@/components/bot-check";
 import { ApiError, apiSend } from "@/lib/api";
 import { SITE_PAGES } from "./content";
 import { liveSiteHref, liveSiteImage } from "./links";
-import { SITE_PAGE_INFO, type SitePageKey } from "./pages";
+import type { SitePageKey } from "./pages";
 import { SiteView } from "./site-view";
 
 class BotCheckNotReady extends Error {}
@@ -42,7 +42,6 @@ export function LiveSitePage({ pageKey }: { pageKey: SitePageKey }) {
   return (
     <SiteView
       page={SITE_PAGES[pageKey]}
-      product={SITE_PAGE_INFO[pageKey].product}
       href={(path) => liveSiteHref(locale, path)}
       image={liveSiteImage}
       waitlist={{

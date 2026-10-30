@@ -21,4 +21,13 @@ describe("waitlist sign-up input", () => {
   it("refuses a product the platform doesn't have", () => {
     expect(() => parseWaitlistRequest({ product: "cinema", name: "Dara", phone: "012345678", businessType: "other" })).toThrow(InvalidInputException);
   });
+
+  it("takes a sign-up for a coming-soon business solution (Khmio Shop, that business)", () => {
+    expect(parseWaitlistRequest({ product: "shop", name: "Sophea", phone: "097 123 4567", businessType: "cafe" })).toMatchObject({ product: "shop", businessType: "cafe" });
+    expect(parseWaitlistRequest({ product: "shop", name: "Sophea", phone: "097 123 4567", businessType: "auto_parts" })).toMatchObject({ businessType: "auto_parts" });
+  });
+
+  it("refuses a business the website doesn't list", () => {
+    expect(() => parseWaitlistRequest({ product: "shop", name: "Sophea", phone: "097 123 4567", businessType: "cinema" })).toThrow(InvalidInputException);
+  });
 });

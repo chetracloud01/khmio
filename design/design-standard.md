@@ -81,18 +81,35 @@ and checks every text pair (4.5 : 1) and shape (3 : 1) in light, dark and
 "follow the device", for every accent. A colour change that fails it doesn't
 ship.
 
-**One kit, no copies.** Every screen — admin, seller, buyer and their
-mockups — is built from the shared building blocks in `packages/ui`
+**One kit, no copies.** Every screen — admin, seller and buyer — is built
+from the shared building blocks in `packages/ui`
 (`blocks.tsx`: `PageHeader`, `SectionTitle`, `StatCard`, `StatusPill` with
 the tones `brand` `success` `warning` `danger` `info` `muted`, `EmptyState`,
 `LoadingBlocks`, `ErrorState`, `DetailList`, `ConfirmDialog`; plus `Button`,
-`Card`, `Input`, `BottomSheet` …), the admin frame in
+`Card`, `Input`, `BottomSheet`, `ProgressBar` (how much is done: setup
+steps, a bill paid off) …), the printed-document parts in
+`apps/web/components/paper` (`Paper`, `PaperHeader`, `PaperStamp`,
+`PaperRow`, `PaperSignatures`, `DocumentScreen`, `PrintLink`: the invoice,
+bills, returns and payment vouchers), the chart pieces in
+`apps/web/components/home` (`ChartCard`, `KpiTile`, `ChangeText`,
+`ChartLegend`, `ChartTooltipBox`, `CHART_COLOR`: every chart uses them), the admin frame in
 `apps/web/components/admin-frame`, the seller frame in
 `apps/web/components/seller-frame` (bottom tabs on a phone, a sidebar from
 768 px; pages use its `SELLER_PAGE` / `SELLER_FORM` widths and
 `SELLER_FORM_BAR`) and the data grid in
 `apps/web/components/data-grid.tsx`. A page never re-creates one of these; a
 block that's missing is added to the kit, shown on `/styleguide`, then used.
+
+**Brief and detail, in one style (2026-10-28).** Every module has a *brief*
+— its list, in the data grid like Products and Orders (search, chips,
+Filters, sort, pages of 20, row numbers, the view kept in the address,
+export; cards on a phone with the name on two lines, a status pill and at
+most one main button) — and a *detail* page a row opens: `SubPage` with
+the way back, the title, the actions top-right, then `DetailStats` (the
+row of number cards: two across on a phone, four on a laptop), then cards
+and sections. Customers, stock items, suppliers and bills follow it; a new
+module does too. A list fits a 1366 px laptop with nothing cut off: columns
+that aren't needed every day start hidden under View.
 The kit holds no words — every label comes from `messages/*.json`.
 
 **Kit or app block — where a shared part lives.**
@@ -109,9 +126,7 @@ and each part is shown inside a `Demo` labelled with its name, so the page
 doubles as the list of what exists. Two checks keep it honest:
 `apps/web/app/[locale]/styleguide/coverage.test.ts` fails when a kit part
 isn't on the page, and lint stops a screen in `apps/web/app` that uses a raw
-`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit — an
-error on live screens, a warning in `app/[locale]/mockup` until that mockup
-is next worked on. A part that really needs a raw element (a whole-row tap
+`<button>`, `<input>`, `<select>` or `<textarea>` instead of the kit. A part that really needs a raw element (a whole-row tap
 target, the seller header's pill) says why in an `eslint-disable-next-line`
 comment. The kit's answers to the usual cases: `Button variant="ghost"` for
 small text actions, `IconButton` for an icon alone, `ChoiceCards` and
@@ -181,9 +196,25 @@ with the same keys in both.
 close on Escape; status changes are announced; contrast at least 4.5:1
 for text.
 
+### Status tiles (list pages and reports)
+- A list page (Orders, Customers, Products, Purchases, Stock, Suppliers) and
+  every report opens on a row of status tiles over **all** its records, not
+  the list's search or filters: each a count and amount, the shop's currency
+  first and the other under it, and what to do there ("Pay", "Confirm them",
+  "Add cost") when there's something to do.
+- Tapped, the list below follows the tile's view (a chip or filter, written
+  to the address) and the tile is ringed; tapped again, the whole list. A
+  tile that belongs to another page (Sales today, Low or out of stock) opens
+  it instead. A tile counts exactly what its view lists.
+- One component: `StatusTileRow` (apps/web/components/status-tile-row.tsx),
+  two across on a phone, one row on a laptop. Each page's rules (what a tile
+  counts) live in a small tested module (purchase-tiles.ts, product-tiles.ts,
+  packages/shared order-status.ts) or the API.
+- A page with a report has a "Report" button beside its title.
+
 ## 5. Forms (all roles)
 
-One standard, implemented in `mockup/form-ui.tsx`:
+One standard, implemented in `apps/web/components/form-ui.tsx`:
 
 1. **Sections** — fields grouped under a title and one line of help.
 2. **Draft** — edits stay in a draft; nothing is saved until Save.

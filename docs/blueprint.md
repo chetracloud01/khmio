@@ -13,7 +13,7 @@ The document follows the project from start to end:
 | Part | Sections | Answers |
 | --- | --- | --- |
 | 1. Why | Overview, Market and how we win | What problem, for whom, and why sellers will choose us |
-| 2. What | Subscription tiers, Workflows from start to end | What the platform does, step by step, for sellers, buyers and the admin |
+| 2. What | Subscription tiers, Business roadmap, Workflows from start to end | What the platform does, which businesses it serves and in what order it grows, step by step for sellers, buyers and the admin |
 | 3. How it's built | System architecture, Tech stack, UX/UI principles, User-friendly data input, Payments, Database schema, Security | The technical design every step follows |
 | 4. Where it runs | Deployment, Budget | Hosting, environments, costs |
 | 5. In what order | Roadmap: zero to live | Gates and steps, each with a "Done when" check and its status |
@@ -26,18 +26,19 @@ Updated at the end of every roadmap step.
 
 | Stage | Status |
 | --- | --- |
-| Mockups of every screen (design/screens.md) | Done — approved, kept at `/mockup` as the reference |
+| Screen specs (design/screens.md) | Done — every screen written; the mockups were approved, then removed 2026-10-28 (git tag v0.5.1). Screens are built and approved as live pages, tested with the Demo Garage ("Garage first") |
 | Gate G1. Save the work | Done — one branch per step, merged to `main` when its checks pass |
-| Gate G2. Sellers try the mockups | Test sheet ready (`design/seller-test.md`); results not yet recorded here |
-| Gate G3. Bakong from the real host | Open — must pass before step 5 (KHQR) |
+| Gate G2. Sellers try the app | Test sheet ready for garage owners on the live app (`design/seller-test.md`); results not yet recorded here |
+| Gate G3. Bakong from the real host | Open — must pass before step 5's last part (the real `BakongKhqrProvider`); waiting on the Bakong Open API token |
 | Step 1. Foundations | Done — CI runs lint, typecheck, tests, build and a built-API health check. Staging and preview links move to step 8, when hosting is bought |
 | Step 2. Data and login | Done — schema, row-level security with two database users, Telegram login, 2-question onboarding |
 | Step 3. Catalog | Done — products with options and photos, shop details, setup checklist, read-only shop page |
 | Step 4. Shop and checkout | Done — delivery and store settings, cart, one-page checkout, cash orders priced by the API, buyer order page, seller order list (read-only) |
-| Step 5. KHQR | **Postponed** — no Bakong Open API token yet. Built as soon as there is one and gate G3 passes. Decided 2026-10-02: the beta may go live with cash on delivery only, and KHQR is switched on when it's ready (its launch-checklist items then apply) |
+| Step 5. KHQR | **Built except the bank** (v0.4.8, 2026-10-27) — payment attempts, held stock, the worker's checks (exact match, 10-minute expiry, issues alert the admin) and the live pay page, run end to end on a stand-in bank (`KHQR_PROVIDER=fake`). Left: `BakongKhqrProvider` and token renewal, once the Bakong Open API token arrives and gate G3 passes. Decided 2026-10-02: the beta may go live with cash on delivery only, and KHQR is switched on when it's ready (its launch-checklist items then apply) |
 | Step 6. Orders and Telegram | Done — order actions (confirm → pack → send by driver, bus or pickup → delivered → cash collected; failed, rebook, cancel), the buyer cancels while allowed and their page refreshes itself, Telegram alerts through an outbox with a Confirm button. Telegram runs in dry run until a bot token is set: send one real alert then |
 | Step 7. Admin, the minimum | Done — admin login with Telegram + authenticator code (2FA, backup codes, lockout), roles enforced by the API, overview, merchants with extend/unblock and change plan, audit log, platform settings, admin alerts to Telegram. First owner by `pnpm admin:add-owner` |
-| **Now: Step 8. Security and go live** | In progress, done in parts so that buying hosting is the last step. B1 security hardening done: rate limits (PostgreSQL counters), Turnstile on checkout, security headers on API and web, production start-up checks, order tokens kept out of logs, Telegram login in redirect mode (no eval under the CSP). B2 photo storage done: one S3 adapter for Cloudflare R2 (production, required there) and a local SeaweedFS (`pnpm s3:up`; MinIO no longer ships Windows downloads), `pnpm files:setup`, `files:check`, `files:copy-to-s3`. B3 done: nightly backup (worker, 03:00 Phnom Penh, pg_dump into a private bucket, kept 14 days, the newest 3 always; failures alert the admins), `pnpm db:backup` and `pnpm db:restore` (into a new database only; rehearsed: the restored copy ran the API with the same rows, row-level security and migrations), Dockerfiles for the API and worker (`infra/docker`, built and run by CI), `railway.json` for both (migrations before each API release, health check, worker never overlaps itself), `apps/web/vercel.json`, and Kantumruy Pro bundled with the web app. B4a done (from the 2026-10-02 structure review): web functions in Singapore (`sin1`), photo thumbnails (~400 px, made in the browser) for the shop grid, cart and product list, the end-to-end checks moved into the repo (`pnpm test:e2e`, run by CI with a stand-in for Telegram), Dependabot; photo upload fixed under the CSP. B4b in progress (2026-10-24): the v0.4.6 release builds for production and passes every end-to-end check on a fresh database (279 checks, new: grouped shop details, Sell in shop); the go-live smoke test covers the map link, Shop info sheet, back to the shop and Sell in shop. Next: `pnpm rehearsal` on a phone, then CI green on GitHub (Docker images). Built meanwhile (2026-10-24): **Stock, part 1** (Pro, main branch) — see design/screens.md S13; finished 2026-10-27: 301 end-to-end checks pass on a fresh database (new: stock), online orders take stock only when paid in cash (`takesStockWhenPlaced`; KHQR and PayWay orders will reserve it in part 2), Stop tracking asks first, and the go-live smoke test has a Stock step |
+| **Now: Step 8. Security and go live** | In progress, done in parts so that buying hosting is the last step. B1 security hardening done: rate limits (PostgreSQL counters), Turnstile on checkout, security headers on API and web, production start-up checks, order tokens kept out of logs, Telegram login in redirect mode (no eval under the CSP). B2 photo storage done: one S3 adapter for Cloudflare R2 (production, required there) and a local SeaweedFS (`pnpm s3:up`; MinIO no longer ships Windows downloads), `pnpm files:setup`, `files:check`, `files:copy-to-s3`. B3 done: nightly backup (worker, 03:00 Phnom Penh, pg_dump into a private bucket, kept 14 days, the newest 3 always; failures alert the admins), `pnpm db:backup` and `pnpm db:restore` (into a new database only; rehearsed: the restored copy ran the API with the same rows, row-level security and migrations), Dockerfiles for the API and worker (`infra/docker`, built and run by CI), `railway.json` for both (migrations before each API release, health check, worker never overlaps itself), `apps/web/vercel.json`, and Kantumruy Pro bundled with the web app. B4a done (from the 2026-10-02 structure review): web functions in Singapore (`sin1`), photo thumbnails (~400 px, made in the browser) for the shop grid, cart and product list, the end-to-end checks moved into the repo (`pnpm test:e2e`, run by CI with a stand-in for Telegram), Dependabot; photo upload fixed under the CSP. B4b in progress (2026-10-24): the v0.4.6 release builds for production and passes every end-to-end check on a fresh database (279 checks, new: grouped shop details, Sell in shop); the go-live smoke test covers the map link, Shop info sheet, back to the shop and Sell in shop. Next: `pnpm rehearsal` on a phone, then CI green on GitHub (Docker images); then buy the domain and hosting and deploy (`docs/go-live.md`) |
+| Built ahead of the roadmap | Not needed for the beta; built while step 8 waits on the phone rehearsal and gate G3. **Stock, part 1** (v0.4.7, 2026-10-27; Pro, main branch; design/screens.md S13): online orders take stock only when paid in cash (`takesStockWhenPlaced`; KHQR and PayWay orders will reserve it in part 2), Stop tracking asks first, the go-live smoke test has a Stock step. **Catalog structure** (v0.5.0, 2026-10-27; most of step 14): business modules, option groups (Size × Colour) and choices with extra prices, the shop's own fields, services with a preferred time, restaurant tables and kitchen, garage job cards. **Cost price and profit report** (v0.5.1, 2026-10-28): level 1 of "Cost price" below — one cost per product in dollars or riel, frozen on each sale; the Pro profit report. **Customers** (S14, 2026-10-28; every plan; no database change): the buyer list with orders, spent and last order, and each buyer's page. 419 end-to-end checks pass on a fresh database |
 
 ## Overview
 
@@ -173,11 +174,113 @@ New store → Free trial (14 days) → Active (paid plan) → Payment due → Gr
 
 The platform serves any business with **one** product model (categories, variants, unit of measure, brand) — there is no separate code path for a café, a shop or a restaurant. During onboarding the merchant picks a business type (`shop`, `restaurant`, `service`, `garage`, `other`), stored on `stores.business_type`. It only pre-fills starting defaults — for example, the default unit of measure (Piece for a shop, Cup/Plate for a restaurant) and suggested first categories (a garage starts with Cars, Engine oil, Tyres, Batteries, Parts, Accessories and Workshop services; every store also gets the Litre, Set and Vehicle units). The merchant can change any of these afterwards, and every feature works the same way for every business type.
 
-**Demo garage:** `pnpm demo:garage` (development only) makes a complete made-up garage, Mekong Auto Garage at `/s/mekong-auto-garage`: 29 products across cars, parts and services, delivery set up, and 12 orders at every stage. Log in with "Demo garage" under Development login. `-- --reset` makes it again, `-- --remove` deletes it, `-- --photos <folder>` loads `<product key>.jpg` photos (default `sample/garage`), `-- --telegram-id <id>` gives it to a real Telegram account.
+**Demo garage:** `pnpm demo:garage` (development only) makes a complete made-up garage, Mekong Auto Garage at `/s/mekong-auto-garage`: 29 products across cars, parts and services, delivery set up, and 12 orders at every stage. Log in with "Sign in as Garage" under Development login. It is the shop every test starts from ("Garage first" below). `-- --reset` makes it again, `-- --remove` deletes it, `-- --photos <folder>` loads `<product key>.jpg` photos (default `sample/garage`), `-- --telegram-id <id>` gives it to a real Telegram account.
+
+### Garage first
+
+Decided 2026-10-28, changed the same day. **Khmio is the main brand: every part of a small business in one simple app** — and the garage leads the testing, so every change is tried smoothly on real pages with one complete, realistic shop, the Demo Garage, before the other businesses.
+
+- **Sign-up is open to every business type** (`OFFERED_BUSINESS_TYPES` in `packages/shared/business.ts` lists them all). The website shows the garage as **Available** (the most tested) and the other industries as **Beta** (free to try, still being tested with real sellers). Taking a type out of that list hides it again; the API accepts every type either way.
+- **Tested in this order:** the garage first, then one business at a time, in the order of "Business roadmap" below — each with its own sellers (`design/seller-test.md`). An industry's badge goes from Beta to Available when its sellers pass that test.
+- **Test data:** `pnpm demo:garage -- --reset` makes a fresh Demo Garage (29 products, 12 orders, delivery set up). `pnpm data:garage-only` clears a development database back to the garage: it lists every other shop (with its products, orders and customers) and the test merchants left without one, and deletes them, with their photo files, only when run with `-- --yes`. Admin users, platform settings, the audit log, the waitlist and the backups list stay. It never changes the database's structure and refuses to run in production.
+- **No mockups:** screens are built as live pages and approved on the Demo Garage (docs/engineering-standard.md "Live pages only"). The old mockups are in git history at tag v0.5.1.
+- **The website** (design/screens.md "Website redesign"): Khmio as an all-in-one app for Cambodia's small businesses — the app grid, "big business software, made small", the industries with their status.
+
+## Business roadmap
+
+Decided 2026-10-28. Which kinds of business Khmio's structure already serves, what each of the others needs, and the order to grow in — one business at a time, as "Garage first" says. In one line: Khmio is a **retail + point of sale + light inventory + repair** system for micro businesses — closest to Odoo's POS + Inventory + eCommerce + Repair together, without accounting, purchasing or manufacturing (yet).
+
+### What the structure covers, compared with an ERP
+
+| Khmio (tables and modules) | ERP equivalent (Odoo) | Coverage today |
+| --- | --- | --- |
+| Products, variants (Size × Colour), choices and add-ons, own fields, categories, brands, units | Sales › Products, variants, attributes | Strong |
+| Online orders and counter sales (`orders.channel`), invoices and receipts, VAT | eCommerce + Point of Sale | Strong |
+| Customers per shop, by phone, with their orders and spending | Contacts / CRM | List and history; no pipeline, no broadcasts yet |
+| Stock levels, movements, reservations; warehouses and branches | Inventory | Counts, sales, corrections and transfers; no lots, expiry dates or serial numbers |
+| Delivery zones, drivers, dispatch | Delivery | Good for local delivery; no courier APIs |
+| KHQR, cash, the shop's own QR | Payment providers | Good (real KHQR waits on the Bakong token) |
+| Cost frozen on each sale, profit report | Margins | Level 1 only ("Cost price"): no purchases or average cost yet |
+| Services with a preferred time (`services`) | Appointments | No staff calendar or capacity |
+| Tables and kitchen tickets (`tables`) | POS Restaurant | Basic |
+| Vehicles and job cards with parts and labour (`jobCards`) | Repair + Fleet | Good |
+| — | Purchase, Accounting, Manufacturing (recipes), HR and payroll, Rental | Not built |
+
+The business type only picks a new shop's starting modules (`BUSINESS_TYPE_MODULES` in `packages/shared/business-modules.ts`); the modules, not the type, decide what a shop can do. So most new businesses below need a type switched on and demo data, not new tables.
+
+### Which businesses fit
+
+**Fit now — no database change** (the type is open at sign-up; make its demo shop, test it with its sellers, and move its badge from Beta to Available):
+
+| Business | Type and modules | ERP apps it replaces |
+| --- | --- | --- |
+| Car garage, auto repair — **now** | garage: job cards, vehicles, parts and labour services, own fields | Repair + Fleet + POS + Inventory |
+| Motorbike repair, car wash, tyre and oil change | garage — the same structure (a vehicle by plate, a job card) | Repair |
+| Auto parts and accessories shop | shop: variants for size and fitment, own fields, stock | POS + Inventory + eCommerce |
+| Clothing, shoes, bags | shop: Size × Colour variants, stock per variant | POS + eCommerce |
+| Phone and electronics sales | shop: IMEI and warranty as own fields on each item sold | POS + Inventory (light serials) |
+| Cosmetics, home goods, books, stationery | shop: catalog and stock | POS + eCommerce |
+| Mini-mart, grocery | shop: units (kg, litre, piece), counter sales, stock | POS + Inventory |
+| Café, bubble tea, bakery counter | restaurant: choices (sugar, ice, +1 shot), counter sales | POS Restaurant |
+| Small restaurant | restaurant: tables and kitchen tickets | POS Restaurant |
+| Salon, barber, spa, laundry, cleaning | service: services with a preferred time, no stock, no delivery | Appointments (light) |
+| Facebook and TikTok sellers | shop: shop link, delivery, KHQR or cash on delivery | eCommerce |
+
+**Fit with a small, add-only change** (a new column or a widened table, never a rebuild):
+
+| Business | What's missing | Size |
+| --- | --- | --- |
+| Phone and computer repair | Job cards belong to a vehicle; widen it to "the item being repaired" (a device by IMEI or serial as well as a car by plate) | Small |
+| Mini-mart with a scanner | A barcode on each product option, and scanning at the counter | Small |
+| Bakery and cake pre-orders | A preferred date on items, not only on services | Small |
+| Pharmacy | Lot and expiry date on stock movements; sell the oldest first | Small–medium |
+| Wholesale distributor | Wholesale prices exist; needs price lists per customer and pay-later credit | Medium |
+| Any shop that buys stock to resell | Suppliers and purchases that carry their cost — "Cost price" level 2 (moving average) | Medium |
+
+**Needs a new module** (its own roadmap step, like a separate ERP app):
+
+| Business | Missing piece | ERP app |
+| --- | --- | --- |
+| Food production, bakery with recipes | Recipes (bill of materials) that use up ingredient stock | Manufacturing |
+| Car and motorbike rental | Bookings by date range, and what's free when | Rental |
+| Hotel, guesthouse | Rooms and nights | Hotel |
+| Clinic, dental | Patient records and their privacy rules | Medical |
+| Tutoring, schools | Classes, students, fees | **Khmio Class** (docs/platform-launch-plan.md) |
+| Landlords | Rooms, tenants, monthly rent | **Khmio Rent** (docs/platform-launch-plan.md) |
+| Bookkeeping | Journal, ledger, tax filing | Accounting |
+| Larger teams | Roles beyond owner and staff, shifts, payroll | HR / Payroll |
+
+### How a business is switched on
+
+The same five steps every time, so each one is tested as smoothly as the garage:
+
+1. **Demo shop:** a script like `pnpm demo:garage` for that business (`demo:<type>`), with realistic products, customers and orders at every stage.
+2. **Open:** the type is in `OFFERED_BUSINESS_TYPES` (every type is, since 2026-10-28); run lint, typecheck, tests and the end-to-end checks.
+3. **Test:** 3–5 owners of that business on the live app, with `design/seller-test.md` (its words adjusted to the business).
+4. **Fix:** anything that stopped two or more of them, on the live screen, before the next business.
+5. **Record:** a line in "Where we are now", and the business's row here moves to done.
+
+### Next actions to grow, in order
+
+Each step starts only when the one before it is done ("Done when"). Steps with "no database change" are only a switch, demo data and testing.
+
+| # | Action | What it takes | Done when |
+| --- | --- | --- | --- |
+| 1 | **Garage live** | Step 8 (go live), gate G2 with garage owners, real KHQR once the Bakong token arrives | Real garages take real orders and payments for two weeks |
+| 2 | **The garage family**: motorbike repair, car wash, tyre and oil shops | No database change: they are the garage type; demo data and wording for each | One shop of each kind uses Khmio for a week |
+| 3 | **Auto parts shop** (type `shop`) | `demo:shop` as a parts shop; "Cost price" level 2 (purchases with cost and supplier, the moving average, stock value) is built, with suppliers and bills of many lines and returns to the supplier | A parts shop records a purchase and its profit report uses the average cost |
+| 4 | **Phone shop, then phone repair** | Phone shop: no database change (IMEI and warranty as own fields). Phone repair: widen job cards from vehicles to devices (add-only migration) | A phone repair shop runs job cards for phones |
+| 5 | **Café and restaurant** (type `restaurant`) | Switch on `restaurant`; demo data. Recipes (ingredients used up per drink) later, only if cafés ask | A café runs a full day at the counter and the kitchen |
+| 6 | **Salon and services** (type `service`) | Switch on `service`; demo data. Staff calendar and capacity later, only if salons ask | A salon takes bookings for a week |
+| 7 | **Retail at large**: clothing, cosmetics, mini-mart, online sellers | No new type: `shop` is on since step 3 (switch on `other` too, for anything that fits no type); demo data per kind; barcodes for mini-marts; customer broadcasts on Telegram (Release 3) | Sellers of three kinds use it without help |
+| 8 | **Bigger shops** | Wholesale price lists and credit, pharmacy lots and expiry, staff roles, reports (S17), discounts (S15) — in the order sellers ask | Each one is asked for by several sellers before it's built |
+| 9 | **New products** | Khmio Class and Khmio Rent, per docs/platform-launch-plan.md and docs/platform-roadmap.md | Their own gates there |
+
+Steps 2–7 also feed the plans: a business that needs stock, branches or wholesale is a Pro or Advance customer ("Subscription tiers").
 
 ## Workflows from start to end
 
-Everything the platform does is one of six workflows. Each one names the roadmap step that builds it; the screens for all of them already exist as approved mockups.
+Everything the platform does is one of six workflows. Each one names the roadmap step that builds it; every screen is specified in design/screens.md.
 
 | # | Workflow | Who starts it | Ends when | Built in |
 | --- | --- | --- | --- | --- |
@@ -370,8 +473,8 @@ Design for a cheap Android phone, one thumb, inside the Telegram or Facebook in-
 
 The super-admin area (laptop-first, still usable on a phone) grows by adding pages, so every page follows the same frame:
 
-- **Menu:** defined once in `apps/web/components/admin-frame/admin-nav.ts` (one frame for the live admin and its mockup) — grouped sections, each item a label, icon, route and optional badge count. Adding a page = one entry there plus the page folder. Unbuilt entries set `comingSoon` and show a standard placeholder until built. Laptop: a sidebar that collapses to icons; phone/tablet: the same menu in a drawer (a bottom tab bar can't hold 10+ items). Groups fold open/closed (remembered per viewer; the group holding the current page always opens), one highlight slides to the current page, only the menu scrolls (logo and collapse button stay put) and keeps the current page in view, and pages fade in on change. All motion is off for viewers who ask for reduced motion.
-- **Every page** starts with a page header (title, one-line description, actions) and uses the shared kit (`packages/ui` blocks, the same for the live admin and its mockup — never a copy in a page folder): stat cards, status pills, data toolbar (search + filter chips), table on laptop / cards below, empty state, pagination, side detail panel, and a confirm dialog for risky actions.
+- **Menu:** defined once in `apps/web/components/admin-frame/admin-nav.ts` (one frame for every admin page) — grouped sections, each item a label, icon, route and optional badge count. Adding a page = one entry there plus the page folder. Unbuilt entries have `live: false` and show a standard "Soon" page until built. Laptop: a sidebar that collapses to icons; phone/tablet: the same menu in a drawer (a bottom tab bar can't hold 10+ items). Groups fold open/closed (remembered per viewer; the group holding the current page always opens), one highlight slides to the current page, only the menu scrolls (logo and collapse button stay put) and keeps the current page in view, and pages fade in on change. All motion is off for viewers who ask for reduced motion.
+- **Every page** starts with a page header (title, one-line description, actions) and uses the shared kit (`packages/ui` blocks — never a copy in a page folder): stat cards, status pills, data toolbar (search + filter chips), table on laptop / cards below, empty state, pagination, side detail panel, and a confirm dialog for risky actions.
 - **Every form** — admin, merchant and buyer — follows one standard (`apps/web/components/form-ui.tsx`): form sections (title and help beside the fields on laptop, above them on narrow merchant forms), edits kept in a draft until Save, a sticky Save/Cancel bar that's only active once something changed, and a Zod schema from `packages/shared` (`product.ts`, `store.ts`, `checkout.ts`, `stock.ts`, `admin-settings.ts`) — the same schema the API validates with. Schemas report problems as error codes (`form-errors.ts`), never English text; the screen shows each code in the viewer's language from the `FormErrors` messages, and the API returns the same codes per field. Price and quantity boxes are read with `parseUsdInput` / `parseKhrInput` / `parseQuantityInput`, so a typo is rejected, never silently rounded. Values owned by code (like plan rules) are shown read-only, never edited in the UI.
 - **Every admin change** is written to the audit log.
 
@@ -514,7 +617,7 @@ sequenceDiagram
 
 ## Database schema
 
-The tables below are what the approved mockups need (design/screens.md). Value lists in brackets — statuses, reasons, roles — are defined once in `packages/shared` and the database uses the same names. Every table has `id`, `created_at` and `updated_at`; they're left out of the lists. Money columns are whole numbers: `_usd_cents`, `_khr`, or `_minor` next to a `currency` column.
+The tables below are what the screens need (design/screens.md). Value lists in brackets — statuses, reasons, roles — are defined once in `packages/shared` and the database uses the same names. Every table has `id`, `created_at` and `updated_at`; they're left out of the lists. Money columns are whole numbers: `_usd_cents`, `_khr`, or `_minor` next to a `currency` column.
 
 **People and login**
 
@@ -558,7 +661,7 @@ KYC belongs to the person, not the shop: the ID is the owner's. A shop shows "Ve
 
 **Every product has at least one variant.** A product with no options gets one default variant (`is_default`, blank label) that the seller never sees. Prices, stock and order lines then always point at a variant — there is no "product or variant" special case anywhere in the code. A hidden product (`is_visible` false) stays in the dashboard, leaves the shop, and is dropped from carts; nothing is deleted.
 
-Promo codes are sample data in the mockups. Their table comes with the Discounts screen (phase 3).
+Promo codes have no table yet: it comes with the Discounts screen (phase 3).
 
 **Stock (Pro and Advance)**
 
@@ -614,6 +717,12 @@ What each admin role may do is in `packages/shared/src/admin-roles.ts` and is en
 - Show both currencies wherever a price appears: the buyer's chosen currency large/primary, the other currency as a small "≈" reference, computed with the same rate and the same round-then-sum rule everywhere it's shown (cart, checkout, KHQR screen, order success) so the numbers never disagree with each other.
 - The merchant sets `usd_to_khr_rate` in Settings; the platform clamps it to a sane band around the market rate (for example ±5%, exact band TBD) so a mistyped rate can't badly misprice an order. Reject or clamp on save, not silently at checkout.
 - **Payment verification never re-converts currency.** The order is created with one fixed `currency` and `total_minor`; the provider (Bakong or PayWay) is asked for exactly that currency and amount; a callback or poll result is accepted only when the provider's reported currency *and* amount are an exact integer match to the order's stored total. Cross-currency comparison must never happen at this layer — a rate change or rounding difference must never be able to mark the wrong amount as paid. (This sharpens the existing "Rules for every provider" rule below — it's the same rule, stated precisely for the multi-currency case.)
+
+**Cost price (the seller's only).** Khmio's costing standard is the **moving weighted average**, the method of ERPNext, Odoo (AVCO) and most POS apps, and accepted by CIFRS; it is built in levels, each only adding to the last (decided 2026-10-28):
+
+- **Level 1 (every plan; the profit report is Pro):** the seller types what one item costs, as **one amount in one currency per product** (`product_variants.cost_minor` + `cost_currency`; both or neither). A sale freezes it on the line (`order_items.unit_cost_minor`), converted into the order's currency with the order's `exchange_rate_used` and rounded per line, like prices. Editing a cost never changes an old order's profit; a line with no cost is "cost missing", never guessed; the shop page never receives a cost.
+- **Level 2 (Pro with stock) — built 2026-10-28:** a purchase (Stock › stock in) carries its cost of one, typed in the product's one cost currency (a purchase in the other currency is refused; a product without a cost yet picks it there), and an optional supplier name. Each purchase sets the option's cost to the moving average: (on hand × old cost + bought × new cost) ÷ (on hand + bought), rounded to a whole cent or riel; a purchase without a cost keeps it. The option's row and count are locked while it's worked out (`apps/api/src/stock/stock.ts`, `movingAverageCost` in `packages/shared/profit.ts`). The Stock page shows the stock value (on hand × cost, dollars and riel apart, and how many items have no cost yet). Returns (a cancelled order, a voided sale) put the stock back and keep the average — decided 2026-10-28, simpler than re-averaging, off by a cent or a riel at most. Migration `purchase_cost`. **Suppliers and bills (built 2026-10-28):** a purchase is one supplier bill (`purchases` + `purchase_lines`, numbered per shop, one currency per bill — since 2026-10-29 a line whose product keeps its cost in the other currency is turned once into it at the bill's rate, which the bill keeps: see "Bills in either currency" below), saved all at once with the cost required on every line; quick stock in is a one-line bill. Bills are never edited (the app's database user can't update or delete them); a mistake goes back with a return (kind `return`, linked to its bill), at most what the bill brought in less earlier returns and what's on the shelf, keeping the average. Suppliers are kept per shop (name unique whatever the case), archived, never deleted (`apps/api/src/purchases`, `packages/shared/purchases.ts`). Migration `purchases`. **Stock count and the form (built 2026-10-28):** a count (`POST /stock/count`) saves every difference as a count correction in one transaction; while the plan follows stock, saving the product form keeps a tracked option's cost and cost currency (its bills' average), so the average is never typed over. No database change. **Numbers, reorder and payments (built 2026-10-28):** documents number per shop and kind through `document_counters` (BILL-, RET-, PAY- prefixes in `packages/shared/documents.ts`; migration `document_numbers`); items get a reorder minimum/maximum (`stock_levels.reorder_min/max`, `needsReorder` / `suggestedOrder` in `packages/shared/stock.ts`; migration `reorder_levels`) and "Create bill" fills a new bill from what's to reorder; bills are paid now or on credit with a due day, with payments (`purchase_payments`, never edited, voided once) and what's owed = total − returns − payments (`billPaymentState`, `apps/api/src/purchases/bill-balances.ts`; migration `bill_payments`, which fills in existing bills as paid). **Bills in either currency (built 2026-10-29, the ERP way — Odoo, ERPNext):** an item keeps one cost currency, but a bill may be in either; a line in the other currency is turned into the item's currency once, when the bill is saved, at the bill's rate (riel per $1: the shop's rate unless the invoice says otherwise, within the platform's band), rounded per line like checkout (`itemCostOf` in `packages/shared/purchases.ts`, `apps/api/src/purchases/bill-costs.ts`). The bill keeps the rate (`purchases.exchange_rate_used`, empty when nothing was turned) and each line both its invoiced price and its cost in the item's currency (`purchase_lines.item_cost_minor/item_cost_currency`); the average and the profit report stay in one currency; the bill's total, payments and returns stay in the bill's currency. Migration `purchase_rates`. **Change stock and opening stock (built 2026-10-29):** stock that changes other than by a bill or a sale goes up or down with a reason, each reason one way (STOCK_CHANGE_REASONS in `packages/shared/stock.ts`: up — count higher, returned outside an order, free goods, other; down — damaged, expired, lost or stolen, used in the shop, given away, count lower, other), never touching the cost. Opening stock is what's on the shelf when an item starts being tracked, with its cost if known (it starts the average) and no bill (reason `opening_stock`; migrations `stock_reasons`, `opening_stock_cost`). **Received or not yet (built 2026-10-29):** a bill may be saved before its goods arrive (`purchases.received_at` empty); stock goes up — and each average moves, from what's on hand then — only when it's received, at once or later with "Received" (`apps/api/src/purchases/receive.ts`), once and never undone, by one statement that only a bill not yet received passes. Returns need a received bill; payments don't. Migration `bill_received`. **Stock counts as documents (built 2026-10-29, the ERP physical inventory):** a count is CNT-… (`stock_counts`, `stock_count_lines`; `apps/api/src/stock/counts.ts`, `packages/shared/stock-count.ts`), a draft over every item or chosen categories, saved as it's typed so it continues on any device; each line keeps what the app had when it was typed, so applying puts counted − expected onto today's stock and a sale made while counting is never taken for a loss. Applied once (each correction a count_correction linked to the count, each line's cost fixed for its value) or cancelled; one draft per shop. The old one-shot count route is gone. Migration `stock_counts`. **Bills & payables report (built 2026-10-29, no database change):** the usual accounts-payable report from the same balances (`payablesReport` in `packages/shared/payables.ts`, `GET /purchases/report`): you owe, overdue, due within 7 days, goods not received, payment standing × goods received, ageing by days past the due day (a bill with no due day is never late, like its standing), and by supplier — dollars and riel apart. Accounting entries and purchase orders before goods arrive are still to come (Advance).
+- **Level 3 (Advance, when sellers ask):** the average per branch, landed costs (delivery, import), suppliers and purchase orders, add-on and recipe costs; FIFO or per-IMEI cost only if a seller truly needs them.
 
 **Stock without overselling (Pro and Advance):** at checkout, one statement reserves stock at the shop's online location only if enough is free:
 
@@ -783,7 +892,7 @@ Prices checked on 2026-09-23 (Railway usage rates on 2026-10-02): [Vercel Hobby 
 
 One list, in order. Do not start a step until the one before it is "Done when" true. There are no week numbers: a solo build slips, and a date that is already wrong helps nobody — the checks are what matter.
 
-The screens are designed first as working mockups (design/screens.md). That part is finished for every release below, so each backend step replaces a mockup's sample data with the real thing; it does not design anything new.
+Every screen is specified first in design/screens.md; that part is finished for every release below. Each step builds its screens as live pages with their API — there are no mockups (docs/engineering-standard.md "Live pages only") — and they are tested with the Demo Garage first ("Garage first").
 
 ### Before any backend: three gates
 
@@ -791,8 +900,8 @@ These cost days, not weeks, and each one can change what gets built.
 
 | Gate | Do | Done when | Status |
 | --- | --- | --- | --- |
-| G1. Save the work | Commit the mockups; from here on, one branch per step, merged when its check passes | Nothing uncommitted on `main` at the end of any day | Done |
-| G2. Sellers try the mockups | Sit with 3–5 real sellers. On their own phone, each one: sets up a shop, adds a product, places an order as a buyer, then handles it as the seller. Watch; don't help (`design/seller-test.md`) | Every one finishes without getting stuck. Anything that stopped two or more of them is fixed in the mockup first | Sheet ready; record the results here |
+| G1. Save the work | Commit the work; from here on, one branch per step, merged when its check passes | Nothing uncommitted on `main` at the end of any day | Done |
+| G2. Sellers try the app | Sit with 3–5 real garage owners (garage first). On their own phone, each one: sets up a shop, adds a product, places an order as a buyer, then handles it as the seller. Watch; don't help (`design/seller-test.md`) | Every one finishes without getting stuck. Anything that stopped two or more of them is fixed on the live screen first | Sheet ready; record the results here |
 | G3. Bakong from the real host | Register the Bakong Open API token. From the server you plan to host on, create one KHQR and check it by MD5 after paying 100៛ | The check returns "paid" from that host. If Bakong refuses the host, choose Deployment Option B (or the small Cambodian checker) **now**, before payment code exists | Open — required before step 5 |
 
 ### Release 1 — First orders (free beta, 5–10 sellers)
@@ -1021,7 +1130,7 @@ Claude asks permission before running commands or editing files. Approve only wh
 **Good prompts are specific.** Compare:
 
 - Weak: "make checkout better"
-- Strong: "On /mockup/checkout, move the Pay in USD/KHR toggle above the payment cards, make the Place order button sticky, and show the total in the button."
+- Strong: "On /km/s/mekong-auto-garage/checkout, move the Pay in USD/KHR toggle above the payment cards, make the Place order button sticky, and show the total in the button."
 
 **Feedback with pictures:** take a screenshot, draw red circles on problems, save it to `design/feedback/`, then write "fix the issues marked in @design/feedback/checkout-1.png".
 
@@ -1047,11 +1156,11 @@ claude
 
 PostgreSQL installed on Windows runs by itself; with Docker, start it first with `pnpm db:up`.
 
-1. **Plan:** "Read CLAUDE.md. Today: build the checkout mockup from @design/screens.md. Propose a plan."
+1. **Plan:** "Read CLAUDE.md. Today: build the checkout page from @design/screens.md, with its API. Show the structure and propose a plan."
 2. **Correct the plan** if anything is wrong, then say "go".
 3. **Check it yourself** on your PC and on your phone (`http://<PC-IP>:3000` on the same Wi-Fi). Give feedback in words or with a marked-up screenshot.
 4. **Review the diff** in VS Code Source Control (Ctrl+Shift+G). Ask "explain this change" for anything unclear.
-5. **Save:** "Run lint, typecheck and tests, then commit with message 'feat: checkout mockup' and push."
+5. **Save:** "Run lint, typecheck and tests, then commit with message 'feat: checkout' and push."
 6. **Merge:** say "merge it". The branch is merged into `main` fast-forward (a straight history) and pushed; then check that GitHub Actions passes on `main`.
 7. **Reset:** `/clear` before the next feature.
 
@@ -1065,8 +1174,8 @@ The steps and their "Done when" checks are in "Roadmap: zero to live" above — 
 | --- | --- |
 | 1. Foundations | "Add a GitHub Actions workflow that runs lint, typecheck, tests and build on every pull request, and set up the staging environment from the Deployment section." |
 | 2. Data and login | "From the blueprint's Database schema, create the Prisma schema and first migration for the Release 1 tables, with RLS and a test proving merchant A can't read merchant B's orders. Then add Telegram Login with a server-side hash check." |
-| 3. Catalog | "Connect the product form and products list mockups to the real API, using productInputSchema from packages/shared. Photos upload to file storage; the database keeps only their keys." |
-| 4. Shop and checkout | "Connect the shop page, cart and checkout mockups to the real API. The order is created in one transaction with an idempotency key, with totals rounded per line and the rate frozen on the order." |
+| 3. Catalog | "Build the product form and products list as live pages on the real API, using productInputSchema from packages/shared. Photos upload to file storage; the database keeps only their keys." |
+| 4. Shop and checkout | "Build the shop page, cart and checkout as live pages on the real API. The order is created in one transaction with an idempotency key, with totals rounded per line and the rate frozen on the order." |
 | 5. KHQR | "Implement BakongKhqrProvider in packages/payments and a worker job that checks pending MD5s every 5 seconds, accepts only an exact amount and currency, and expires the order after 10 minutes." |
 | 6. Orders and Telegram | "Connect the seller order screens and the buyer order page. Every status change goes through applyOrderAction. Telegram bot in long-polling mode for development: order alerts with Confirm and Open buttons, checked against store membership." |
 | 7. Admin, the minimum | "Connect the admin merchants list, the extend-period action and the audit log to real data." |
@@ -1110,7 +1219,7 @@ The steps and their "Done when" checks are in "Roadmap: zero to live" above — 
 - [ ] Backup restored into a fresh database
 - [ ] Sentry alerts reach your Telegram
 - [ ] Khmer text checked by a native reader on a cheap Android phone
-- [ ] Terms of service and privacy policy published
+- [ ] Terms of service and privacy policy published — drafted 2026-10-28 (`/terms`, `/privacy`, marked Draft; `apps/web/site/content-legal.ts`): an advisor checks them, the operator's registered name replaces the placeholder, then `draft: false`
 - [ ] Company registration and e-commerce permit confirmed with a local advisor
 
 **Open questions**

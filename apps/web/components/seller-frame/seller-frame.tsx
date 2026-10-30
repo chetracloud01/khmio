@@ -45,8 +45,7 @@ export const HEADER_PILL =
 export const HEADER_PILL_TEXT = "sr-only min-[400px]:group-data-[compact=false]:not-sr-only";
 
 /**
- * The seller dashboard's frame (design/design-standard.md §2), the same for the
- * live dashboard (/m) and its mockup: on a phone the shop at the top and up to
+ * The seller dashboard's frame (/m; design/design-standard.md §2): on a phone the shop at the top and up to
  * five bottom tabs; from 768 px a sidebar with every section and no bottom
  * tabs. Pages put their own width inside (lists up to 1100 px, forms 720 px —
  * see SELLER_PAGE and SELLER_FORM). Header, tabs and sidebar don't print, so
@@ -57,7 +56,6 @@ export function SellerFrame({
   nav,
   homeHref,
   banner,
-  sidebarExtra,
   headerExtra,
   topBarExtra,
   sidebarFooter,
@@ -80,8 +78,6 @@ export function SellerFrame({
   homeHref: string;
   /** A notice across the top of the content (shop paused, plan ending …). */
   banner?: ReactNode;
-  /** Next to the shop in the sidebar (the mockup's app switcher). */
-  sidebarExtra?: ReactNode;
   /** At the right of the phone header. */
   headerExtra?: ReactNode;
   /** "teal" look: at the right of the laptop's top bar, before language and theme (e.g. "View my shop"). */
@@ -129,7 +125,7 @@ export function SellerFrame({
     <div className="flex min-w-0 items-center gap-3">
       <span className="relative shrink-0">
         {shop.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- the shop's own logo (uploaded, or a local preview in the mockup)
+          // eslint-disable-next-line @next/next/no-img-element -- the shop's own logo (uploaded)
           <img src={shop.logoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
         ) : (
           <span className={cn("flex h-10 w-10 items-center justify-center rounded-full text-base font-bold", onTeal ? "bg-nav-accent text-nav-bg" : "bg-brand text-on-brand")}>
@@ -164,7 +160,6 @@ export function SellerFrame({
       >
         <div className="flex items-center justify-between gap-2">
           {identity(teal)}
-          {sidebarExtra}
         </div>
         <nav className={cn("flex flex-1 flex-col gap-1 overflow-y-auto", teal && "nav-scroll")}>
           {nav.map((item) => {

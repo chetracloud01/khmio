@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { listQueryFromParams, listQuerySchemaFor, listQueryToSearchParams, type ListSpec } from "./list-query";
-import { ORDER_LIST_SPEC, orderStatusesForTab } from "./orders";
+import { ORDER_TABS, orderStatusesForTab } from "./orders";
 
 const spec: ListSpec = { sorts: ["date", "name"], chips: ["open", "done"], filters: { pay: ["cash", "online"] }, defaultSort: { key: "date", dir: "desc" } };
 const schema = listQuerySchemaFor(spec);
@@ -35,7 +35,7 @@ describe("list query", () => {
 
 describe("order list", () => {
   it("puts every status under exactly one tab", () => {
-    const tabs = [...ORDER_LIST_SPEC.chips, "awaiting" as const];
+    const tabs = [...ORDER_TABS, "awaiting" as const];
     const all = tabs.flatMap((tab) => orderStatusesForTab(tab));
     expect(new Set(all).size).toBe(all.length);
     expect(all).toHaveLength(11);

@@ -4,6 +4,8 @@
 // some phones have no Khmer dates, and the server's page and the phone's must agree.
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
+/** Hours in a day: a day's sales are drawn hour by hour. */
+export const HOURS_IN_DAY = 24;
 
 export const PHNOM_PENH_OFFSET_MS = 7 * 60 * 60 * 1000;
 
@@ -41,3 +43,13 @@ export const phnomPenhDay = (at: Date | string): string => phnomPenhTime(at).day
 
 /** Midnight in Phnom Penh on the day of `at`, as a moment ("orders today" counts from here, not from midnight UTC). */
 export const startOfPhnomPenhDay = (at: Date | string): Date => new Date(new Date(`${phnomPenhDay(at)}T00:00:00Z`).getTime() - PHNOM_PENH_OFFSET_MS);
+
+/** A day key ("2026-10-28") moved by whole days (negative goes back): calendar days, whatever the hour or zone. */
+export function addDays(dayKey: string, days: number): string {
+  return new Date(Date.parse(`${dayKey}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Whole calendar days from one day key to another (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
+}

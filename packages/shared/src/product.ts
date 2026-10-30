@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { rawCustomValuesSchema } from "./custom-fields";
+import { currencySchema, minorAmountSchema } from "./money";
 import { productKindSchema } from "./services";
 import { choiceGroupInputSchema, MAX_CHOICE_GROUPS, MAX_VARIANT_GROUPS, variantGroupInputSchema } from "./product-options";
 
@@ -13,14 +14,7 @@ export const MAX_DISCOUNT_PERCENT = 90;
 export const MAX_PRODUCT_OPTIONS = 50;
 export const MAX_PRODUCT_DESCRIPTION_LENGTH = 1000;
 
-/** Cents or riel. The cap stops a slipped finger (an extra few zeros) from saving. */
-const amountSchema = z
-  .number({ invalid_type_error: "price_invalid" })
-  .int("price_invalid")
-  .min(0, "price_invalid")
-  .max(1_000_000_000, "price_invalid");
-
-const optionalAmount = amountSchema.optional();
+const optionalAmount = minorAmountSchema.optional();
 
 const priceFields = {
   /** Price the storefront shows buyers. */
@@ -29,6 +23,8 @@ const priceFields = {
   /** Bulk/B2B price — Pro and Advance only; kept, hidden, on lower plans. */
   wholesalePriceUsdCents: optionalAmount,
   wholesalePriceKhr: optionalAmount,
+  /** What one costs the shop (the seller's only, for profit), in the product's costCurrency; blank = not known. */
+  costMinor: optionalAmount,
 };
 
 type Prices = { [K in keyof typeof priceFields]?: number };
@@ -85,6 +81,8 @@ export const productInputSchema = z
       .max(MAX_DISCOUNT_PERCENT, "discount_range")
       .optional(),
     ...priceFields,
+    /** The one currency of the product's costs, for all its options (docs/blueprint.md "Cost price"); needed once any cost is given. */
+    costCurrency: currencySchema.optional(),
     /** When present, prices live on each option and the product-level prices are ignored. */
     options: z.array(productOptionInputSchema).max(MAX_PRODUCT_OPTIONS, "too_long").optional(),
     /** Size, Colour…: each option is one value of each (Features › options). */
@@ -97,6 +95,8 @@ export const productInputSchema = z
     kind: productKindSchema.default("item"),
   })
   .superRefine((product, ctx) => {
+    const costGiven = product.options?.length ? product.options.some((option) => option.costMinor !== undefined) : product.costMinor !== undefined;
+    if (costGiven && !product.costCurrency) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["costCurrency"] });
     if (!product.options?.length) {
       checkPrices(product, ctx, []);
       if (product.variantGroups.length) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "required", path: ["options"] });

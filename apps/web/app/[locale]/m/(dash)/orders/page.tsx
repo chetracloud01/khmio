@@ -1,16 +1,23 @@
 "use client";
 
 import { DAY_MS, formatKhmerPhoneLocal, getOrderTab, listQueryToSearchParams, ORDER_TABS, phnomPenhDay, type ListQuery } from "@khmio/shared";
-import { cn, Mio, Notice, PageHeader } from "@khmio/ui";
-import { AlertTriangle, Phone, Store, Truck } from "lucide-react";
+import { buttonVariants, cn, Mio, Notice, PageHeader } from "@khmio/ui";
+import { AlertTriangle, ChartColumn, HandCoins, Store, Truck } from "lucide-react";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { CallButton } from "@/components/call-button";
+import { CustomersLink } from "@/components/customers/customers-link";
+import { StockLink } from "@/components/stock/stock-link";
+import { isOrderTileView, OrderStatusTiles, type OrderTileView } from "@/components/orders/order-status-tiles";
 import { DataGrid, DataGridHighlight, type DataGridColumn, type DataGridGroup } from "@/components/data-grid";
 import { formatMoney, ORDER_STATUS_TONE, ORDER_TAB_ICON, ORDER_TAB_TONE, orderStatusIcon, TONE_TEXT, useOrderText } from "@/components/order-ui";
 import { OrderStatusCircle } from "@/components/seller-cards";
 import { SELLER_PAGE } from "@/components/seller-frame/seller-frame";
-import { api, listPageSchema, type SellerOrder, sellerOrderSchema } from "@/lib/api";
+import { api, listPageSchema, type OrderTiles, orderTilesSchema, type SellerOrder, sellerOrderSchema } from "@/lib/api";
+import { listAddress } from "@/lib/list-address";
+import { useMerchant } from "../merchant-context";
 import { useDateText } from "@/components/use-date-text";
 import { OrderNextStep } from "../order-next-step";
 
@@ -34,7 +41,28 @@ export default function OrdersPage() {
   /** Bumped after an order moves on, so the list reads its page again. */
   const [reloadKey, setReloadKey] = useState(0);
   const load = useCallback(() => setReloadKey((key) => key + 1), []);
-  const loadPage = useCallback((query: ListQuery) => api(`/orders/page?${listQueryToSearchParams(query)}`, listPageSchema(sellerOrderSchema)), []);
+  const { store } = useMerchant();
+  const [tiles, setTiles] = useState<OrderTiles | null>(null);
+  const [activeTile, setActiveTile] = useState<OrderTileView | null>(null);
+  // Bumped when a tile is tapped: the list starts again from the address the tile wrote.
+  const [listKey, setListKey] = useState(0);
+  // The tiles only: without them the list still works. Again after an order moves on.
+  useEffect(() => {
+    api("/orders/status", orderTilesSchema).then(setTiles, () => setTiles(null));
+  }, [reloadKey]);
+  const loadPage = useCallback(async (query: ListQuery) => {
+    // The tile the list now shows, whether a tile or the chips set it.
+    setActiveTile(isOrderTileView(query.chip) ? query.chip : null);
+    return api(`/orders/page?${listQueryToSearchParams(query)}`, listPageSchema(sellerOrderSchema));
+  }, []);
+
+  function selectTile(view: OrderTileView | null) {
+    // Tapped again: every order (not the list's first-open tab).
+    const search = listAddress(window.location.search.replace(/^\?/, ""), { chip: view ?? "all" });
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}?${search}`);
+    setActiveTile(view);
+    setListKey((key) => key + 1);
+  }
 
   const href = (order: SellerOrder) => `/${locale}/m/orders/${order.id}`;
   /** The one next step as a compact pill: a button when it's one tap, otherwise a link into the order (shared with the home page). */
@@ -43,16 +71,7 @@ export default function OrdersPage() {
       <OrderNextStep order={order} onDone={load} onProblem={setProblem} />
     </div>
   );
-  const callButton = (order: SellerOrder) => (
-    <a
-      href={`tel:+${order.buyerPhone}`}
-      onClick={(event) => event.stopPropagation()}
-      aria-label={t("callBuyer", { name: order.buyerName })}
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand hover:bg-brand/15"
-    >
-      <Phone className="h-4 w-4" aria-hidden="true" />
-    </a>
-  );
+  const callButton = (order: SellerOrder) => <CallButton phone={order.buyerPhone} label={t("callBuyer", { name: order.buyerName })} />;
   /** Minutes an order has waited to be confirmed, when that's too long; null otherwise. */
   const lateBy = (order: SellerOrder): number | null => {
     if (getOrderTab(order.status) !== "to_confirm") return null;
@@ -179,7 +198,19 @@ export default function OrdersPage() {
 
   return (
     <div className={`${SELLER_PAGE} gap-4`}>
-      <PageHeader title={t("title")} description={t("description")} />
+      <PageHeader title={t("title")} description={t("description")} actions={
+          <>
+            <Link href={`/${locale}/m/reports/sales`} className={buttonVariants({ variant: "secondary" })}>
+              <ChartColumn className="h-4 w-4" aria-hidden="true" />
+              {t("reportLink")}
+            </Link>
+            <StockLink href={`/${locale}/m/stock`} />
+            <CustomersLink href={`/${locale}/m/customers`} />
+          </>
+        }
+      />
+
+      {tiles && <OrderStatusTiles figures={tiles} mainCurrency={store.defaultCurrency} rate={store.usdToKhrRate} active={activeTile} onSelect={selectTile} todayHref={`/${locale}/m/reports/sales?period=today`} />}
 
       {problem && (
         <Notice tone="warning" role="alert">
@@ -188,13 +219,17 @@ export default function OrdersPage() {
       )}
 
       <DataGrid
+        key={listKey}
         rowNumbers
         syncUrl
         server={{ load: loadPage, reloadKey }}
         getRowId={(order) => order.id}
         columns={columns}
         searchPlaceholder={t("searchPlaceholder")}
-        chips={ORDER_TABS.map((tab) => ({ value: tab, label: t(`tab_${tab}`), icon: ORDER_TAB_ICON[tab], iconClass: TONE_TEXT[ORDER_TAB_TONE[tab]] }))}
+        chips={[
+          ...ORDER_TABS.map((tab) => ({ value: tab, label: t(`tab_${tab}`), icon: ORDER_TAB_ICON[tab], iconClass: TONE_TEXT[ORDER_TAB_TONE[tab]] })),
+          { value: "to_collect", label: t("tab_to_collect"), icon: HandCoins, iconClass: TONE_TEXT.info },
+        ]}
         // Open on what needs the seller first; everything when nothing does.
         initialChip="to_confirm"
         initialChipFallback="all"

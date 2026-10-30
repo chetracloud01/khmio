@@ -1,15 +1,18 @@
 import { withContext, type AppDb } from "@khmio/db";
-import { lineFieldsRequestSchema, orderActionRequestSchema } from "@khmio/shared";
+import { lineFieldsRequestSchema, orderActionRequestSchema, reportQuerySchema } from "@khmio/shared";
 import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { APP_DB } from "../db";
 import { FILE_STORAGE, type FileStorage } from "../files/storage";
-import { assertStoreWritable } from "../merchant/plan";
+import { assertPlanFeature, assertStoreWritable, storePlan } from "../merchant/plan";
 import { CurrentStore, MerchantStoreGuard, type MerchantStore } from "../merchant/store.guard";
 import { assertModule } from "../modules/modules";
 import { readSellerInvoice } from "./invoice";
 import { saveLineFields } from "./line-fields";
 import { readOrderDetail, runSellerAction } from "./order-actions";
 import { parseOrderListQuery, readOrderList, readOrderListPage, readStoreSlug } from "./order-list";
+import { readProfitLoss } from "./profit-loss";
+import { readOrderStatus } from "./order-status";
+import { readSalesReport } from "./sales-report";
 import { sellerSummary } from "./summary";
 
 /** The seller's orders (roadmap steps 4 and 6): the list, one order in full, and moving it on. */
@@ -37,10 +40,33 @@ export class OrdersController {
     return withContext(this.app, context, async (tx) => readOrderListPage(tx, context.storeId, await readStoreSlug(tx, context.storeId), query));
   }
 
-  /** The home page's numbers: waiting orders, today's sales, cash to collect, 30 days of totals, best sellers. Before ":id", so "summary" isn't read as an order id. */
+  /** The Orders page's status tiles: how many orders and how much at each step, cash to collect, today's sales — over every order. Before ":id". */
+  @Get("status")
+  async status(@CurrentStore() context: MerchantStore) {
+    return withContext(this.app, context, (tx) => readOrderStatus(tx, context.storeId));
+  }
+
+  /** What needs the seller now: orders waiting for a step, cash to collect (the dashboard and the Orders badge). Before ":id", so "summary" isn't read as an order id. */
   @Get("summary")
   async summary(@CurrentStore() context: MerchantStore) {
     return withContext(this.app, context, (tx) => sellerSummary(tx, context.storeId));
+  }
+
+  /** The profit and loss report (Pro; design/screens.md S17 "Profit & loss"): the statement for a period, sales to profit. Before ":id". */
+  @Get("profit-loss")
+  async profitLoss(@CurrentStore() context: MerchantStore, @Query() params: unknown) {
+    const query = reportQuerySchema.parse(params);
+    return withContext(this.app, context, async (tx) => {
+      assertPlanFeature((await storePlan(tx, context.storeId)).plan, "profitReport");
+      return readProfitLoss(tx, context.storeId, query);
+    });
+  }
+
+  /** The sales report (design/screens.md S17 "Sales"), every plan: sales in the shop and online for a period. Before ":id". */
+  @Get("report")
+  async report(@CurrentStore() context: MerchantStore, @Query() params: unknown) {
+    const query = reportQuerySchema.parse(params);
+    return withContext(this.app, context, (tx) => readSalesReport(tx, context.storeId, query));
   }
 
   @Get(":id")

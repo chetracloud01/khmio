@@ -9,7 +9,7 @@ import { MenuList } from "@/components/menu-list";
 import { formatMoney } from "@/components/order-ui";
 import { useShopContacts } from "./use-shop-contacts";
 
-/** Everything the sheet shows, from the live shop or its mockup. */
+/** Everything the sheet shows, from the shop page or the styleguide's sample. */
 export interface ShopInfoData {
   name: string;
   /** The logo picture, or the shop's first letter. */
@@ -89,7 +89,7 @@ export function ShopInfoButton({ onClick }: { onClick: () => void }) {
  * The buyer's Shop info (design/screens.md B1): the shop, its round buttons —
  * Call, Map, Telegram, Facebook, each opening the phone's own app — then
  * Contact, Delivery and How to pay, each a list of rows. Anything the seller
- * left empty is left out. One sheet for the live shop and its mockup.
+ * left empty is left out.
  */
 export function ShopInfoSheet({ open, onClose, shop }: { open: boolean; onClose: () => void; shop: ShopInfoData }) {
   const t = useTranslations("Storefront");

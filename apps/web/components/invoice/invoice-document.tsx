@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import QRCode from "qrcode";
 import { forwardRef, useEffect, useState } from "react";
 import { formatMoney } from "@/components/order-ui";
+import { Paper, PaperDivider, PaperHeader, PaperRow, PaperStamp, type PaperShop, type PaperSize, type StampTone } from "../paper/paper-parts";
 import { useDateText } from "../use-date-text";
 
 // The invoice / receipt (design/screens.md B7): one document for the buyer
@@ -13,20 +14,9 @@ import { useDateText } from "../use-date-text";
 // as an image or PDF and shared. Every amount is the order's saved amount —
 // nothing here recalculates a price.
 
-export type InvoiceSize = "a4" | "receipt";
+export type InvoiceSize = PaperSize;
 
-/** Width of the saved image / PDF page: A4 at 96 dpi, and an 80 mm roll's printable 72 mm. */
-export const INVOICE_EXPORT_WIDTH: Record<InvoiceSize, number> = { a4: 794, receipt: 302 };
-
-export interface InvoiceShop {
-  name: string;
-  logoUrl?: string | null;
-  /** 855… */
-  phone?: string;
-  address?: string;
-  taxNumber?: string;
-  telegram?: string;
-  facebook?: string;
+export interface InvoiceShop extends PaperShop {
   note?: string;
 }
 
@@ -67,11 +57,7 @@ export interface InvoiceData {
   trackUrl?: string;
 }
 
-const STAMP: Record<InvoiceState, string> = {
-  unpaid: "border-paper-unpaid text-paper-unpaid",
-  paid: "border-paper-paid text-paper-paid",
-  cancelled: "border-paper-void text-paper-void",
-};
+const STAMP_TONE: Record<InvoiceState, StampTone> = { unpaid: "unpaid", paid: "paid", cancelled: "void" };
 
 export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; size: InvoiceSize; fixedWidth?: boolean; className?: string }>(
   function InvoiceDocument({ data, size, fixedWidth = false, className }, ref) {
@@ -95,35 +81,15 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
     const date = dateTime(data.placedAtIso);
     const otherCurrency: Currency = data.currency === "USD" ? "KHR" : "USD";
     const money = (amount: number) => formatMoney(amount, data.currency);
-    const contacts = [data.shop.phone && formatKhmerPhoneLocal(data.shop.phone), data.shop.telegram, data.shop.facebook].filter(Boolean);
-
-    const logo = data.shop.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element -- also drawn into the saved image, which needs a plain <img>
-      <img src={data.shop.logoUrl} alt="" className={cn("shrink-0 rounded-xl object-cover", receipt ? "h-14 w-14" : "h-16 w-16")} />
-    ) : (
-      <span
-        aria-hidden="true"
-        className={cn("flex shrink-0 items-center justify-center rounded-xl bg-paper-brand font-bold text-paper", receipt ? "h-14 w-14 text-2xl" : "h-16 w-16 text-3xl")}
-      >
-        {data.shop.name.charAt(0).toUpperCase()}
-      </span>
-    );
-
-    const stamp = (
-      <span className={cn("inline-block -rotate-6 rounded-md border-2 px-3 py-0.5 text-sm font-bold uppercase leading-normal tracking-wide", STAMP[data.state])}>
-        {t(`stamp_${data.state}`)}
-      </span>
-    );
-
     const totals = (
       <dl className="flex flex-col gap-1 text-sm">
-        <Row label={t("subtotal")} value={money(data.subtotal)} />
-        {data.discount > 0 && <Row label={t("discount")} value={`−${money(data.discount)}`} />}
+        <PaperRow label={t("subtotal")} value={money(data.subtotal)} />
+        {data.discount > 0 && <PaperRow label={t("discount")} value={`−${money(data.discount)}`} />}
         {/* Sold at the counter: nothing was delivered or picked up. */}
         {data.buyer && !data.inStore && (
-          <Row label={data.buyer.pickup ? t("pickup") : t("delivery")} value={data.deliveryFee === 0 ? t("free") : money(data.deliveryFee)} />
+          <PaperRow label={data.buyer.pickup ? t("pickup") : t("delivery")} value={data.deliveryFee === 0 ? t("free") : money(data.deliveryFee)} />
         )}
-        {data.vatPercent > 0 && <Row label={t("vat", { percent: data.vatPercent })} value={money(data.vat)} />}
+        {data.vatPercent > 0 && <PaperRow label={t("vat", { percent: data.vatPercent })} value={money(data.vat)} />}
         <div className="mt-1 flex items-baseline justify-between gap-3 border-t-2 border-paper-ink pt-2">
           <dt className="font-bold">{t("total")}</dt>
           <dd className="text-right">
@@ -152,41 +118,23 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
     );
 
     return (
-      <div
-        ref={ref}
-        className={cn(
-          "relative mx-auto flex flex-col bg-paper font-khmer leading-relaxed text-paper-ink",
-          receipt ? "gap-3 px-4 py-5" : wide ? "gap-6 p-10" : "gap-6 p-5 sm:p-10",
-          fixedWidth ? "" : receipt ? "w-full max-w-[302px]" : "w-full max-w-[794px]",
-          className,
-        )}
-        style={fixedWidth ? { width: INVOICE_EXPORT_WIDTH[size] } : undefined}
-      >
-        {/* Shop and document title */}
-        <header className={cn("flex gap-4", receipt ? "flex-col items-center text-center" : "flex-wrap items-start justify-between")}>
-          <div className={cn("flex min-w-0 gap-3", receipt ? "flex-col items-center" : "items-start")}>
-            {logo}
-            <div className="min-w-0">
-              <p className="text-lg font-bold leading-normal">{data.shop.name}</p>
-              {data.shop.address && <p className="text-xs text-paper-muted">{data.shop.address}</p>}
-              {contacts.length > 0 && <p className="text-xs text-paper-muted">{contacts.join(" · ")}</p>}
-              {data.shop.taxNumber && <p className="text-xs text-paper-muted">{t("taxNumber", { number: data.shop.taxNumber })}</p>}
-            </div>
-          </div>
-          <div className={cn("flex flex-col gap-1", receipt ? "items-center" : "items-end text-right")}>
-            <h1 className="text-2xl font-bold uppercase leading-normal tracking-wide">{title}</h1>
-            {stamp}
-          </div>
-        </header>
+      <Paper ref={ref} size={size} fixedWidth={fixedWidth} className={className}>
+        <PaperHeader
+          shop={data.shop}
+          taxText={data.shop.taxNumber ? t("taxNumber", { number: data.shop.taxNumber }) : undefined}
+          title={title}
+          stamps={<PaperStamp tone={STAMP_TONE[data.state]}>{t(`stamp_${data.state}`)}</PaperStamp>}
+          receipt={receipt}
+        />
 
-        <Divider receipt={receipt} />
+        <PaperDivider receipt={receipt} />
 
         {/* Order facts and the customer */}
         <section className={cn("grid gap-4 text-sm", receipt ? "grid-cols-1" : wide ? "grid-cols-2" : "grid-cols-1 sm:grid-cols-2")}>
           <dl className="flex flex-col gap-1">
-            <Row label={t("orderNumber")} value={data.orderNumber} strong />
-            <Row label={t("date")} value={date} />
-            {data.trackingCode && <Row label={t("trackingCode")} value={data.trackingCode} strong mono />}
+            <PaperRow label={t("orderNumber")} value={data.orderNumber} strong />
+            <PaperRow label={t("date")} value={date} />
+            {data.trackingCode && <PaperRow label={t("trackingCode")} value={data.trackingCode} strong mono />}
           </dl>
           {data.buyer && (
             <div className={cn(wide ? "border-l border-paper-line pl-4" : !receipt && "sm:border-l sm:border-paper-line sm:pl-4")}>
@@ -266,20 +214,7 @@ export const InvoiceDocument = forwardRef<HTMLDivElement, { data: InvoiceData; s
           <p className="font-semibold">{t("thankYou")}</p>
           <p className="text-xs text-paper-muted">{t("madeWith")}</p>
         </footer>
-      </div>
+      </Paper>
     );
   },
 );
-
-function Row({ label, value, strong = false, mono = false }: { label: string; value: string; strong?: boolean; mono?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-paper-muted">{label}</dt>
-      <dd className={cn("text-right tabular-nums", strong && "font-semibold", mono && "tracking-wider")}>{value}</dd>
-    </div>
-  );
-}
-
-function Divider({ receipt }: { receipt: boolean }) {
-  return <hr className={cn("border-paper-ink", receipt ? "border-dashed" : "border-t-2")} />;
-}

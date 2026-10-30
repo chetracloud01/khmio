@@ -7,8 +7,8 @@ import { Card } from "./Card";
 import { cn } from "./cn";
 import { Skeleton } from "./Skeleton";
 
-// The standard building blocks of every app screen — admin, seller and their
-// mockups (docs/blueprint.md "Admin area standards", design/design-standard.md).
+// The standard building blocks of every app screen — admin and seller
+// (docs/blueprint.md "Admin area standards", design/design-standard.md).
 // One copy here, used everywhere: a page never re-creates a header, a status
 // badge or an empty state of its own. Like the rest of this package they hold
 // no words — every label comes from the caller (messages/*.json).

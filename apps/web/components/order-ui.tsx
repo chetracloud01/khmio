@@ -38,7 +38,7 @@ import { useDateText } from "./use-date-text";
 // One wording and one colour per order status, for the buyer's order page,
 // the seller's dashboard and (later) Telegram — design/design-standard.md §7.
 
-/** The parts of an order these helpers read; the mockup's sample orders and the API's orders both fit. */
+/** The parts of an order these helpers read; the API's orders and the styleguide's samples both fit. */
 export interface OrderFactsForText {
   status: OrderStatus;
   fulfilment: OrderFulfilment;

@@ -157,10 +157,11 @@ admin Settings, set the alert chat.
    `https://api.<domain>/health` and `https://<domain>/km`, alerting your Telegram or email.
 2. Sentry alerts (if `SENTRY_DSN` is set) to your email or Telegram.
 
-## 11. Smoke test (about 30 minutes, on your phone, mobile data)
+## 11. Smoke test (about 45 minutes, on your phone, mobile data)
 
 - [ ] `https://<domain>/km`: page loads in Kantumruy Pro, padlock shown.
-- [ ] Seller: Log in with Telegram → 2 questions → shop open.
+- [ ] Website: Home shows the app grid (Available and Coming soon badges), "big business software, made small", and the industries (Garage **Available**, the others **Beta**); the **Industries** menu opens and lists them; a beta page (`/km/solutions/cafe`) opens with "Start free"; the old `/km/products/shop` lands on `/km/solutions/garage`.
+- [ ] Seller: Log in with Telegram → pick the business type (all five are offered) → name and link → shop open. Use **Garage** for this test: it starts with the garage's categories, and **Job cards** is in the menu.
 - [ ] Add a product with 2 photos → photos load from `files.<domain>`; the shop grid shows them.
 - [ ] Shop details: phone, shop address, a Google Maps link (tap "Check your map link": the right pin opens), pickup on with hours, Telegram → Save.
 - [ ] Delivery zones saved; its Pickup row shows "Pickup is on · address" → the checklist reaches "Share your shop" → Share works.
@@ -174,6 +175,9 @@ admin Settings, set the alert chat.
 - [ ] **Sell in shop** (Home's first tile): a cash sale → the change shown → Receipt at 80 mm → Print or Share works; a **Shop QR** sale (pay yourself a small amount, tick only after it shows in the bank app); no Telegram alert for either.
 - [ ] Today's sales: cash and shop QR totals are right → Void one → it's crossed out and not counted; Orders → filter **In shop** shows both.
 - [ ] **Stock** (a Pro shop: Products → Stock): start tracking one product at 2 → the buyer's shop shows "Only 2 left" → sell 2 in the shop → it shows **Sold out** and the cart can't add it → void that sale → the count is back to 2 and the history says "Back from #…". A correction with reason "Other" needs a note; Stop tracking asks first.
+- [ ] **Job cards** (the garage): open a card for a plate → add a part and labour → hand over → the sale and its receipt are there, and the part's stock went down (if tracked).
+- [ ] **Customers**: the buyer from the order above is listed with the right total; tapping the buyer's name on that order opens their page; on a phone the **Customers** button on Orders gets there.
+- [ ] **Cost and profit** (a Pro shop): give a product a cost price (one currency for the whole product) → sell one → Reports › Profit shows that sale's profit; change the cost afterwards → the old sale's profit stays the same.
 - [ ] Admin: login with the authenticator code → the shop is listed → extend its trial → it's in the audit log.
 - [ ] Worker log: `database backup done` after 03:00 the next night, or run it now:
       Railway → worker → SSH → `pnpm db:backup`.

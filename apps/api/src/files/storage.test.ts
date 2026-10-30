@@ -1,5 +1,8 @@
 import { loadEnv, apiEnvSchema } from "@khmio/shared";
 import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isPhotoKey, isStorePhotoKey, thumbKeyOf } from "./photos";
 import { assertSafeKey, createFileStorage, LocalFileStorage, S3FileStorage } from "./storage";
@@ -33,6 +36,23 @@ describe("photo storage", () => {
     expect(s3).toBeInstanceOf(S3FileStorage);
     expect(s3.publicUrl("stores/a/b.jpg")).toBe("https://files.example.com/stores/a/b.jpg");
   });
+
+  it("deletes one shop's whole folder, and only that shop's", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "khmio-photos-"));
+    try {
+      const storage = new LocalFileStorage(dir, "/files");
+      const [shop, other] = [randomUUID(), randomUUID()];
+      const [first, second, kept] = [`stores/${shop}/${randomUUID()}.jpg`, `stores/${shop}/${randomUUID()}.png`, `stores/${other}/${randomUUID()}.jpg`];
+      for (const photo of [first, second, kept]) await storage.put(photo, JPEG);
+      expect(await storage.removeStoreFiles(shop)).toBe(2);
+      expect(await storage.read(first)).toBeNull();
+      expect(await storage.read(kept)).toEqual(JPEG);
+      expect(await storage.removeStoreFiles(shop)).toBe(0);
+      await expect(storage.removeStoreFiles("../..")).rejects.toThrow();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // Against a real S3 server (the local SeaweedFS from pnpm s3:up) when S3_ENDPOINT is set.
@@ -52,6 +72,15 @@ describe.skipIf(!s3Env)("photo storage in a real S3 bucket", () => {
 
   it("answers null for a photo that isn't there", async () => {
     expect(await createFileStorage(s3Env!).read(key())).toBeNull();
+  });
+
+  it("deletes one shop's whole folder", async () => {
+    const storage = createFileStorage(s3Env!);
+    const shop = randomUUID();
+    const photo = `stores/${shop}/${randomUUID()}.jpg`;
+    await storage.put(photo, JPEG, "image/jpeg");
+    expect(await storage.removeStoreFiles(shop)).toBe(1);
+    expect(await storage.read(photo)).toBeNull();
   });
 });
 

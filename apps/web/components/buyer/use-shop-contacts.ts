@@ -18,7 +18,7 @@ export interface ShopContactDetails {
 
 /**
  * The Shop info sheet's round buttons — Call, Map, Telegram, Facebook, each
- * opening the phone's own app — the same on the live shop and its mockup.
+ * opening the phone's own app.
  * Anything the seller left empty is left out.
  */
 export function useShopContacts(shop: ShopContactDetails): ActionTile[] {

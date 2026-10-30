@@ -25,6 +25,8 @@ import { detectPhotoType, newPhotoKey } from "../files/photos";
 import { createFileStorage } from "../files/storage";
 import { newOrderToken } from "../orders/place-order";
 import { createStore } from "../stores/create-store";
+import { fillGarageStock } from "./demo-garage-stock";
+import { removeStore } from "./remove-store";
 
 // pnpm demo:garage [-- --reset | --remove] [--telegram-id <id>] [--photos <folder>]
 //
@@ -540,7 +542,7 @@ async function main() {
   const args = process.argv.slice(2);
   const { values } = parseArgs({
     args: args[0] === "--" ? args.slice(1) : args,
-    options: { reset: { type: "boolean" }, remove: { type: "boolean" }, "telegram-id": { type: "string" }, photos: { type: "string" } },
+    options: { reset: { type: "boolean" }, remove: { type: "boolean" }, stock: { type: "boolean" }, "telegram-id": { type: "string" }, photos: { type: "string" } },
   });
   if (process.env.NODE_ENV === "production") fail("demo:garage is for development only.");
   const telegramId = values["telegram-id"]?.trim();
@@ -551,10 +553,18 @@ async function main() {
   const db = createSystemDb(ownerUrl);
   try {
     const existing = await db.store.findUnique({ where: { slug: SLUG }, select: { id: true } });
-    if (existing && !values.reset && !values.remove) fail(`The demo garage already exists. Run with --reset to make it again, or --remove to delete it.`);
+    // --stock: add the stock demo (suppliers, bills, counts) to the garage as it is, once.
+    if (existing && values.stock && !values.reset && !values.remove) {
+      const filled = await fillGarageStock(db, existing.id);
+      process.stdout.write(
+        filled ? "Demo garage stock added: suppliers, bills, payments, a return, reorder levels and a count (plan: Pro).\n" : "The demo garage already has its stock (it has suppliers): nothing added.\n",
+      );
+      return;
+    }
+    if (existing && !values.reset && !values.remove) fail(`The demo garage already exists. Run with --reset to make it again, --stock to add its stock, or --remove to delete it.`);
     if (existing) {
-      await removeStore(db, existing.id);
-      process.stdout.write("Demo garage removed.\n");
+      const removedPhotos = await removeStore(db, existing.id, createFileStorage(getEnv()));
+      process.stdout.write(`Demo garage removed (${removedPhotos} photo files).\n`);
     }
     if (values.remove) return;
 
@@ -566,6 +576,7 @@ async function main() {
     }
     const { photos, logo } = await loadPhotos(values.photos);
     await fillStore(db, created.storeId, photos, logo);
+    await fillGarageStock(db, created.storeId);
     const photoCount = [...photos.values()].reduce((sum, list) => sum + list.length, 0);
     process.stdout.write(
       `Demo garage ready: ${PRODUCTS.length} products, ${ORDERS.length} orders, ${photoCount} photos.\n` +
@@ -575,15 +586,6 @@ async function main() {
   } finally {
     await db.$disconnect();
   }
-}
-
-/** Orders first: an order's customer can't be deleted under it (RESTRICT), so the store's cascade would stop there. */
-async function removeStore(db: SystemDb, storeId: string): Promise<void> {
-  await db.$transaction(async (tx) => {
-    await tx.order.deleteMany({ where: { storeId } });
-    await tx.outboxEvent.deleteMany({ where: { storeId } });
-    await tx.store.delete({ where: { id: storeId } });
-  });
 }
 
 /** Photo files by product key, in display order, and the logo, from the folder (relative to where pnpm was run). */

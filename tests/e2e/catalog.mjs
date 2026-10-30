@@ -192,6 +192,7 @@ const haircut = (kind) => ({ product: { titleKm: "កាត់សក់", titleE
 check("a service can't be made while services are off", (await call("/products", { method: "POST", cookie: a, body: haircut("service") })).json?.error === "module_off");
 await setModules(["options", "services"]);
 const serviceSaved = await call("/products", { method: "POST", cookie: a, body: haircut("service") });
+check("a service never shows in the stock list: nothing on a shelf to count", !((await call("/stock", { cookie: a })).json?.items ?? []).some((entry) => entry.productId === serviceSaved.json?.id));
 const serviceId = serviceSaved.json?.id;
 const service = (await call(`/products/${serviceId}`, { cookie: a })).json;
 check("a product can be a service", service?.kind === "service", serviceSaved.raw);

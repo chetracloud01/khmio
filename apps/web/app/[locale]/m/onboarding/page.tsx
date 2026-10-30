@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  BUSINESS_TYPES,
   businessTypeSchema,
+  OFFERED_BUSINESS_TYPES,
   createStoreInputSchema,
   getMissingForSharing,
   SHARE_REQUIREMENTS,
@@ -31,11 +31,14 @@ import { AppLoading, AppOffline } from "../app-frame";
 const ICONS: Record<BusinessType, LucideIcon> = { shop: Store, restaurant: UtensilsCrossed, service: Wrench, garage: Car, other: LayoutGrid };
 type SlugState = "idle" | "checking" | "available" | "taken" | "invalid";
 
-// Real onboarding (roadmap step 2, redesigned with the approved mockup):
-// ① business type, ② shop name and link (the shop page previewed beside them
-// on a laptop), then the shop is created and ③ "Your shop is ready" shows its
-// link, an optional logo and what's still needed before sharing. Phone,
-// delivery and payment come from the dashboard checklist.
+// Onboarding (roadmap step 2): ① business type, ② shop name and link (the
+// shop page previewed beside them on a laptop), then the shop is created and
+// ③ "Your shop is ready" shows its link, an optional logo and what's still
+// needed before sharing. Phone, delivery and payment come from the dashboard
+// checklist. Only the offered business types are shown (packages/shared
+// OFFERED_BUSINESS_TYPES; garage first): with just one, it's chosen and ①
+// is already done.
+const ONLY_TYPE = OFFERED_BUSINESS_TYPES.length === 1 ? OFFERED_BUSINESS_TYPES[0] : undefined;
 export default function OnboardingPage() {
   const t = useTranslations("Onboarding");
   const tSignUp = useTranslations("SignUp");
@@ -50,8 +53,8 @@ export default function OnboardingPage() {
 
   const [me, setMe] = useState<Me | null>(null);
   const [state, setState] = useState<"checking" | "ready" | "offline">("checking");
-  const [step, setStep] = useState<1 | 2>(1);
-  const [businessType, setBusinessType] = useState<BusinessType | null>(null);
+  const [step, setStep] = useState<1 | 2>(ONLY_TYPE ? 2 : 1);
+  const [businessType, setBusinessType] = useState<BusinessType | null>(ONLY_TYPE ?? null);
   const [shopName, setShopName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -232,7 +235,7 @@ export default function OnboardingPage() {
               const parsed = businessTypeSchema.safeParse(value);
               if (parsed.success) setBusinessType(parsed.data);
             }}
-            options={BUSINESS_TYPES.map((type) => ({ value: type, icon: ICONS[type], title: tType(type), detail: tType(`${type}Hint`) }))}
+            options={OFFERED_BUSINESS_TYPES.map((type) => ({ value: type, icon: ICONS[type], title: tType(type), detail: tType(`${type}Hint`) }))}
           />
         </section>
       ) : (
@@ -290,7 +293,7 @@ export default function OnboardingPage() {
       {/* Phone: pinned to the bottom; laptop: at the end of the form. */}
       <div className="fixed inset-x-0 bottom-0 z-20 lg:static lg:z-auto">
         <div className="pb-safe mx-auto flex max-w-[480px] gap-3 border-t border-border bg-bg px-4 pt-3 lg:max-w-[440px] lg:border-0 lg:bg-transparent lg:p-0">
-          {step > 1 && (
+          {step > 1 && !ONLY_TYPE && (
             <Button variant="secondary" onClick={() => setStep(1)} className="w-full">
               {t("back")}
             </Button>
