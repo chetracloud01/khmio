@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customerOrderBySql, customerSearchSql, parseCustomerListQuery, toCustomerRow } from "./customers";
+import { customerChipSql, customerOrderBySql, customerSearchSql, parseCustomerListQuery, toCustomerRow } from "./customers";
 
 describe("customer list query", () => {
   it("opens sorted by the newest order", () => {
@@ -60,5 +60,22 @@ describe("a customer as the API answers", () => {
       lastOrderAt: null,
       createdAt: "2026-10-20T03:00:00.000Z",
     });
+  });
+});
+
+describe("customer list views", () => {
+  const now = new Date("2026-10-29T05:00:00Z");
+
+  it("new: saved in the last 30 days; coming back: 2 orders or more; not back: no order in 60 days", () => {
+    expect(customerChipSql("new", now).values).toEqual([new Date("2026-09-29T05:00:00Z")]);
+    expect(customerChipSql("returning", now).sql).toContain("count(orders.id) >=");
+    expect(customerChipSql("returning", now).values).toEqual([2]);
+    expect(customerChipSql("lapsed", now).sql).toContain("max(orders.created_at) <");
+    expect(customerChipSql("lapsed", now).values).toEqual([new Date("2026-08-30T05:00:00Z")]);
+  });
+
+  it("anything else is every customer, never built from the request's text", () => {
+    expect(customerChipSql("all", now).sql).toBe("TRUE");
+    expect(customerChipSql("1=1; drop table customers", now).sql).toBe("TRUE");
   });
 });

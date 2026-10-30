@@ -8,8 +8,9 @@ dist/
 coverage/
 *.tsbuildinfo
 
-# Browser-testing screenshots and logs (Playwright MCP)
+# Browser-testing screenshots and logs (Playwright MCP), and screenshots kept by hand
 .playwright-mcp/
+screenshot/
 
 # Photos uploaded while developing (apps/api FILES_DIR)
 .uploads/

@@ -59,6 +59,14 @@ export function isCashOrder(order: Pick<OrderFacts, "paymentMethod">): boolean {
   return order.paymentMethod === "cod";
 }
 
+/** When a cash order's money is settled: collected (completed) or never coming (cancelled). */
+export const CASH_SETTLED_STATUSES = ["completed", "cancelled"] as const satisfies readonly OrderStatus[];
+
+/** Cash still to collect: a cash-on-delivery order not yet completed or cancelled (the dashboard, the Orders tile, the Sales report). */
+export function isCashToCollect(order: Pick<OrderFacts, "paymentMethod" | "status">): boolean {
+  return isCashOrder(order) && !CASH_SETTLED_STATUSES.some((settled) => settled === order.status);
+}
+
 /** The status a new order starts in: cash orders go straight to the seller, online ones wait for payment. */
 export function getInitialOrderStatus(paymentMethod: PaymentMethod): OrderStatus {
   return paymentMethod === "cod" ? "cod_pending" : "awaiting_payment";
@@ -176,7 +184,8 @@ export function orderStatusesForTab(tab: OrderTab): OrderStatus[] {
 /** The seller's order list read page by page (the data grid's server mode): what it may be searched, filtered and sorted by. */
 export const ORDER_LIST_SPEC = {
   sorts: ["order", "buyer", "total", "status"],
-  chips: ORDER_TABS,
+  /** The tabs, and cash still to collect (the Orders tile). */
+  chips: [...ORDER_TABS, "to_collect"],
   filters: { payment: ["online", "cod"], fulfilment: ["delivery", "pickup", "in_store"] },
   defaultSort: { key: "order", dir: "desc" },
 } as const satisfies ListSpec;

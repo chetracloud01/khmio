@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { movingAverageCost, profitSince, stockValue, unitCostIn, type ProfitRow } from "./profit";
+import { movingAverageCost, stockValue, unitCostIn } from "./profit";
 import { stockChangeInputSchema } from "./stock";
 
 describe("the average cost after a purchase", () => {
@@ -36,16 +36,11 @@ describe("the stock value", () => {
   });
 });
 
-describe("a purchase's cost as typed", () => {
+describe("a purchase's cost", () => {
   const variantId = "0b9f3c3e-1d2a-4c1f-9a51-6a3a7a2b9c10";
-  it("is optional, and needs its currency when given", () => {
-    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 5 }).success).toBe(true);
-    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 5, unitCost: 2600, costCurrency: "USD", supplier: " Chhay Auto " }).data?.supplier).toBe("Chhay Auto");
-    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 5, unitCost: 2600 }).success).toBe(false);
-  });
-
-  it("belongs to a purchase only", () => {
-    expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_in", quantity: 1, reason: "returned", unitCost: 100, costCurrency: "USD" }).success).toBe(false);
+  it("comes only with a supplier bill (purchases.ts): a stock correction is never a purchase", () => {
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 5 }).success).toBe(false);
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_in", quantity: 1, reason: "returned" }).success).toBe(true);
   });
 });
 
@@ -64,35 +59,5 @@ describe("an item's cost in the order's currency", () => {
 
   it("never guesses a cost that isn't known", () => {
     expect(unitCostIn({ costMinor: null, costCurrency: null }, "USD", RATE)).toBeUndefined();
-  });
-});
-
-const row = (overrides: Partial<ProfitRow>): ProfitRow => ({ day: "2026-10-27", nameKm: "កាហ្វេ", nameEn: "Coffee", currency: "USD", quantity: 1, sales: 200, costedSales: 200, cost: 80, ...overrides });
-
-describe("the profit report", () => {
-  it("takes cost from sales, and gives the margin on what has a cost", () => {
-    const period = profitSince([row({ quantity: 2, sales: 400, costedSales: 400, cost: 160 })], "2026-10-27", "USD");
-    expect(period.USD).toEqual({ sales: 400, costedSales: 400, cost: 160, profit: 240, marginPercent: 60, missingCostSales: 0 });
-  });
-
-  it("never guesses a missing cost: those sales are shown apart and left out of the profit", () => {
-    const period = profitSince([row({}), row({ nameEn: "Tea", sales: 150, costedSales: 0, cost: 0 })], "2026-10-27", "USD");
-    expect(period.USD).toMatchObject({ sales: 350, profit: 120, missingCostSales: 150, marginPercent: 60 });
-  });
-
-  it("keeps dollars and riel apart, and has no margin when nothing with a cost was sold", () => {
-    const period = profitSince([row({}), row({ currency: "KHR", sales: 8000, costedSales: 0, cost: 0 })], "2026-10-27", "USD");
-    expect(period.KHR).toMatchObject({ sales: 8000, profit: 0, marginPercent: null, missingCostSales: 8000 });
-    expect(period.USD.sales).toBe(200);
-  });
-
-  it("counts only the period, and lists the most profitable products first", () => {
-    const period = profitSince(
-      [row({ day: "2026-10-01", sales: 999, costedSales: 999, cost: 0 }), row({ nameEn: "Tea", sales: 500, costedSales: 500, cost: 100 }), row({})],
-      "2026-10-21",
-      "USD",
-    );
-    expect(period.products.map((product) => product.nameEn)).toEqual(["Tea", "Coffee"]);
-    expect(period.USD.sales).toBe(700);
   });
 });

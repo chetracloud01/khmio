@@ -1,4 +1,5 @@
 import type { Currency, DeliverySettings, InvoiceDetails, OrderFulfilment, OrderStatus, SitePage, StoreSettings } from "@khmio/shared";
+import type { Dashboard, SellerOrder, Supplier } from "@/lib/api";
 
 // Sample values the styleguide shows its parts with: a made-up garage, like
 // the Demo Garage the app is tested with (docs/blueprint.md "Garage first").
@@ -50,6 +51,26 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
   { orderNumber: "#121", name: "Visal Prak", status: "delivered", fulfilment: "delivery", total: 48000, currency: "KHR" },
 ];
 
+/** The sample orders as GET /orders gives them (the dashboard's latest orders). */
+export const SAMPLE_SELLER_ORDERS: SellerOrder[] = SAMPLE_ORDERS.map((order, index) => ({
+  id: `order-${index}`,
+  orderNumber: Number(order.orderNumber.slice(1)),
+  trackingCode: `MEK-SAMP-${index}`,
+  status: order.status,
+  channel: order.fulfilment === "in_store" ? "in_store" : "online",
+  paymentMethod: order.fulfilment === "in_store" ? "cash" : "cod",
+  currency: order.currency,
+  totalMinor: order.total,
+  buyerName: order.name,
+  buyerPhone: SAMPLE_SHOP.phone,
+  fulfilment: order.fulfilment,
+  area: "phnom_penh",
+  districtId: null,
+  provinceId: null,
+  createdAt: `2026-10-${String(29 - index).padStart(2, "0")}T09:30:00+07:00`,
+  itemCount: 1,
+}));
+
 /**
  * Site kit sections no website page uses today (an announcement, a timed
  * promotion, a seller's story, a coming-soon waitlist), kept for the admin's
@@ -96,4 +117,52 @@ export const SAMPLE_SITE_PAGE: SitePage = {
       thanks: { km: "អរគុណ! យើងនឹងផ្ញើសារតាម Telegram ឬទូរស័ព្ទ នៅពេលវាបើក។", en: "Thank you! We'll message you on Telegram or by phone when it opens." },
     },
   ],
+};
+
+/** Suppliers for the styleguide's SupplierPicker. */
+export const SAMPLE_SUPPLIERS: Supplier[] = [
+  { id: "s1", name: "Chhay Auto Parts", phone: "85512345678", note: "", archived: false, purchaseCount: 3, bought: { USD: 106_050, KHR: 0 }, owed: { USD: 52_400, KHR: 0 }, lastBillOn: "2026-10-08" },
+  { id: "s2", name: "Angkor Tyres & Batteries", phone: "855971234567", note: "", archived: false, purchaseCount: 4, bought: { USD: 248_500, KHR: 0 }, owed: { USD: 0, KHR: 0 }, lastBillOn: "2026-10-23" },
+  { id: "s3", name: "Phnom Penh Lubricants", phone: "", note: "", archived: false, purchaseCount: 2, bought: { USD: 121_800, KHR: 540_000 }, owed: { USD: 0, KHR: 0 }, lastBillOn: "2026-10-16" },
+];
+
+/** A day key so many days before 2026-10-29. */
+const sampleDay = (daysAgo: number) => new Date(Date.UTC(2026, 9, 29 - daysAgo)).toISOString().slice(0, 10);
+/** Sales that rise and fall through the week. */
+const sampleSales = (index: number) => 20_000 + ((index * 7919) % 9) * 6_000 + (index % 7 === 5 ? 18_000 : 0);
+const inDollars = (USD: number) => ({ USD, KHR: 0 });
+const SAMPLE_WEEK = 7;
+
+/** The dashboard for 7 days beside the 7 before (design/screens.md S3), on Pro: profit and stock included. */
+export const SAMPLE_DASHBOARD: Dashboard = {
+  period: "week",
+  days: { from: sampleDay(6), to: sampleDay(0) },
+  previousDays: { from: sampleDay(13), to: sampleDay(7) },
+  unit: "day",
+  sales: {
+    now: { sales: { USD: 182_400, KHR: 120_000 }, orders: 21, average: { USD: 8_686, KHR: 120_000 }, shop: inDollars(64_000), online: { USD: 118_400, KHR: 120_000 }, bookings: 2 },
+    before: { sales: inDollars(158_000), orders: 18, average: inDollars(8_778), shop: inDollars(60_000), online: inDollars(98_000), bookings: 0 },
+    toCollect: { orders: 3, money: { USD: 12_500, KHR: 80_000 } },
+    points: Array.from({ length: SAMPLE_WEEK }, (_, index) => {
+      const sales = sampleSales(index);
+      const shop = Math.round(sales * 0.35);
+      return { key: sampleDay(SAMPLE_WEEK - 1 - index), shop: inDollars(shop), online: inDollars(sales - shop), orders: 3, previous: inDollars(sampleSales(index + SAMPLE_WEEK)) };
+    }),
+    payments: [
+      { method: "cod", orders: 11, money: inDollars(96_000) },
+      { method: "cash", orders: 7, money: inDollars(52_000) },
+      { method: "khqr", orders: 3, money: inDollars(34_400) },
+    ],
+    products: [
+      { productId: "p1", nameKm: "សំបកកង់", nameEn: "Michelin Primacy 4 tyre", quantity: 8, money: inDollars(92_000) },
+      { productId: "p2", nameKm: "ប្រេងម៉ាស៊ីន", nameEn: "Engine oil 5W-30", quantity: 20, money: inDollars(25_000) },
+      { productId: "p3", nameKm: "អាគុយ", nameEn: "Amaron battery", quantity: 2, money: inDollars(16_000) },
+    ],
+  },
+  profit: {
+    now: { netSales: inDollars(182_400), costedGoods: inDollars(170_000), cost: inDollars(116_000), missingCostSales: inDollars(12_000), grossProfit: inDollars(54_400), losses: inDollars(-2_500), found: inDollars(0), profit: inDollars(51_900), lossesEstimated: false },
+    before: { netSales: inDollars(158_000), costedGoods: inDollars(158_000), cost: inDollars(110_600), missingCostSales: inDollars(0), grossProfit: inDollars(47_400), losses: inDollars(0), found: inDollars(0), profit: inDollars(47_400), lossesEstimated: false },
+    points: Array.from({ length: SAMPLE_WEEK }, (_, index) => ({ key: sampleDay(SAMPLE_WEEK - 1 - index), profit: inDollars(Math.round(sampleSales(index) * 0.3)) })),
+  },
+  stock: { value: { USD: 383_056, KHR: 540_000 }, withoutCost: 0, toReorder: 4, unpaidBills: 3, overdueBills: 1 },
 };

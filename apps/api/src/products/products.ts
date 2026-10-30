@@ -260,9 +260,22 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
     return sku;
   };
 
+  // A tracked option's cost is the average its bills worked out (docs/blueprint.md "Cost price", level 2):
+  // while the plan follows stock, the form can't change it, nor the product's cost currency once one has a cost.
+  const trackedIds = new Set(
+    existing && planHasFeature(plan, "stock")
+      ? (await tx.stockLevel.findMany({ where: { variantId: { in: existing.variants.map((variant) => variant.id) } }, select: { variantId: true } })).map((level) => level.variantId)
+      : [],
+  );
+  const trackedCurrency = existing?.variants.find((variant) => trackedIds.has(variant.id) && variant.costCurrency)?.costCurrency ?? null;
+  if (trackedCurrency && product.costCurrency && product.costCurrency !== trackedCurrency) errors.costCurrency = "cost_currency_mismatch";
+
   // One cost currency for the whole product (the schema requires it once a cost is given); no amount = no currency.
-  const costOf = (costMinor: number | undefined) =>
-    costMinor !== undefined && product.costCurrency ? { costMinor, costCurrency: product.costCurrency } : { costMinor: null, costCurrency: null };
+  const costOf = (variantId: string | undefined, costMinor: number | undefined) => {
+    const kept = existing?.variants.find((variant) => variant.id === variantId && trackedIds.has(variant.id));
+    if (kept) return { costMinor: kept.costMinor, costCurrency: kept.costCurrency };
+    return costMinor !== undefined && product.costCurrency ? { costMinor, costCurrency: product.costCurrency } : { costMinor: null, costCurrency: null };
+  };
 
   let variants: VariantPlan[];
   if (product.options?.length) {
@@ -283,7 +296,7 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
         ...(canWholesale
           ? { wholesalePriceUsdCents: option.wholesalePriceUsdCents ?? null, wholesalePriceKhr: option.wholesalePriceKhr ?? null }
           : keptWholesale(id)),
-        ...costOf(option.costMinor),
+        ...costOf(id, option.costMinor),
         sortOrder: index,
       };
     });
@@ -302,7 +315,7 @@ export async function saveProduct(tx: Tx, storeId: string, plan: PlanId, input: 
         ...(canWholesale
           ? { wholesalePriceUsdCents: product.wholesalePriceUsdCents ?? null, wholesalePriceKhr: product.wholesalePriceKhr ?? null }
           : keptWholesale(current?.id)),
-        ...costOf(product.costMinor),
+        ...costOf(current?.id, product.costMinor),
         sortOrder: 0,
       },
     ];

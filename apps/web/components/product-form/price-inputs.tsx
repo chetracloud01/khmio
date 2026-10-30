@@ -86,12 +86,12 @@ function priceFieldKeys(kind: TwoCurrencyKind, prefix = ""): { usd: string; khr:
 }
 
 /** Dollars or riel for every cost of the product: once for a simple product, once above its option rows. */
-export function CostCurrencyChoice({ value, onChange }: { value: Currency; onChange: (currency: Currency) => void }) {
+export function CostCurrencyChoice({ value, onChange, label }: { value: Currency; onChange: (currency: Currency) => void; /** "Costs in" unless the page says otherwise (a bill: "Bill in"). */ label?: string }) {
   const t = useTranslations("ProductForm");
   return (
     <SegmentedControl
       mode="choice"
-      label={t("costCurrencyLabel")}
+      label={label ?? t("costCurrencyLabel")}
       value={value}
       onChange={onChange}
       options={CURRENCIES.map((currency) => ({ value: currency, label: t(COST_CURRENCIES[currency].choice) }))}
@@ -112,6 +112,7 @@ export function PriceInputs({
   checkFields,
   fieldPrefix = "",
   compact = false,
+  costLocked = false,
 }: {
   texts: PriceTexts;
   onChange: (box: keyof PriceTexts, text: string) => void;
@@ -130,6 +131,8 @@ export function PriceInputs({
   fieldPrefix?: string;
   /** An option row: smaller titles, short box labels, no hints. */
   compact?: boolean;
+  /** Its stock is tracked: the cost is the average its bills worked out, shown, not typed. */
+  costLocked?: boolean;
 }) {
   const t = useTranslations("ProductForm");
   return (
@@ -139,8 +142,9 @@ export function PriceInputs({
           <p className={compact ? "text-xs font-medium text-muted" : "text-sm font-medium text-fg"}>{t(PRICE_WORDS[kind].title)}</p>
           {kind === "cost" ? (
             <>
-              {onCostCurrencyChange && <CostCurrencyChoice value={costCurrency} onChange={onCostCurrencyChange} />}
+              {onCostCurrencyChange && !costLocked && <CostCurrencyChoice value={costCurrency} onChange={onCostCurrencyChange} />}
               <Input
+                disabled={costLocked}
                 label={t(compact ? COST_CURRENCIES[costCurrency].shortLabel : COST_CURRENCIES[costCurrency].label)}
                 inputMode={COST_CURRENCIES[costCurrency].inputMode}
                 value={texts.cost}
@@ -155,7 +159,11 @@ export function PriceInputs({
           ) : (
             <TwoCurrencyBoxes kind={kind} {...{ texts, onChange, usdToKhrRate, error, clearErrors, checkFields, fieldPrefix, compact }} />
           )}
-          {!compact && <p className="text-xs text-muted">{t(PRICE_WORDS[kind].hint)}</p>}
+          {kind === "cost" && costLocked ? (
+            <p className="text-xs text-muted">{t("costFromBills")}</p>
+          ) : (
+            !compact && <p className="text-xs text-muted">{t(PRICE_WORDS[kind].hint)}</p>
+          )}
         </div>
       ))}
     </>

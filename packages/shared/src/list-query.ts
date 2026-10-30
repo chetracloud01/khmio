@@ -11,11 +11,14 @@ export const MAX_LIST_SEARCH_LENGTH = 100;
 /** Filter values travel as "f.<key>=<value>" in the address. */
 const FILTER_PREFIX = "f.";
 
-/** What a list allows: its sort keys, chips and each filter's values. */
+/** A filter whose values are the shop's own records (a supplier): any id, which the API then looks up under row-level security. */
+export const ID_FILTER = "id";
+
+/** What a list allows: its sort keys, chips and each filter's values (a fixed list, or ID_FILTER for a record's id). */
 export interface ListSpec {
   sorts: readonly string[];
   chips: readonly string[];
-  filters: Readonly<Record<string, readonly string[]>>;
+  filters: Readonly<Record<string, readonly string[] | typeof ID_FILTER>>;
   defaultSort: { key: string; dir: "asc" | "desc" };
 }
 
@@ -52,8 +55,8 @@ const oneOf = (values: readonly string[]) => z.string().refine((value) => values
 
 /** The checked query of one list: an unknown sort, chip, filter or value is refused. */
 export function listQuerySchemaFor(spec: ListSpec) {
-  const filterShape: Record<string, z.ZodOptional<z.ZodEffects<z.ZodString, string, string>>> = {};
-  for (const [key, values] of Object.entries(spec.filters)) filterShape[key] = oneOf(values).optional();
+  const filterShape: Record<string, z.ZodOptional<z.ZodType<string>>> = {};
+  for (const [key, values] of Object.entries(spec.filters)) filterShape[key] = (values === ID_FILTER ? z.string().uuid("invalid_option") : oneOf(values)).optional();
   return z
     .object({
       q: z.string().trim().max(MAX_LIST_SEARCH_LENGTH, "too_long").default(""),

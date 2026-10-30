@@ -1,7 +1,7 @@
 "use client";
 
 import { hasModule } from "@khmio/shared";
-import { CarFront, ChefHat, ExternalLink, LayoutDashboard, Package, ShoppingBag, Store, Users } from "lucide-react";
+import { Boxes, CarFront, ChefHat, ExternalLink, LayoutDashboard, Package, ShoppingBag, Store, Users } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -191,7 +191,6 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           label: tDash("navProducts"),
           icon: Package,
           mobile: true,
-          alsoActiveOn: [`${base}/stock`],
         },
         {
           href: `${base}/orders`,
@@ -202,6 +201,8 @@ function DashboardFrame({ me, store, waiting, children }: { me: Me; store: Store
           // A phone reaches Customers from the Orders page's button.
           alsoActiveOn: [`${base}/customers`],
         },
+        // Stock with its bills, suppliers and counts (every plan sees it; Pro and Advance use it, lower plans see the upgrade): under Orders on a laptop; a phone reaches it from Products and Orders.
+        { href: `${base}/stock`, label: tDash("navStock"), icon: Boxes, mobile: false, alsoActiveOn: [`${base}/purchases`, `${base}/suppliers`] },
         // Customers (every plan): beside the four on a laptop; no room in a phone's bottom bar.
         { href: `${base}/customers`, label: tDash("navCustomers"), icon: Users, mobile: false },
         // The same four on a laptop and a phone: shop details, delivery, store settings, invoices and Telegram alerts are reached from "My shop", which stays lit there.

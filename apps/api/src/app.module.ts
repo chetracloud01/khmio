@@ -6,6 +6,7 @@ import { AuthController } from "./auth/auth.controller";
 import { SessionGuard } from "./auth/session.guard";
 import { CatalogController } from "./catalog/catalog.controller";
 import { CounterController } from "./counter/counter.controller";
+import { DashboardController } from "./dashboard/dashboard.controller";
 import { DbShutdown, dbProviders } from "./db";
 import { DeliveryController } from "./delivery/delivery.controller";
 import { FilesController } from "./files/files.controller";
@@ -23,6 +24,7 @@ import { FakeBankController } from "./payments/fake-bank.controller";
 import { khqrProvider } from "./payments/khqr";
 import { PublicController } from "./public/public.controller";
 import { rateLimiterProvider } from "./security/rate-limit";
+import { PurchasesController, SuppliersController } from "./purchases/purchases.controller";
 import { StockController } from "./stock/stock.controller";
 import { StoreController } from "./store/store.controller";
 import { StoresController } from "./stores/stores.controller";
@@ -38,9 +40,12 @@ import { WaitlistController } from "./website/waitlist.controller";
     ProductsController,
     DeliveryController,
     OrdersController,
+    DashboardController,
     CustomersController,
     CounterController,
     StockController,
+    PurchasesController,
+    SuppliersController,
     ModulesController,
     CustomFieldsController,
     TablesController,

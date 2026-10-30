@@ -141,6 +141,18 @@ enum StockAdjustmentReason {
   lost
   returned
   other
+  /// Sent back to the supplier (a purchase return).
+  supplier_return
+  /// Went down: past its date.
+  expired
+  /// Went down: used in the shop (a repair, its own use).
+  own_use
+  /// Went down: given away (a gift, a sample).
+  given_away
+  /// Went up: free goods from a supplier.
+  free_goods
+  /// What was on the shelf when the item started being tracked (may carry its cost).
+  opening_stock
 }
 
 /// An option group either makes variants (Size × Colour) or adds choices at order time (Sugar, Add-ons).
@@ -277,11 +289,18 @@ model Merchant {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  identities  MerchantIdentity[]
-  memberships StoreMember[]
-  salesMade   Order[]            @relation("OrderSoldBy")
-  stockMoves  StockMovement[]
-  sessions    Session[]
+  identities      MerchantIdentity[]
+  memberships     StoreMember[]
+  salesMade       Order[]            @relation("OrderSoldBy")
+  stockMoves      StockMovement[]
+  purchases       Purchase[]
+  billPayments    PurchasePayment[]  @relation("PaymentRecordedBy")
+  receivedBills   Purchase[]         @relation("PurchaseReceivedBy")
+  voidedPayments  PurchasePayment[]  @relation("PaymentVoidedBy")
+  countsStarted   StockCount[]       @relation("CountStartedBy")
+  countsApplied   StockCount[]       @relation("CountAppliedBy")
+  countsCancelled StockCount[]       @relation("CountCancelledBy")
+  sessions        Session[]
 
   @@map("merchants")
 }
@@ -408,6 +427,13 @@ model Store {
   dineTables          DineTable[]
   vehicles            Vehicle[]
   jobCards            JobCard[]
+  suppliers           Supplier[]
+  purchases           Purchase[]
+  purchaseLines       PurchaseLine[]
+  documentCounters    DocumentCounter[]
+  stockCounts         StockCount[]
+  stockCountLines     StockCountLine[]
+  purchasePayments    PurchasePayment[]
   jobCardLines        JobCardLine[]
 
   @@map("stores")
@@ -566,9 +592,11 @@ model ProductVariant {
   stockLevels       StockLevel[]
   stockMovements    StockMovement[]
   stockReservations StockReservation[]
+  stockCountLines   StockCountLine[]
   /// One value per variant group: "M" and "Red" make this the M · Red variant.
   values            ProductVariantValue[]
   jobCardLines      JobCardLine[]
+  purchaseLines     PurchaseLine[]
 
   @@index([productId])
   @@map("product_variants")
@@ -751,6 +779,7 @@ model StockLocation {
   suppliedBy   StockLocation?     @relation("LocationSupply", fields: [suppliedByLocationId], references: [id], onDelete: SetNull)
   supplies     StockLocation[]    @relation("LocationSupply")
   levels       StockLevel[]
+  stockCounts  StockCount[]
   movements    StockMovement[]
   reservations StockReservation[]
   /// The store whose shop page sells from here (Advance; null = the main branch).
@@ -769,6 +798,10 @@ model StockLevel {
   onHand     Int      @default(0) @map("on_hand")
   /// Held for unpaid online orders (KHQR, step 5); 0 until then.
   reserved   Int      @default(0)
+  /// Reorder when what's free is at or below this (empty: the shop's rule, LOW_STOCK_THRESHOLD).
+  reorderMin Int?     @map("reorder_min")
+  /// Order up to this many (empty: twice the minimum).
+  reorderMax Int?     @map("reorder_max")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
@@ -800,19 +833,27 @@ model StockMovement {
   costCurrency    Currency?              @map("cost_currency")
   /// Who a purchase came from ("" = not said).
   supplier        String                 @default("")
+  /// The bill this purchase or return belongs to.
+  purchaseId      String?                @map("purchase_id") @db.Uuid
+  /// The stock count (CNT-…) a count correction came from.
+  stockCountId    String?                @map("stock_count_id") @db.Uuid
   note            String                 @default("")
   actorMerchantId String?                @map("actor_merchant_id") @db.Uuid
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  location StockLocation  @relation(fields: [locationId], references: [id], onDelete: Cascade)
-  order    Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  actor    Merchant?      @relation(fields: [actorMerchantId], references: [id], onDelete: SetNull)
+  store      Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variant    ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  location   StockLocation  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  order      Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  purchase   Purchase?      @relation(fields: [purchaseId], references: [id], onDelete: NoAction)
+  stockCount StockCount?    @relation(fields: [stockCountId], references: [id], onDelete: NoAction)
+  actor      Merchant?      @relation(fields: [actorMerchantId], references: [id], onDelete: SetNull)
 
   @@index([storeId, createdAt])
   @@index([variantId])
   @@index([orderId])
+  @@index([purchaseId])
+  @@index([stockCountId])
   @@map("stock_movements")
 }
 
@@ -1347,4 +1388,211 @@ model BackupRun {
 
   @@index([createdAt])
   @@map("backup_runs")
+}
+
+/// What a purchase is: goods bought in, or goods sent back to the supplier.
+enum PurchaseKind {
+  purchase
+  return
+}
+
+/// A shop's supplier (docs/blueprint.md "Cost price", level 2+). Archived, never deleted, so old bills keep it.
+model Supplier {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId    String    @map("store_id") @db.Uuid
+  /// Unique in the shop whatever the case (a database index on lower(name)).
+  name       String
+  /// Saved as 855XXXXXXXX(X); "" = not given.
+  phone      String    @default("")
+  note       String    @default("")
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  store     Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchases Purchase[]
+
+  @@index([storeId])
+  @@map("suppliers")
+}
+
+/// One supplier bill (or a return to the supplier), received in one go. Never edited: a mistake is fixed with a return.
+model Purchase {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId          String       @map("store_id") @db.Uuid
+  /// 1, 2, 3… per shop.
+  number           Int
+  kind             PurchaseKind @default(purchase)
+  /// A return: the purchase it sends goods back from.
+  returnsId        String?      @map("returns_id") @db.Uuid
+  supplierId       String?      @map("supplier_id") @db.Uuid
+  /// The supplier's own bill or invoice number.
+  billRef          String       @default("") @map("bill_ref")
+  /// The day on the bill (Phnom Penh).
+  purchasedOn      DateTime     @map("purchased_on") @db.Date
+  /// Bought on credit: the day it should be paid by (empty: paid now, or no date agreed).
+  dueOn            DateTime?    @map("due_on") @db.Date
+  /// One currency per bill: every line's product costs in it.
+  currency         Currency
+  totalMinor       Int          @map("total_minor")
+  /// Riel per $1 used to turn this bill's prices into its items' cost currencies; empty when nothing needed turning.
+  exchangeRateUsed Int?         @map("exchange_rate_used")
+  /// When the goods arrived and stock went up (set once); empty: saved, not received yet. A return is always received.
+  receivedAt       DateTime?    @map("received_at") @db.Timestamptz(6)
+  receivedById     String?      @map("received_by_id") @db.Uuid
+  note             String       @default("")
+  createdById      String?      @map("created_by_id") @db.Uuid
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplier   Supplier?         @relation(fields: [supplierId], references: [id], onDelete: NoAction)
+  returns    Purchase?         @relation("PurchaseReturns", fields: [returnsId], references: [id], onDelete: NoAction)
+  returnedBy Purchase[]        @relation("PurchaseReturns")
+  createdBy  Merchant?         @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  receivedBy Merchant?         @relation("PurchaseReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  lines      PurchaseLine[]
+  payments   PurchasePayment[]
+  movements  StockMovement[]
+
+  /// Bills and returns each count from 1 (document_counters).
+  @@unique([storeId, kind, number])
+  @@index([storeId, purchasedOn])
+  @@index([supplierId])
+  @@map("purchases")
+}
+
+/// One product option on a bill: how many, and what one cost.
+model PurchaseLine {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId          String    @map("store_id") @db.Uuid
+  purchaseId       String    @map("purchase_id") @db.Uuid
+  variantId        String    @map("variant_id") @db.Uuid
+  quantity         Int
+  /// In the bill's currency.
+  unitCostMinor    Int       @map("unit_cost_minor")
+  lineTotalMinor   Int       @map("line_total_minor")
+  /// The cost of one in the item's own cost currency (what went into its average): converted at the bill's rate, or the same as unit_cost_minor. Both or neither.
+  itemCostMinor    Int?      @map("item_cost_minor")
+  itemCostCurrency Currency? @map("item_cost_currency")
+
+  store    Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchase Purchase       @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  variant  ProductVariant @relation(fields: [variantId], references: [id], onDelete: NoAction)
+
+  @@index([purchaseId])
+  @@index([variantId])
+  @@map("purchase_lines")
+}
+
+/// Which numbered documents a shop has: each counts 1, 2, 3… on its own (shown as BILL-0001, RET-0001, PAY-0001: packages/shared documents.ts).
+enum DocumentSeries {
+  bill
+  return
+  payment
+  count
+}
+
+/// The last number a shop gave out in each series; the next document takes this + 1 in the same statement, so two at once never share one.
+model DocumentCounter {
+  storeId    String         @map("store_id") @db.Uuid
+  series     DocumentSeries
+  lastNumber Int            @default(0) @map("last_number")
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, series])
+  @@map("document_counters")
+}
+
+/// How a supplier bill was paid.
+enum PurchasePaymentMethod {
+  cash
+  bank
+  khqr
+  other
+}
+
+/// Money paid to a supplier against one bill, in the bill's currency (PAY-0001…). Never edited or deleted: one paid by mistake is voided, and stays in the history.
+model PurchasePayment {
+  id          String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId     String                @map("store_id") @db.Uuid
+  purchaseId  String                @map("purchase_id") @db.Uuid
+  /// 1, 2, 3… per shop (document_counters, series payment).
+  number      Int
+  /// The day it was paid (Phnom Penh).
+  paidOn      DateTime              @map("paid_on") @db.Date
+  /// In the bill's currency: cents or riel.
+  amountMinor Int                   @map("amount_minor")
+  method      PurchasePaymentMethod
+  note        String                @default("")
+  createdById String?               @map("created_by_id") @db.Uuid
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  /// Set once, when it's voided; the only thing about a payment that changes.
+  voidedAt    DateTime?             @map("voided_at") @db.Timestamptz(6)
+  voidedById  String?               @map("voided_by_id") @db.Uuid
+
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  purchase  Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  createdBy Merchant? @relation("PaymentRecordedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  voidedBy  Merchant? @relation("PaymentVoidedBy", fields: [voidedById], references: [id], onDelete: SetNull)
+
+  @@unique([storeId, number])
+  @@index([purchaseId])
+  @@map("purchase_payments")
+}
+
+enum StockCountStatus {
+  draft
+  applied
+  cancelled
+}
+
+/// A stock count (design/screens.md S13 "Count stock"): a numbered document (CNT-…) of what's on the shelf, over every item or chosen categories. Left as a draft and continued on any device; applied once (each correction counted − expected, onto today's stock) or cancelled. Never deleted; at most one draft per shop.
+model StockCount {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  storeId       String           @map("store_id") @db.Uuid
+  number        Int
+  status        StockCountStatus @default(draft)
+  locationId    String           @map("location_id") @db.Uuid
+  /// The categories counted; empty = every item.
+  categoryIds   String[]         @default([]) @map("category_ids") @db.Uuid
+  note          String           @default("")
+  startedAt     DateTime         @default(now()) @map("started_at") @db.Timestamptz(6)
+  startedById   String?          @map("started_by_id") @db.Uuid
+  appliedAt     DateTime?        @map("applied_at") @db.Timestamptz(6)
+  appliedById   String?          @map("applied_by_id") @db.Uuid
+  cancelledAt   DateTime?        @map("cancelled_at") @db.Timestamptz(6)
+  cancelledById String?          @map("cancelled_by_id") @db.Uuid
+
+  store       Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  location    StockLocation    @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  startedBy   Merchant?        @relation("CountStartedBy", fields: [startedById], references: [id], onDelete: SetNull)
+  appliedBy   Merchant?        @relation("CountAppliedBy", fields: [appliedById], references: [id], onDelete: SetNull)
+  cancelledBy Merchant?        @relation("CountCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  lines       StockCountLine[]
+  movements   StockMovement[]
+
+  @@unique([storeId, number])
+  @@index([storeId, startedAt])
+  @@map("stock_counts")
+}
+
+/// One item counted in a stock count: what's on the shelf, and what the app had for it the moment it was typed (blank: it wasn't tracked). The cost is fixed when the count is applied, so its value never changes after.
+model StockCountLine {
+  countId        String    @map("count_id") @db.Uuid
+  storeId        String    @map("store_id") @db.Uuid
+  variantId      String    @map("variant_id") @db.Uuid
+  counted        Int
+  expectedOnHand Int?      @map("expected_on_hand")
+  countedAt      DateTime  @default(now()) @map("counted_at") @db.Timestamptz(6)
+  costMinor      Int?      @map("cost_minor")
+  costCurrency   Currency? @map("cost_currency")
+
+  count   StockCount     @relation(fields: [countId], references: [id], onDelete: Cascade)
+  store   Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@id([countId, variantId])
+  @@index([storeId])
+  @@map("stock_count_lines")
 }

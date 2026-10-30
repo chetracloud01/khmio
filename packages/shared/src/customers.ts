@@ -6,10 +6,22 @@ import type { ListSpec } from "./list-query";
 // figures: not cancelled, not still awaiting payment; dollars and riel
 // apart, never converted.
 
+/** A customer is new for this many days after they're first saved. */
+export const NEW_CUSTOMER_DAYS = 30;
+/** A customer is coming back from this many orders. */
+export const RETURNING_MIN_ORDERS = 2;
+/** A customer who bought before but not in this many days hasn't come back (worth a call). */
+export const LAPSED_AFTER_DAYS = 60;
+
+/** The customer list's views (the Customers page's tiles): new, coming back, not back for a while. */
+export const CUSTOMER_CHIPS = ["new", "returning", "lapsed"] as const;
+export type CustomerChip = (typeof CUSTOMER_CHIPS)[number];
+export const isCustomerChip = (chip: string): chip is CustomerChip => (CUSTOMER_CHIPS as readonly string[]).includes(chip);
+
 /** The customer list: sorted by their newest order unless the seller picks another column. */
 export const CUSTOMER_LIST_SPEC = {
   sorts: ["lastOrder", "orders", "spent", "name", "since"],
-  chips: [],
+  chips: CUSTOMER_CHIPS,
   filters: {},
   defaultSort: { key: "lastOrder", dir: "desc" },
 } as const satisfies ListSpec;

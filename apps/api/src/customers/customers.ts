@@ -1,12 +1,19 @@
 import { Prisma, type Tx } from "@khmio/db";
 import {
+  CUSTOMER_CHIPS,
   CUSTOMER_LIST_SPEC,
   CUSTOMER_ORDER_HISTORY,
+  DAY_MS,
+  isCustomerChip,
+  LAPSED_AFTER_DAYS,
+  NEW_CUSTOMER_DAYS,
+  RETURNING_MIN_ORDERS,
   listQueryFromParams,
   listQuerySchemaFor,
   NOT_SALE_STATUSES,
   phoneSearchDigits,
   type Currency,
+  type CustomerChip,
   type DeliveryArea,
   type ListPage,
   type ListQuery,
@@ -97,8 +104,47 @@ export function customerOrderBySql(sort: string, dir: "asc" | "desc", mainCurren
   return Prisma.sql`ORDER BY ${column[key]} ${direction} NULLS LAST, customers.created_at DESC, customers.id`;
 }
 
-/** Customers matching `where`, each with their numbers from the orders that count as sales. */
-async function selectCustomers(tx: Tx, storeId: string, where: Prisma.Sql, tail: Prisma.Sql): Promise<CustomerStatsRow[]> {
+/**
+ * Each list view as a condition on a customer's numbers (SQL HAVING, after
+ * their orders are added up); "all": every customer. Never built from the
+ * request's text.
+ */
+export function customerChipSql(chip: string, now: Date): Prisma.Sql {
+  const daysAgo = (days: number) => new Date(now.getTime() - days * DAY_MS);
+  const views: Record<CustomerChip, Prisma.Sql> = {
+    new: Prisma.sql`customers.created_at >= ${daysAgo(NEW_CUSTOMER_DAYS)}`,
+    returning: Prisma.sql`count(orders.id) >= ${RETURNING_MIN_ORDERS}`,
+    lapsed: Prisma.sql`max(orders.created_at) < ${daysAgo(LAPSED_AFTER_DAYS)}`,
+  };
+  return isCustomerChip(chip) ? views[chip] : Prisma.sql`TRUE`;
+}
+
+/** How many customers match the search in a view. */
+async function countCustomers(tx: Tx, storeId: string, where: Prisma.Sql, having: Prisma.Sql): Promise<number> {
+  const counted = await tx.$queryRaw<{ total: number }[]>`
+    SELECT count(*)::int AS total FROM (
+      SELECT customers.id
+        FROM customers
+        LEFT JOIN orders
+          ON orders.customer_id = customers.id
+         AND orders.store_id = customers.store_id
+         AND orders.status::text NOT IN (${Prisma.join(NOT_SALE_STATUSES)})
+       WHERE customers.store_id = ${storeId}::uuid AND ${where}
+       GROUP BY customers.id
+      HAVING ${having}) matching`;
+  return counted[0]?.total ?? 0;
+}
+
+/** Every view's count for a search: the list's chips, and (with no search) the page's tiles. */
+async function countViews(tx: Tx, storeId: string, where: Prisma.Sql, now: Date): Promise<Record<"all" | CustomerChip, number>> {
+  // One after another: queries inside a transaction share its one connection.
+  const counts: Record<"all" | CustomerChip, number> = { all: await countCustomers(tx, storeId, where, Prisma.sql`TRUE`), new: 0, returning: 0, lapsed: 0 };
+  for (const view of CUSTOMER_CHIPS) counts[view] = await countCustomers(tx, storeId, where, customerChipSql(view, now));
+  return counts;
+}
+
+/** Customers matching `where` (and `having`, on their numbers), each with their numbers from the orders that count as sales. */
+async function selectCustomers(tx: Tx, storeId: string, where: Prisma.Sql, tail: Prisma.Sql, having: Prisma.Sql = Prisma.sql`TRUE`): Promise<CustomerStatsRow[]> {
   return tx.$queryRaw<CustomerStatsRow[]>`
     SELECT customers.id, customers.name, customers.phone, customers.created_at AS "createdAt",
            count(orders.id)::int AS "orderCount",
@@ -113,6 +159,7 @@ async function selectCustomers(tx: Tx, storeId: string, where: Prisma.Sql, tail:
        AND orders.status::text NOT IN (${Prisma.join(NOT_SALE_STATUSES)})
      WHERE customers.store_id = ${storeId}::uuid AND ${where}
      GROUP BY customers.id
+    HAVING ${having}
      ${tail}`;
 }
 
@@ -120,21 +167,30 @@ async function readMainCurrency(tx: Tx, storeId: string): Promise<Currency> {
   return (await tx.store.findUniqueOrThrow({ where: { id: storeId }, select: { defaultCurrency: true } })).defaultCurrency;
 }
 
-/** One page of the customer list (the data grid's server mode). */
-export async function readCustomerPage(tx: Tx, storeId: string, query: ListQuery): Promise<ListPage<CustomerRow>> {
+/** One page of the customer list (the data grid's server mode): the search, one view, sorted and paged. */
+export async function readCustomerPage(tx: Tx, storeId: string, query: ListQuery, now = new Date()): Promise<ListPage<CustomerRow>> {
   const search = customerSearchSql(query.q);
   const mainCurrency = await readMainCurrency(tx, storeId);
-  const [counted, rows] = await Promise.all([
-    tx.$queryRaw<{ total: number }[]>`SELECT count(*)::int AS total FROM customers WHERE customers.store_id = ${storeId}::uuid AND ${search}`,
-    selectCustomers(
-      tx,
-      storeId,
-      search,
-      Prisma.sql`${customerOrderBySql(query.sort, query.dir, mainCurrency)} LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
-    ),
-  ]);
-  const total = counted[0]?.total ?? 0;
-  return { rows: rows.map(toCustomerRow), total, page: query.page, pageSize: query.pageSize, chipCounts: { all: total } };
+  const chipCounts = await countViews(tx, storeId, search, now);
+  const rows = await selectCustomers(
+    tx,
+    storeId,
+    search,
+    Prisma.sql`${customerOrderBySql(query.sort, query.dir, mainCurrency)} LIMIT ${query.pageSize} OFFSET ${(query.page - 1) * query.pageSize}`,
+    customerChipSql(query.chip, now),
+  );
+  const total = isCustomerChip(query.chip) ? chipCounts[query.chip] : chipCounts.all;
+  return { rows: rows.map(toCustomerRow), total, page: query.page, pageSize: query.pageSize, chipCounts };
+}
+
+/** The Customers page's tiles (design/screens.md S14): every view's count, and what all customers have spent (dollars and riel apart). */
+export async function readCustomerStatus(tx: Tx, storeId: string, now = new Date()) {
+  const counts = await countViews(tx, storeId, Prisma.sql`TRUE`, now);
+  const spent = await tx.$queryRaw<{ usd: bigint; khr: bigint }[]>`
+    SELECT coalesce(sum(total_minor) FILTER (WHERE currency = 'USD'), 0)::bigint AS usd, coalesce(sum(total_minor) FILTER (WHERE currency = 'KHR'), 0)::bigint AS khr
+      FROM orders
+     WHERE store_id = ${storeId}::uuid AND customer_id IS NOT NULL AND status::text NOT IN (${Prisma.join(NOT_SALE_STATUSES)})`;
+  return { counts, spent: { USD: Number(spent[0]?.usd ?? 0), KHR: Number(spent[0]?.khr ?? 0) } };
 }
 
 export interface CustomerDetail extends CustomerRow {

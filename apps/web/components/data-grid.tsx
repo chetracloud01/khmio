@@ -172,6 +172,7 @@ export function DataGrid<T>({
   renderCardAside,
   syncUrl = false,
   rowNumbers = false,
+  onViewChange,
 }: {
   /** All rows, in browser mode. Leave out with `server`. */
   rows?: T[];
@@ -218,6 +219,8 @@ export function DataGrid<T>({
   rowNumbers?: boolean;
   /** Keeps the tab, search, sort, filters and page in the address, so refresh and Back return to the same place. One grid per page. */
   syncUrl?: boolean;
+  /** Told the chip and filters the grid shows whenever they change, so the page can follow (a status tile it rings). */
+  onViewChange?: (view: { chip: string; filters: Record<string, string> }) => void;
 }) {
   const t = useTranslations("DataGrid");
   const [search, setSearch] = useState(initialSearch);
@@ -229,6 +232,12 @@ export function DataGrid<T>({
   /** Server mode: the fallback is checked on the first page only. */
   const firstServerPage = useRef(true);
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
+  // The page follows what the grid shows; the latest callback, without re-telling on every render.
+  const viewChange = useRef(onViewChange);
+  viewChange.current = onViewChange;
+  useEffect(() => {
+    viewChange.current?.({ chip, filters: Object.fromEntries(Object.entries(filterValues).filter((entry) => entry[1] !== "")) });
+  }, [chip, filterValues]);
   /** The toolbar menu that's open, if any. */
   const [menu, setMenu] = useState<"filter" | "sort" | "view" | null>(null);
   const measuredWide = useWide();
@@ -640,8 +649,9 @@ export function DataGrid<T>({
         {/* Toolbar: pinned under the app's header while a long list scrolls. */}
         <div className="sticky top-[var(--grid-sticky-top,0px)] z-30 flex flex-col gap-3 rounded-t-DEFAULT border-b border-border bg-bg p-3 md:p-4">
           {refreshing && <div aria-hidden="true" className="grid-progress absolute inset-x-0 top-0 h-0.5 overflow-hidden rounded-t-DEFAULT" />}
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
+          {/* On a phone the search takes the whole line and the tools wrap under it, labelled; from sm up they sit beside it. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-0 flex-1 basis-full sm:basis-0">
               <SearchInput
                 ref={searchBox}
                 placeholder={searchPlaceholder}
@@ -660,7 +670,7 @@ export function DataGrid<T>({
               <div className="relative">
                 <button type="button" onClick={() => setMenu(menu === "filter" ? null : "filter")} aria-expanded={menu === "filter"} aria-label={t("filters")} className={toolButton(menu === "filter" || activeFilterCount > 0)}>
                   <ListFilter className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden sm:inline">{t("filters")}</span>
+                  <span>{t("filters")}</span>
                   {activeFilterCount > 0 && <span className="rounded-full bg-brand px-1.5 text-xs text-on-brand">{activeFilterCount}</span>}
                 </button>
                 {toolMenu(
@@ -761,7 +771,7 @@ export function DataGrid<T>({
             <div className="relative">
               <button type="button" onClick={() => setMenu(menu === "view" ? null : "view")} aria-expanded={menu === "view"} aria-label={t("view")} className={toolButton(menu === "view")}>
                 <Settings2 className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden xl:inline">{t("view")}</span>
+                <span className="sm:hidden xl:inline">{t("view")}</span>
               </button>
               {toolMenu(
                 "view",
@@ -939,8 +949,9 @@ export function DataGrid<T>({
           </div>
         ) : (
           <div className={cn("transition-opacity", refreshing && "opacity-70")} aria-busy={refreshing || undefined}>
-            {/* Laptop: the table scrolls in its own box, so its header row stays in view and pinned columns hold while it scrolls sideways. */}
-            <div className="hidden max-h-[calc(100dvh-var(--grid-sticky-top,0px)-12rem)] min-h-[16rem] overflow-auto lg:block">
+            {/* Laptop: the table scrolls in its own box, so its header row stays in view and pinned columns hold while it scrolls sideways.
+                relative: anything placed inside a cell (a hidden label) is clipped by this box, never lengthening the page under it. */}
+            <div className="relative hidden max-h-[calc(100dvh-var(--grid-sticky-top,0px)-12rem)] min-h-[16rem] overflow-auto lg:block">
               <table className="w-full text-left text-sm">
                 <thead className="sticky top-0 z-20 border-b border-border bg-canvas text-xs uppercase tracking-wide text-muted shadow-[0_1px_0_rgb(var(--color-border))]">
                   <tr>

@@ -338,5 +338,6 @@ There are no mockups any more (2026-10-28): screens not built yet are written sp
 | `pnpm dev` | Starts the website, API and worker on your PC |
 | `pnpm lint` · `pnpm typecheck` · `pnpm test` | Check the code (Claude runs these after every change) |
 | `pnpm db:up` | Starts the database with Docker (only if you use Docker, not the installed PostgreSQL) |
-| `pnpm demo:garage -- --reset` | A fresh Demo Garage to test with (deletes the old one and its photos first) |
+| `pnpm demo:garage -- --reset` | A fresh Demo Garage to test with (deletes the old one and its photos first), with its stock: suppliers, bills, payments, a return, reorder levels and a count |
+| `pnpm demo:garage -- --stock` | Adds that stock to the Demo Garage you already have, once (nothing twice) |
 | `pnpm data:garage-only` | Lists every shop that isn't a garage, and the test merchants without a shop; add `-- --yes` to delete them and their photos. Your PC only, never production |

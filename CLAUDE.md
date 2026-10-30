@@ -42,7 +42,7 @@ Every new table with store_id must enable RLS in its migration.
 pnpm db:up (start Postgres) | pnpm dev | pnpm lint | pnpm typecheck | pnpm test |
 pnpm db:migrate (new migration) | pnpm db:deploy (apply migrations)
 pnpm admin:add-owner -- --telegram-id <id> --name "<name>" (make/reset a platform owner; resets their 2FA)
-pnpm demo:garage [-- --reset] (the Demo Garage to test with) | pnpm data:garage-only [-- --yes]
+pnpm demo:garage [-- --reset | --stock] (the Demo Garage to test with; --stock adds its suppliers, bills and counts once) | pnpm data:garage-only [-- --yes]
 (development: delete every shop but the garage(s), with their photos; lists first)
 
 ## Rules

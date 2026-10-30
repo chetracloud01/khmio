@@ -97,7 +97,7 @@ screen. If one is truly needed, the line above it says why:
 **Talking to the server:** client screens call the API only through
 `apps/web/lib/api.ts`, which handles the address, cookies and `ApiError`.
 `api(path, schema, options)` reads the answer with its schema from
-`lib/api-answers.ts` (admin: `lib/admin-api.ts`), so a screen never works on a
+`lib/api-answers/` (admin: `lib/admin-api.ts`), so a screen never works on a
 shape it only assumed; an answer of another shape becomes `ApiError`
 "bad_answer" and the screen shows its error state. `apiSend(path, options)` is
 for calls whose answer isn't used. Answer schemas check the shape, not the

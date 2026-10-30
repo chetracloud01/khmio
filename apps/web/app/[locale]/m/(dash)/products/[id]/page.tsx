@@ -62,6 +62,7 @@ import {
   customFieldsAnswerSchema,
   type Product,
   productSchema,
+  stockPageSchema,
   uploadPhoto,
 } from "@/lib/api";
 import { readStored, writeStored } from "@/lib/device-storage";
@@ -315,6 +316,16 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
   const [prices, setPrices] = useState<PriceTexts>(priceTextsOf(simple));
   // One cost currency for the whole product (docs/blueprint.md "Cost price"); a new product starts on the shop's main currency.
   const [costCurrency, setCostCurrency] = useState<Currency>(costCurrencyOf(existing?.variants, store.defaultCurrency));
+  // Options whose stock is tracked: their cost comes from bills, so it's shown, not typed (the API keeps it either way).
+  const [trackedIds, setTrackedIds] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    if (!existing || !planHasFeature(store.plan, "stock")) return;
+    api("/stock", stockPageSchema).then(
+      (page) => setTrackedIds(new Set(page.items.filter((item) => item.onHand !== null && item.productId === existing.id).map((item) => item.variantId))),
+      () => setTrackedIds(new Set()),
+    );
+  }, [existing, store.plan]);
+  const currencyLocked = existing?.variants.some((variant) => trackedIds.has(variant.id) && variant.costCurrency !== null) ?? false;
   const [discountPercent, setDiscountPercent] = useState(existing?.discountPercent?.toString() ?? "");
   const [variantDrafts, setVariantDrafts] = useState<VariantDraft[]>(
     existing?.hasOptions
@@ -841,6 +852,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
               usdToKhrRate={rate}
               costCurrency={costCurrency}
               onCostCurrencyChange={setCostCurrency}
+              costLocked={simple !== undefined && trackedIds.has(simple.id)}
               error={error}
               clearErrors={clearErrors}
               checkFields={checkFields}
@@ -871,7 +883,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
           {hasVariants && (
             <div className="flex flex-col gap-2">
               <p className="text-sm font-medium text-fg">{t("costCurrencyLabel")}</p>
-              <CostCurrencyChoice value={costCurrency} onChange={setCostCurrency} />
+              {currencyLocked ? <p className="text-sm text-muted">{t("costCurrencyFromBills")}</p> : <CostCurrencyChoice value={costCurrency} onChange={setCostCurrency} />}
             </div>
           )}
           {variantDrafts.map((row, index) => {
@@ -922,6 +934,7 @@ function ProductForm({ catalog, existing, fields, onReset }: { catalog: Catalog;
                   kinds={priceKinds}
                   usdToKhrRate={rate}
                   costCurrency={costCurrency}
+                  costLocked={trackedIds.has(row.id)}
                   error={error}
                   clearErrors={clearErrors}
                   fieldPrefix={key("")}

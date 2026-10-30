@@ -30,6 +30,17 @@ const garage = sql("select id from stores where slug = 'mekong-auto-garage'");
 const otherShops = count("select count(*) from stores where business_type <> 'garage'");
 const others = sql("select id from stores where business_type <> 'garage'").split("\n").filter(Boolean);
 check("the other checks left shops that aren't garages, with job cards among their data", otherShops > 0 && count("select count(*) from job_cards where store_id in (select id from stores where business_type <> 'garage')") > 0);
+check(
+  "the Demo Garage comes with its stock: suppliers, bills paid and on credit, a return, reorder levels, a count",
+  count(`select count(*) from suppliers where store_id = '${garage}'`) === 4 &&
+    count(`select count(*) from purchases where store_id = '${garage}' and kind = 'purchase'`) === 8 &&
+    count(`select count(*) from purchases where store_id = '${garage}' and kind = 'return'`) === 1 &&
+    count(`select count(*) from purchases where store_id = '${garage}' and due_on is not null`) === 3 &&
+    count(`select count(*) from stock_levels where store_id = '${garage}' and reorder_min is not null`) === 7 &&
+    count(`select count(*) from stock_movements where store_id = '${garage}' and reason = 'count_correction'`) >= 4,
+);
+const again = cli("demo-garage", ["--stock"]);
+check("--stock on the made garage adds nothing twice", again.status === 0 && again.stdout.includes("nothing added") && count(`select count(*) from purchases where store_id = '${garage}'`) === 9, again.stdout.slice(-300));
 const garageOrders = count(`select count(*) from orders where store_id = '${garage}'`);
 const admins = count("select count(*) from admin_users");
 

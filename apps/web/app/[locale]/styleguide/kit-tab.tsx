@@ -26,11 +26,13 @@ import {
   PillInput,
   PillInputButton,
   PriceTag,
+  QuantityInput,
   SearchInput,
   SectionTitle,
   SegmentedControl,
   Select,
   Skeleton,
+  ProgressBar,
   StatCard,
   StatusPill,
   Switch,
@@ -57,6 +59,7 @@ export function KitTab() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sheet, setSheet] = useState<SheetPlacement | null>(null);
   const [search, setSearch] = useState("");
+  const [quantity, setQuantity] = useState("2");
   const [switchOn, setSwitchOn] = useState(true);
   const [ticked, setTicked] = useState(false);
   const [fulfilment, setFulfilment] = useState("delivery");
@@ -83,6 +86,11 @@ export function KitTab() {
             <StatCard icon={ShoppingBag} label={t("statOrders")} value="42" detail={t("statOrdersDetail")} tone="success" />
             <StatCard icon={TriangleAlert} label={t("statLate")} value="3" tone="warning" />
             <StatCard icon={TriangleAlert} label={t("statFailed")} value="1" tone="danger" />
+          </Demo>
+          <Demo name="ProgressBar">
+            <ProgressBar value={40} max={100} label={t("progressLabel", { done: 40, total: 100 })} />
+            <ProgressBar value={100} max={100} tone="success" label={t("progressLabel", { done: 100, total: 100 })} />
+            <ProgressBar value={15} max={100} tone="danger" size="sm" label={t("progressLabel", { done: 15, total: 100 })} />
           </Demo>
           <Demo name="SectionTitle">
             <SectionTitle aside={<span className="text-sm font-medium text-brand">{t("viewAll")}</span>}>{t("sectionTitle")}</SectionTitle>
@@ -210,6 +218,10 @@ export function KitTab() {
             <Input label={t("nameLabel")} placeholder={t("namePlaceholder")} />
             <Input label={t("phoneLabel")} prefix="+855" inputMode="tel" error={t("phoneError")} />
           </Demo>
+          <Demo name="QuantityInput">
+            <QuantityInput label={t("quantityLabel")} value={quantity} onChange={setQuantity} decreaseLabel={t("quantityLess")} increaseLabel={t("quantityMore")} min={1} />
+            <QuantityInput label={t("quantityLabel")} value="abc" onChange={() => undefined} decreaseLabel={t("quantityLess")} increaseLabel={t("quantityMore")} error={t("quantityError")} />
+          </Demo>
           <Demo name="Select">
             <Select
               label={t("selectLabel")}
@@ -280,6 +292,26 @@ export function KitTab() {
               options={[
                 { value: "delivery", label: t("cardDeliveryTitle") },
                 { value: "pickup", label: t("cardPickupTitle") },
+              ]}
+            />
+            <SegmentedControl
+              size="sm"
+              value={fulfilment}
+              onChange={setFulfilment}
+              options={[
+                { value: "delivery", label: t("cardDeliveryTitle") },
+                { value: "pickup", label: t("cardPickupTitle") },
+              ]}
+            />
+            {/* look="underline": a section's own pages, with an icon and what needs attention. */}
+            <SegmentedControl
+              look="underline"
+              size="sm"
+              value={fulfilment}
+              onChange={setFulfilment}
+              options={[
+                { value: "delivery", label: t("cardDeliveryTitle"), icon: Truck, badge: { value: 3, tone: "warning" } },
+                { value: "pickup", label: t("cardPickupTitle"), icon: Store, badge: { value: 1, tone: "danger" } },
               ]}
             />
             <SegmentedControl

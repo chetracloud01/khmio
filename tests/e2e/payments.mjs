@@ -104,7 +104,7 @@ check("its held stock became a sale", level() === "0,0");
 check("and only now the seller is alerted", sql(`select count(*) from outbox_events where kind = 'order_placed' and payload->>'orderId' = '${orderId(token1)}'`) === "1");
 
 // --- the code runs out
-await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "purchase", quantity: 3 } });
+await call("/stock/changes", { method: "POST", cookie: a, body: { variantId: bread, type: "adjust_in", quantity: 3, reason: "count_correction" } });
 const second = await order();
 const token2 = second.json?.token;
 sql(`update payment_attempts set expires_at = now() - interval '1 second' where order_id = '${orderId(token2)}'`);

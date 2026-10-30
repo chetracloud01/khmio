@@ -24,6 +24,8 @@ export * from "./site/sections";
 export * from "./site/SiteChrome";
 export * from "./site/WaitlistSection";
 export * from "./PriceTag";
+export * from "./ProgressBar";
+export * from "./QuantityInput";
 export * from "./SearchInput";
 export * from "./Select";
 export * from "./SegmentedControl";

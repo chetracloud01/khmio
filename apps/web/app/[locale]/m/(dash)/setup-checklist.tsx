@@ -1,7 +1,7 @@
 "use client";
 
 import { getMissingForSharing, SHARE_REQUIREMENTS, type ShareRequirement } from "@khmio/shared";
-import { Card, cn, TONE_STYLES } from "@khmio/ui";
+import { Card, cn, ProgressBar, TONE_STYLES } from "@khmio/ui";
 import { Check, ChevronRight, ImagePlus, Lock, PackagePlus, Phone, Share2, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -161,9 +161,7 @@ export function SetupChecklist() {
         <h2 className="font-semibold">{t("setupTitle")}</h2>
         <span className="shrink-0 text-sm text-muted">{t("setupProgress", { done: doneCount, total: steps.length })}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-border/40" aria-hidden="true">
-        <div className="h-full rounded-full bg-brand transition-all motion-reduce:transition-none" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
-      </div>
+      <ProgressBar value={doneCount} max={steps.length} label={t("setupProgress", { done: doneCount, total: steps.length })} />
       <ol className="flex flex-col gap-1">{steps.map((step, index) => row(step, index + 1))}</ol>
       {extras.some((item) => !item.done) && (
         <div className="flex flex-col gap-1 border-t border-border pt-3">

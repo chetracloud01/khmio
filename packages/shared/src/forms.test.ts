@@ -359,8 +359,8 @@ describe("stock movement", () => {
 
 describe("a stock change on the Stock page", () => {
   const variantId = "0b5e5f3e-8f6c-4c2a-9d7e-1a2b3c4d5e6f";
-  it("takes stock arriving without a reason", () => {
-    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 12 }).success).toBe(true);
+  it("leaves stock arriving to a supplier bill (purchases.ts)", () => {
+    expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity: 12 }).success).toBe(false);
   });
   it("asks a correction why, and \"other\" for a note", () => {
     const noReason = stockChangeInputSchema.safeParse({ variantId, type: "adjust_out", quantity: 1 });
@@ -369,7 +369,7 @@ describe("a stock change on the Stock page", () => {
     expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_out", quantity: 1, reason: "damaged" }).success).toBe(true);
   });
   it("refuses zero, negative or partial quantities, and a sale typed by hand", () => {
-    for (const quantity of [0, -1, 1.5]) expect(stockChangeInputSchema.safeParse({ variantId, type: "purchase", quantity }).success).toBe(false);
+    for (const quantity of [0, -1, 1.5]) expect(stockChangeInputSchema.safeParse({ variantId, type: "adjust_in", reason: "count_correction", quantity }).success).toBe(false);
     expect(stockChangeInputSchema.safeParse({ variantId, type: "sale", quantity: 1 }).success).toBe(false);
   });
   it("starts tracking from any whole count, zero included", () => {

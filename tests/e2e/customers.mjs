@@ -100,6 +100,25 @@ check("another shop's list never has them", !((await call(`/customers/page?q=${e
 check("an unknown customer is not found", (await call(`/customers/${randomUUID()}`, { cookie: a })).status === 404);
 check("a malformed id is refused", (await call("/customers/not-an-id", { cookie: a })).status === 400);
 
+// The Customers page's status tiles (GET /customers/status; design/screens.md S14) and the list views they open, against the database.
+check("the customer tiles need a signed-in shop", (await call("/customers/status")).status === 401);
+const tiles = (await call("/customers/status", { cookie: a })).json;
+const storeA = `(select id from stores where slug = '${slugA}')`;
+const sales = `orders.status::text not in ('cancelled', 'awaiting_payment')`;
+const perCustomer = (having) => Number(sql(`select count(*) from (select c.id from customers c left join orders on orders.customer_id = c.id and orders.store_id = c.store_id and ${sales} where c.store_id = ${storeA} group by c.id having ${having}) t`));
+check(
+  "each tile counts what the database has: every customer, new in 30 days, 2+ orders, none in 60 days",
+  tiles?.counts?.all === perCustomer("true") && tiles.counts.new === perCustomer("c.created_at >= now() - interval '30 days'") && tiles.counts.returning === perCustomer("count(orders.id) >= 2") && tiles.counts.lapsed === perCustomer("max(orders.created_at) < now() - interval '60 days'"),
+  JSON.stringify(tiles?.counts),
+);
+check("what customers spent matches their orders that count as sales", tiles?.spent?.USD === Number(sql(`select coalesce(sum(total_minor), 0) from orders where store_id = ${storeA} and customer_id is not null and currency = 'USD' and ${sales.replaceAll("orders.", "")}`)));
+const view = async (chip, cookie = a) => (await call(`/customers/page?chip=${chip}`, { cookie })).json;
+const returning = await view("returning");
+check("a tile and the list view it opens hold the same customers", returning?.total === tiles.counts.returning && returning.rows.every((row) => row.orderCount >= 2) && (await view("new"))?.total === tiles.counts.new, JSON.stringify(returning?.chipCounts));
+check("an unknown list view is refused", (await call("/customers/page?chip=everyone", { cookie: a })).status === 400);
+const tilesB = (await call("/customers/status", { cookie: b })).json;
+check("another shop's tiles count only its own customers", tilesB?.counts?.all === (await view("all", b))?.total && tilesB.counts.all !== undefined);
+
 sql(`update subscriptions set plan = '${planBefore[0]}', status = '${planBefore[1]}' where ${subscriptionOf}`);
 sql(`update platform_settings set beta_all_basic = ${beta} where id = 1`);
 

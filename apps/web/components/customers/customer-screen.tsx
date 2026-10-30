@@ -1,12 +1,13 @@
 "use client";
 
 import { formatKhmerPhoneLocal, type Currency } from "@khmio/shared";
-import { Button, Card, DetailList, EmptyState, SectionTitle, StatCard } from "@khmio/ui";
+import { Button, Card, DetailList, EmptyState, SectionTitle } from "@khmio/ui";
 import { CalendarPlus, Check, Clock, Coins, Copy, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { CallButton } from "@/components/call-button";
+import { DetailStats } from "@/components/detail-stats";
 import { formatMoney, useOrderText } from "@/components/order-ui";
 import { OrderStatusCircle } from "@/components/seller-cards";
 import { SubPage } from "@/components/seller-frame/sub-page";
@@ -69,14 +70,7 @@ export function CustomerScreen({
         </>
       }
     >
-      <div className="flex flex-col gap-2">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.label} icon={stat.icon} label={stat.label} value={stat.value} detail={stat.detail} />
-          ))}
-        </div>
-        <p className="text-xs text-muted">{t("countedHint")}</p>
-      </div>
+      <DetailStats stats={stats} note={t("countedHint")} />
 
       {customer.area && (
         <Card className="flex flex-col gap-3 p-4">

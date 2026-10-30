@@ -1,11 +1,13 @@
 "use client";
 
-import { DEFAULT_ADMIN_SETTINGS, fulfilmentSchema, orderStatusSchema, phnomPenhDay, type InvoiceDetails, type ShopLocation } from "@khmio/shared";
+import { DEFAULT_ADMIN_SETTINGS, fulfilmentSchema, orderStatusSchema, phnomPenhDay, type Currency, type InvoiceDetails, type ReportQuery, type ShopLocation } from "@khmio/shared";
 import { Card, Input } from "@khmio/ui";
-import { Languages, Store, Truck } from "lucide-react";
+import { AlarmClock, Bell, Boxes, CircleCheck, Coins, Languages, Percent, ReceiptText, ShoppingBag, Store, Truck, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { DataGrid, DataGridHighlight, type DataGridColumn } from "@/components/data-grid";
+import { DetailStats } from "@/components/detail-stats";
+import { SupplierPicker } from "@/components/purchases/supplier-picker";
 import { FormActions, FormSection, ReadOnlyField, SectionJumpLinks } from "@/components/form-ui";
 import { ShopHero } from "@/components/buyer/shop-hero";
 import { KhqrPayPanel } from "@/components/buyer/khqr-pay-panel";
@@ -19,12 +21,26 @@ import { ShopInfoButton, ShopInfoSheet } from "@/components/buyer/shop-info-shee
 import { LANGUAGE_NAMES, LanguageSwitch } from "@/components/language-switch";
 import { MenuList } from "@/components/menu-list";
 import { formatMoney, OrderStatusPill } from "@/components/order-ui";
+import { Paper, PaperDivider, PaperHeader, PaperRow, PaperSignatures, PaperStamp } from "@/components/paper/paper-parts";
+import { PrintLink } from "@/components/paper/print-link";
 import { PhotoThumb } from "@/components/photo-thumb";
 import { InvoiceFields } from "@/components/shop-details/invoice-fields";
 import { LocationFields } from "@/components/shop-details/location-fields";
 import { PricingFields, toPricingDraft, type PricingDraft } from "@/components/shop-details/pricing-fields";
+import { ActionStatTile } from "@/components/action-stat-tile";
+import { BestSellersCard } from "@/components/dashboard/best-sellers-card";
+import { KpiLink } from "@/components/dashboard/kpi-link";
+import { LatestOrdersCard } from "@/components/dashboard/latest-orders-card";
+import { NeedsYouStrip } from "@/components/dashboard/needs-you-strip";
+import { ProfitSnapshotCard } from "@/components/dashboard/profit-snapshot-card";
+import { SalesMixCard } from "@/components/dashboard/sales-mix-card";
+import { SalesTrendCard } from "@/components/dashboard/sales-trend-card";
+import { ChangeText } from "@/components/home/chart-parts";
+import { ReportFilters } from "@/components/reports/report-filters";
+import { ReportLinks } from "@/components/reports/report-links";
+import { StatusTileRow } from "@/components/status-tile-row";
 import { useDateText } from "@/components/use-date-text";
-import { SAMPLE_DELIVERY, SAMPLE_INVOICE_DETAILS, SAMPLE_ORDERS, SAMPLE_SHOP, SAMPLE_STORE_SETTINGS, type SampleOrder } from "./samples";
+import { SAMPLE_DELIVERY, SAMPLE_INVOICE_DETAILS, SAMPLE_ORDERS, SAMPLE_DASHBOARD, SAMPLE_SELLER_ORDERS, SAMPLE_SHOP, SAMPLE_STORE_SETTINGS, SAMPLE_SUPPLIERS, type SampleOrder } from "./samples";
 import { Demo, Section } from "./styleguide-ui";
 
 const WAITING = new Set<SampleOrder["status"]>(["awaiting_payment", "cod_pending"]);
@@ -44,8 +60,18 @@ export function AppBlocksTab() {
   const tShop = useTranslations("Storefront");
   const tKhqr = useTranslations("Khqr");
   const savedShopName = t("detailShopValue");
+  const [supplierId, setSupplierId] = useState("");
   const [shopName, setShopName] = useState(savedShopName);
   const tProfile = useTranslations("DashboardProfile");
+  const tPaper = useTranslations("BillPaper");
+  const tPurchases = useTranslations("Purchases");
+  const tPayables = useTranslations("Payables");
+  const tDashboard = useTranslations("HomeDashboard");
+  const tApp = useTranslations("SellerApp");
+  // A status row's chosen tile, and a report's period and currency, kept here as a page would.
+  const [tileView, setTileView] = useState<"overdue" | "open" | "paid" | null>("overdue");
+  const [reportQuery, setReportQuery] = useState<ReportQuery>({ period: "month" });
+  const [reportInOne, setReportInOne] = useState<Currency | null>(null);
   // Shop details' groups with the sample shop's values, editable here.
   const [location, setLocation] = useState<ShopLocation>({
     address: SAMPLE_DELIVERY.pickup.address,
@@ -100,6 +126,22 @@ export function AppBlocksTab() {
               <OrderStatusPill key={status} order={{ status, fulfilment: fulfilmentSchema.enum.delivery }} />
             ))}
           </Demo>
+          {/* Who a bill is from: search, keyboard, add a new one by name. */}
+          <Demo name="SupplierPicker">
+            <SupplierPicker suppliers={SAMPLE_SUPPLIERS} value={supplierId} onChange={setSupplierId} onAddNew={() => undefined} />
+          </Demo>
+          {/* The number cards under every detail page's title: a customer, an item, a supplier, a bill. */}
+          <Demo name="DetailStats">
+            <DetailStats
+              stats={[
+                { icon: Boxes, label: t("detailStatOnHand"), value: "24", detail: t("detailStatInStock") },
+                { icon: Coins, label: t("detailStatCost"), value: formatMoney(2_600, "USD") },
+                { icon: Wallet, label: t("detailStatValue"), value: formatMoney(62_400, "USD") },
+                { icon: Store, label: t("detailStatBills"), value: "3" },
+              ]}
+              note={t("detailStatNote")}
+            />
+          </Demo>
           <Demo name="PhotoThumb" className="flex-row">
             <PhotoThumb photo={{ key: "sample", url: "/icons/icon-512.png", thumbUrl: "/icons/icon-192.png" }} className="h-16 w-16 rounded-full object-cover" />
           </Demo>
@@ -134,6 +176,121 @@ export function AppBlocksTab() {
                 shop={{ name: t("detailShopValue"), logoUrl: null, phone: SAMPLE_SHOP.phone, address: location.address }}
               />
             </Card>
+          </Demo>
+          <Demo name={["Paper", "PaperHeader", "PaperStamp", "PaperRow", "PaperDivider", "PaperSignatures", "PrintLink"]}>
+            {/* The pieces of every printed document: invoice, bill, return, payment voucher. */}
+            <div className="overflow-hidden rounded-2xl border border-border">
+              <Paper size="a4">
+                <PaperHeader
+                  shop={{ name: t("detailShopValue"), phone: SAMPLE_SHOP.phone, address: location.address }}
+                  title={tPaper("titleVoucher")}
+                  stamps={
+                    <>
+                      <PaperStamp tone="paid">{tPaper("paid")}</PaperStamp>
+                      <PaperStamp tone="void">{tPaper("void")}</PaperStamp>
+                    </>
+                  }
+                  receipt={false}
+                />
+                <PaperDivider receipt={false} />
+                <dl className="flex flex-col gap-1 text-sm">
+                  <PaperRow label={tPaper("number")} value="PAY-0004" strong />
+                  <PaperRow label={tPaper("balanceAfter")} value={formatMoney(50700, "USD")} />
+                </dl>
+                <PaperSignatures labels={[tPaper("signPaidBy"), tPaper("signReceivedPayment")]} receipt={false} />
+              </Paper>
+            </div>
+            <PrintLink href="#" label={tPaper("titleVoucher")} />
+          </Demo>
+        </div>
+      </Section>
+
+      <Section title={t("homeChartsSection")} description={t("homeChartsHint")}>
+        {/* The dashboard's blocks (design/screens.md S3), from chart-parts: ChartCard, ChangeText, ChartLegend, ChartTooltipBox, Sparkline. As on the home. */}
+        <div className="flex flex-col gap-8">
+          <Demo name="NeedsYouStrip">
+            <NeedsYouStrip
+              title={tDashboard("needsYouTitle")}
+              allClear={tApp("allCaughtUp")}
+              items={[
+                { key: "orders", icon: Bell, tone: "warning", text: tDashboard("ordersToHandle", { count: 3 }), href: "#", show: true },
+                { key: "bills", icon: ReceiptText, tone: "danger", text: tDashboard("billsOverdue", { count: 1 }), href: "#", show: true },
+              ]}
+            />
+          </Demo>
+          <Demo name={["KpiLink", "Sparkline", "ChangeText"]}>
+            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+              <KpiLink
+                href="#"
+                icon={ShoppingBag}
+                label={tDashboard("kpiSales")}
+                value={formatMoney(182_400, "USD")}
+                sub={formatMoney(120_000, "KHR")}
+                change={
+                  <>
+                    <ChangeText percent={15} />
+                    <span>{tDashboard("compare_week")}</span>
+                  </>
+                }
+                spark={{ values: SAMPLE_DASHBOARD.sales.points.map((point) => point.shop.USD + point.online.USD), label: tDashboard("trendOf", { name: tDashboard("kpiSales") }) }}
+              />
+              <KpiLink
+                href="#"
+                icon={Percent}
+                label={tDashboard("kpiMargin")}
+                value={tDashboard("percent", { value: 32 })}
+                change={
+                  <>
+                    <ChangeText percent={-2} text={tDashboard("points", { value: 2 })} />
+                    <span>{tDashboard("compare_week")}</span>
+                  </>
+                }
+              />
+            </div>
+          </Demo>
+          <Demo name={["SalesTrendCard", "ChartCard", "ChartLegend", "ChartTooltipBox"]}>
+            <SalesTrendCard dashboard={SAMPLE_DASHBOARD} mainCurrency="USD" rate={SAMPLE_STORE_SETTINGS.usdToKhrRate} previousLabel={tDashboard("previous_week")} href="#" />
+          </Demo>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <Demo name="SalesMixCard">
+              <SalesMixCard dashboard={SAMPLE_DASHBOARD} mainCurrency="USD" rate={SAMPLE_STORE_SETTINGS.usdToKhrRate} href="#" />
+            </Demo>
+            <Demo name={["ProfitSnapshotCard", "ProfitStatement"]}>
+              {SAMPLE_DASHBOARD.profit && <ProfitSnapshotCard profit={SAMPLE_DASHBOARD.profit} mainCurrency="USD" rate={SAMPLE_STORE_SETTINGS.usdToKhrRate} href="#" addCostsHref="#" />}
+            </Demo>
+            <Demo name="BestSellersCard">
+              <BestSellersCard products={SAMPLE_DASHBOARD.sales.products} mainCurrency="USD" rate={SAMPLE_STORE_SETTINGS.usdToKhrRate} href="#" productHref={() => "#"} />
+            </Demo>
+            <Demo name="LatestOrdersCard">
+              <LatestOrdersCard orders={SAMPLE_SELLER_ORDERS} href="#" orderHref={() => "#"} />
+            </Demo>
+          </div>
+          <Demo name="ReportLinks">
+            <ReportLinks base="#" plan="pro" variant="compact" />
+          </Demo>
+          <Demo name="ActionStatTile">
+            {/* A number that leads somewhere: the Purchases page's tiles. */}
+            <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+              <ActionStatTile icon={AlarmClock} tone="danger" label={tPurchases("tile_overdue")} count={tPayables("billCount", { count: 2 })} amount={formatMoney(72100, "USD")} action={tPurchases("tileActionPay")} active onSelect={() => undefined} />
+              <ActionStatTile icon={CircleCheck} tone="success" label={tPurchases("tile_paid")} count={tPayables("billCount", { count: 7 })} amount={formatMoney(347650, "USD")} sub={`+ ${formatMoney(641000, "KHR")}`} active={false} onSelect={() => undefined} />
+            </div>
+          </Demo>
+          <Demo name="StatusTileRow">
+            {/* A page's row of tiles (Purchases, Stock, Suppliers, Orders, Customers, the reports): tap one and the list follows. */}
+            <StatusTileRow
+              label={tPurchases("tilesLabel")}
+              active={tileView}
+              onSelect={setTileView}
+              tiles={[
+                { key: "overdue", icon: AlarmClock, tone: "danger", label: tPurchases("tile_overdue"), count: tPayables("billCount", { count: 2 }), amount: formatMoney(72100, "USD"), action: tPurchases("tileActionPay"), view: "overdue" },
+                { key: "open", icon: Wallet, tone: "warning", label: tPurchases("tile_open"), count: tPayables("billCount", { count: 3 }), amount: formatMoney(50700, "USD"), action: tPurchases("tileActionPay"), view: "open" },
+                { key: "paid", icon: CircleCheck, tone: "success", label: tPurchases("tile_paid"), count: tPayables("billCount", { count: 7 }), amount: formatMoney(347650, "USD"), sub: `+ ${formatMoney(641000, "KHR")}`, view: "paid" },
+              ]}
+            />
+          </Demo>
+          <Demo name="ReportFilters">
+            {/* Every report's period and "show all in one currency" (design/screens.md S17). */}
+            <ReportFilters query={reportQuery} onQuery={setReportQuery} inOne={reportInOne} onInOne={setReportInOne} mainCurrency="USD" rate={SAMPLE_STORE_SETTINGS.usdToKhrRate} />
           </Demo>
         </div>
       </Section>

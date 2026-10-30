@@ -47,5 +47,7 @@ export function useDateText() {
     },
     /** "22 Oct", for a Phnom Penh day written "2026-10-22" (chart days, list groups). */
     day: (dayKey: string) => t("dayMonth", { day: Number(dayKey.slice(8, 10)), month: month(Number(dayKey.slice(5, 7))) }),
+    /** "Oct 2026", for a month written "2026-10" (chart months). */
+    monthYear: (monthKey: string) => t("monthYear", { month: month(Number(monthKey.slice(5, 7))), year: monthKey.slice(0, 4) }),
   };
 }

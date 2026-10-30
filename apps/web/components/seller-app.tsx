@@ -1,7 +1,7 @@
 "use client";
 
 import { BottomSheet, Button, cn, Mio, StatusPill } from "@khmio/ui";
-import { Bell, Check, ChevronRight, Copy, Download, FileText, Inbox, MapPin, Phone, Search, Send, Share, SquarePlus, X, type LucideIcon } from "lucide-react";
+import { Bell, Check, Copy, Download, FileText, MapPin, Phone, Search, Send, Share, SquarePlus, X, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -58,7 +58,7 @@ export function HomeTopBar({ firstName, state, onSearch, codePrefix }: { firstNa
   );
 }
 
-/** The two things a seller does most, as big cards with a bright icon: Add product and Share shop link. */
+/** The home's big buttons with a bright icon (today one: Sell in shop). */
 /** A quick action goes to a page (`href`) or opens something on this one (`onClick`, e.g. the Share sheet). */
 export type QuickAction = {
   key: string;
@@ -102,31 +102,6 @@ export function QuickActions({ items }: { items: QuickAction[] }) {
         );
       })}
     </nav>
-  );
-}
-
-/** "7 orders need you" at the top of the home, straight to the orders; a quiet "All caught up" when there are none. */
-export function NeedsYouBanner({ count, href }: { count: number; href: string }) {
-  const t = useTranslations("SellerApp");
-  if (count === 0) {
-    return (
-      <p className="flex items-center gap-2 rounded-2xl border border-success/30 bg-success/5 px-4 py-3 text-sm font-medium text-success">
-        <Check className="h-4 w-4" aria-hidden="true" />
-        {t("allCaughtUp")}
-      </p>
-    );
-  }
-  return (
-    <Link href={href} className="group flex items-center gap-3 rounded-2xl border border-warning/40 bg-warning/5 p-3 pr-4">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning text-bg">
-        <Inbox className="h-5 w-5" aria-hidden="true" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-semibold leading-normal">{t("needsYou", { count })}</span>
-        <span className="block text-sm leading-normal text-muted">{t("needsYouHint")}</span>
-      </span>
-      <ChevronRight className="h-5 w-5 shrink-0 text-warning transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden="true" />
-    </Link>
   );
 }
 
